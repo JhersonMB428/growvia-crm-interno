@@ -1,0 +1,40 @@
+.acceso { position: relative; min-height: 100vh; overflow: hidden; background: #012b28; }
+.acceso__fondo { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; }
+.acceso__velo { position: absolute; inset: 0; background: rgba(1, 43, 40, 0.45); }
+.acceso__contenido {
+  position: relative; max-width: 1240px; min-height: 100vh; margin: 0 auto;
+  padding: 40px 32px; display: flex; flex-direction: column; gap: 40px;
+}
+.acceso__cabecera { display: flex; align-items: center; justify-content: space-between; gap: 16px; flex-wrap: wrap; }
+.acceso__logo { height: 38px; width: auto; }
+.acceso__etiqueta {
+  font-size: 13px; font-weight: 600; letter-spacing: 0.04em; color: var(--crema);
+  border: 1px solid rgba(248, 239, 210, 0.35); border-radius: 999px; padding: 8px 14px;
+}
+.acceso__cuerpo { flex-grow: 1; display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 56px; }
+.acceso__bienvenida { flex: 1 1 420px; max-width: 560px; display: flex; flex-direction: column; gap: 24px; }
+.acceso__bienvenida h1 { font-weight: 700; font-size: clamp(40px, 6vw, 64px); line-height: 1.02; letter-spacing: -0.02em; }
+.acceso__bienvenida h1 span { color: var(--lima); }
+.acceso__bienvenida p { font-size: 18px; line-height: 1.6; color: rgba(255, 255, 255, 0.82); max-width: 460px; }
+.acceso__bienvenida ul { list-style: none; margin: 8px 0 0; padding: 0; display: flex; flex-direction: column; gap: 14px; }
+.acceso__bienvenida li { display: flex; align-items: center; gap: 12px; font-size: 15px; color: rgba(255, 255, 255, 0.9); }
+.acceso__bienvenida li::before {
+  content: ''; width: 10px; height: 10px; border-radius: 50%; background: var(--lima); flex-shrink: 0;
+  box-shadow: 0 0 0 6px rgba(199, 225, 150, 0.16);
+}
+.acceso__pie { font-size: 13px; color: rgba(255, 255, 255, 0.6); }
+
+/* Tarjeta de vidrio del formulario */
+.tarjeta-acceso {
+  flex: 0 1 440px; border-radius: 24px; padding: 40px;
+  display: flex; flex-direction: column; gap: 22px;
+}
+.tarjeta-acceso h2 { font-weight: 600; font-size: 30px; }
+.tarjeta-acceso .subtitulo { font-size: 15px; line-height: 1.5; color: var(--texto-suave); margin-top: 8px; }
+.tarjeta-acceso form { display: flex; flex-direction: column; gap: 18px; }
+
+@media (max-width: 760px) {
+  .acceso__contenido { padding: 28px 16px; gap: 28px; }
+  .acceso__bienvenida { display: none; }
+  .tarjeta-acceso { padding: 28px 22px; flex-basis: 100%; }
+}
