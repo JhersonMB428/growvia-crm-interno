@@ -1,6 +1,11 @@
-import { ValidationPipe } from '@nestjs/common';
+import { BadRequestException, ValidationError, ValidationPipe } from '@nestjs/common';
 import { NestFactory } from '@nestjs/core';
 import { AppModule } from './app.module';
+
+/** Junta los mensajes de validación (también los de listas, como los contactos) sin prefijos técnicos */
+function mensajes(errores: ValidationError[]): string[] {
+  return errores.flatMap((e) => [...Object.values(e.constraints ?? {}), ...mensajes(e.children ?? [])]);
+}
 
 async function bootstrap() {
   const app = await NestFactory.create(AppModule);
@@ -19,7 +24,12 @@ async function bootstrap() {
 
   // Valida y limpia automáticamente los datos que llegan
   app.useGlobalPipes(
-    new ValidationPipe({ whitelist: true, forbidNonWhitelisted: true, transform: true }),
+    new ValidationPipe({
+      whitelist: true,
+      forbidNonWhitelisted: true,
+      transform: true,
+      exceptionFactory: (errores) => new BadRequestException([...new Set(mensajes(errores))]),
+    }),
   );
 
   const port = Number(process.env.PORT ?? 3000);

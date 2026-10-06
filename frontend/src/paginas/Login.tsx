@@ -9,7 +9,7 @@ import type { RespuestaLogin } from '../sesion/tipos';
 export function Login() {
   const { usuario, iniciar } = useSesion();
   const navegar = useNavigate();
-  const desde = (useLocation().state as { desde?: string } | null)?.desde ?? '/inicio';
+  const desde = (useLocation().state as { desde?: string } | null)?.desde ?? '/';
 
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -17,7 +17,7 @@ export function Login() {
   const [error, setError] = useState('');
   const [enviando, setEnviando] = useState(false);
 
-  if (usuario) return <Navigate to="/inicio" replace />;
+  if (usuario) return <Navigate to="/" replace />;
 
   async function ingresar(e: FormEvent) {
     e.preventDefault();

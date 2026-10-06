@@ -1,0 +1,63 @@
+import { Body, Controller, Get, Param, ParseUUIDPipe, Post, Put, Query } from '@nestjs/common';
+import { RequierePermisos } from '../auth/decorators/requiere-permisos.decorator';
+import { SesionUsuario, UsuarioActual } from '../auth/decorators/usuario-actual.decorator';
+import { CrearEmpresaDto, GuardarContactosDto } from './dto/crear-empresa.dto';
+import { ListarEmpresasDto } from './dto/listar.dto';
+import { ReasignarDto } from './dto/reasignar.dto';
+import { EmpresasService } from './empresas.service';
+
+@Controller('empresas')
+export class EmpresasController {
+  constructor(private readonly empresas: EmpresasService) {}
+
+  /** ¿Existe el RUC? Se llama mientras el asesor escribe, para la alerta roja */
+  @Get('ruc/:ruc')
+  @RequierePermisos('REPOSITORIO_VER')
+  verificarRuc(@Param('ruc') ruc: string) {
+    return this.empresas.verificarRuc(ruc);
+  }
+
+  /** Cartera del asesor */
+  @Get('mias')
+  @RequierePermisos('PROSPECTO_CREAR')
+  mias(@Query() f: ListarEmpresasDto, @UsuarioActual() s: SesionUsuario) {
+    return this.empresas.misEmpresas(f, s);
+  }
+
+  /** Repositorio: todas las empresas, solo datos generales */
+  @Get('repositorio')
+  @RequierePermisos('REPOSITORIO_VER')
+  repositorio(@Query() f: ListarEmpresasDto) {
+    return this.empresas.repositorio(f);
+  }
+
+  @Post()
+  @RequierePermisos('PROSPECTO_CREAR')
+  crear(@Body() dto: CrearEmpresaDto, @UsuarioActual() s: SesionUsuario) {
+    return this.empresas.crear(dto, s);
+  }
+
+  @Get(':id')
+  @RequierePermisos('REPOSITORIO_VER')
+  detalle(@Param('id', ParseUUIDPipe) id: string, @UsuarioActual() s: SesionUsuario) {
+    return this.empresas.detalle(id, s);
+  }
+
+  @Post(':id/tomar')
+  @RequierePermisos('EMPRESA_TOMAR')
+  tomar(@Param('id', ParseUUIDPipe) id: string, @UsuarioActual() s: SesionUsuario) {
+    return this.empresas.tomar(id, s);
+  }
+
+  @Put(':id/contactos')
+  @RequierePermisos('PROSPECTO_CREAR')
+  contactos(@Param('id', ParseUUIDPipe) id: string, @Body() dto: GuardarContactosDto, @UsuarioActual() s: SesionUsuario) {
+    return this.empresas.guardarContactos(id, dto.contactos, s);
+  }
+
+  @Post(':id/reasignar')
+  @RequierePermisos('EMPRESA_REASIGNAR')
+  reasignar(@Param('id', ParseUUIDPipe) id: string, @Body() dto: ReasignarDto, @UsuarioActual() s: SesionUsuario) {
+    return this.empresas.reasignar(id, dto.asesorId, s);
+  }
+}

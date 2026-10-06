@@ -85,3 +85,51 @@ p { margin: 0; }
 .casilla input { width: 18px; height: 18px; accent-color: var(--lima); margin: 0; }
 
 .oculto-visual { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+/* ===== Temas de la aplicación (claro / oscuro) ===== */
+.app {
+  --app-fondo:
+    radial-gradient(1100px 700px at 85% 10%, rgba(64, 140, 90, 0.55), transparent 60%),
+    radial-gradient(900px 600px at 10% 90%, rgba(0, 110, 95, 0.45), transparent 60%),
+    linear-gradient(160deg, #013936 0%, #01201d 55%, #021a17 100%);
+  --texto: #ffffff;
+  --texto-suave: rgba(255, 255, 255, 0.72);
+  --texto-tenue: rgba(255, 255, 255, 0.55);
+  --vidrio-fondo: rgba(255, 255, 255, 0.08);
+  --vidrio-borde: rgba(255, 255, 255, 0.16);
+  --vidrio-sombra: inset 0 1px 0 rgba(255, 255, 255, 0.22), 0 24px 60px rgba(0, 0, 0, 0.28);
+  --vidrio-abierto: rgba(3, 40, 36, 0.86);
+  --campo-fondo: rgba(255, 255, 255, 0.06);
+  --campo-borde: rgba(255, 255, 255, 0.16);
+  --linea: rgba(255, 255, 255, 0.12);
+  --activo-fondo: #c7e196;
+  --activo-texto: #013936;
+  --item: rgba(255, 255, 255, 0.85);
+  --acento: #c7e196;
+  --salir: #f4b9ab;
+  --logo-filtro: none;
+  color-scheme: dark;
+}
+.app[data-tema='claro'] {
+  --app-fondo:
+    radial-gradient(1000px 650px at 85% 5%, rgba(199, 225, 150, 0.75), transparent 60%),
+    radial-gradient(900px 600px at 5% 95%, rgba(248, 239, 210, 0.9), transparent 60%),
+    linear-gradient(160deg, #eef3e4 0%, #f7f5ec 60%, #e8efe3 100%);
+  --texto: #0f2422;
+  --texto-suave: #4f625e;
+  --texto-tenue: #6b7c78;
+  --vidrio-fondo: rgba(255, 255, 255, 0.55);
+  --vidrio-borde: rgba(255, 255, 255, 0.8);
+  --vidrio-sombra: inset 0 1px 0 rgba(255, 255, 255, 0.9), 0 20px 50px rgba(1, 57, 54, 0.12);
+  --vidrio-abierto: rgba(255, 255, 255, 0.94);
+  --campo-fondo: rgba(255, 255, 255, 0.7);
+  --campo-borde: rgba(1, 57, 54, 0.14);
+  --linea: rgba(1, 57, 54, 0.12);
+  --activo-fondo: #013936;
+  --activo-texto: #c7e196;
+  --item: #23403c;
+  --acento: #3f6b1c;
+  --salir: #a33a24;
+  /* el logo pasa a verde oscuro en modo claro */
+  --logo-filtro: brightness(0) saturate(100%) invert(15%) sepia(38%) saturate(2400%) hue-rotate(146deg) brightness(92%);
+  color-scheme: light;
+}

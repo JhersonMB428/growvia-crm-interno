@@ -1,21 +1,60 @@
-import { BrowserRouter, Navigate, Route, Routes } from 'react-router-dom';
-import { Inicio } from './paginas/Inicio';
+import type { ReactNode } from 'react';
+import { BrowserRouter, Route, Routes } from 'react-router-dom';
+import { AppLayout } from './layout/AppLayout';
+import { EnConstruccion } from './paginas/EnConstruccion';
+import { InicioPorRol } from './paginas/InicioPorRol';
 import { Login } from './paginas/Login';
 import { Verificar } from './paginas/Verificar';
 import { RutaPrivada } from './sesion/RutaPrivada';
 import { SesionProvider } from './sesion/SesionContext';
+import type { Usuario } from './sesion/tipos';
+import { TemaProvider } from './tema/TemaContext';
+
+type Rol = Usuario['rol']['codigo'];
+
+/** Atajo: ruta protegida por rol que por ahora muestra "En construcción" */
+const pagina = (titulo: string, descripcion: string, roles?: Rol[]): ReactNode => (
+  <RutaPrivada roles={roles}><EnConstruccion titulo={titulo} descripcion={descripcion} /></RutaPrivada>
+);
 
 export default function App() {
   return (
-    <SesionProvider>
-      <BrowserRouter>
-        <Routes>
-          <Route path="/login" element={<Login />} />
-          <Route path="/verificar" element={<Verificar />} />
-          <Route path="/inicio" element={<RutaPrivada><Inicio /></RutaPrivada>} />
-          <Route path="*" element={<Navigate to="/inicio" replace />} />
-        </Routes>
-      </BrowserRouter>
-    </SesionProvider>
+    <TemaProvider>
+      <SesionProvider>
+        <BrowserRouter>
+          <Routes>
+            <Route path="/login" element={<Login />} />
+            <Route path="/verificar" element={<Verificar />} />
+
+            <Route element={<RutaPrivada><AppLayout /></RutaPrivada>}>
+              <Route path="/" element={<InicioPorRol />} />
+              {/* Asesor */}
+              <Route path="/inicio" element={pagina('Inicio', 'Tus gestiones del día, tu avance y tus negociaciones.', ['ASESOR'])} />
+              <Route path="/empresas" element={pagina('Mis empresas', 'Tu cartera de prospectos y clientes.', ['ASESOR'])} />
+              <Route path="/agenda" element={pagina('Agenda', 'Tus gestiones programadas y el calendario.', ['ASESOR'])} />
+              {/* Compartidas */}
+              <Route path="/negociaciones" element={pagina('Negociaciones', 'El embudo de ventas.', ['ASESOR', 'SUPERVISOR', 'GERENTE'])} />
+              <Route path="/repositorio" element={pagina('Repositorio de empresas', 'Todas las empresas del CRM: libres y asignadas.')} />
+              <Route path="/metas" element={pagina('Metas', 'Avance de metas por asesor y por equipo.', ['SUPERVISOR', 'GERENTE'])} />
+              <Route path="/bases" element={pagina('Cargar base', 'Carga de empresas desde Excel.', ['SUPERVISOR', 'GERENTE'])} />
+              {/* Supervisor */}
+              <Route path="/equipo" element={pagina('Mi equipo', 'Avance de tus asesores.', ['SUPERVISOR'])} />
+              <Route path="/aprobaciones" element={pagina('Aprobaciones de mi equipo', 'Paso 1 de la validación de ventas.', ['SUPERVISOR'])} />
+              {/* Gerencia */}
+              <Route path="/reportes" element={pagina('Resumen general', 'Indicadores de toda la empresa.', ['GERENTE'])} />
+              <Route path="/revision" element={pagina('Revisión de ventas', 'Paso 2: observa o detén ventas sin frenarlas.', ['GERENTE'])} />
+              <Route path="/accesos-celular" element={pagina('Acceso desde celular', 'Solicitudes para usar el CRM en el celular.', ['GERENTE'])} />
+              {/* Back office y administración */}
+              <Route path="/validacion" element={pagina('Validación y posventa', 'Paso 3: valida ventas y registra la posventa.', ['BACKOFFICE'])} />
+              <Route path="/usuarios" element={pagina('Usuarios y equipos', 'Cuentas, equipos, roles y permisos.', ['BACKOFFICE', 'ADMIN'])} />
+              {/* Todos */}
+              <Route path="/perfil" element={pagina('Perfil y ajustes', 'Tus datos, contraseña, avisos y equipos de confianza.')} />
+              <Route path="/notificaciones" element={pagina('Notificaciones', 'Tus avisos y recordatorios.')} />
+              <Route path="*" element={<InicioPorRol />} />
+            </Route>
+          </Routes>
+        </BrowserRouter>
+      </SesionProvider>
+    </TemaProvider>
   );
 }
