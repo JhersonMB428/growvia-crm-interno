@@ -18,6 +18,11 @@ import { TemaProvider } from './tema/TemaContext';
 import { FichaNegociacion } from './paginas/negociaciones/FichaNegociacion';
 import { FormNegociacion } from './paginas/negociaciones/FormNegociacion';
 import { Negociaciones } from './paginas/negociaciones/Negociaciones';
+import { BandejaVentas } from './paginas/validacion/BandejaVentas';
+import { InicioAsesor } from './paginas/tableros/InicioAsesor';
+import { Metas } from './paginas/tableros/Metas';
+import { MiEquipo } from './paginas/tableros/MiEquipo';
+import { ResumenGerencia } from './paginas/tableros/ResumenGerencia';
 
 type Rol = Usuario['rol']['codigo'];
 
@@ -38,7 +43,7 @@ export default function App() {
             <Route element={<RutaPrivada><AppLayout /></RutaPrivada>}>
               <Route path="/" element={<InicioPorRol />} />
 
-              <Route path="/inicio" element={pagina('Inicio', 'Tus gestiones del día, tu avance y tus negociaciones.', ['ASESOR'])} />
+              <Route path="/inicio" element={<RutaPrivada roles={['ASESOR']}><InicioAsesor /></RutaPrivada>} />
               <Route path="/empresas" element={<RutaPrivada roles={['ASESOR', 'SUPERVISOR']}><MisEmpresas /></RutaPrivada>} />
               <Route path="/empresas/nueva" element={<RutaPrivada roles={['ASESOR', 'SUPERVISOR']}><NuevoProspecto /></RutaPrivada>} />
               <Route path="/empresas/:id" element={<FichaEmpresa />} />
@@ -49,16 +54,16 @@ export default function App() {
               <Route path="/negociaciones/:id/editar" element={<RutaPrivada roles={['ASESOR']}><FormNegociacion /></RutaPrivada>} />
               <Route path="/negociaciones/:id" element={<FichaNegociacion />} />              <Route path="/repositorio" element={<Repositorio />} />
 
-              <Route path="/metas" element={pagina('Metas', 'Avance de metas por asesor y por equipo.', ['SUPERVISOR', 'GERENTE'])} />
+              <Route path="/metas" element={<RutaPrivada roles={['SUPERVISOR', 'GERENTE']}><Metas /></RutaPrivada>} />
               <Route path="/bases" element={pagina('Cargar base', 'Carga de empresas desde Excel.', ['SUPERVISOR', 'GERENTE'])} />
-              <Route path="/equipo" element={pagina('Mi equipo', 'Avance de tus asesores.', ['SUPERVISOR'])} />
-              <Route path="/aprobaciones" element={pagina('Aprobaciones de mi equipo', 'Paso 1 de la validación de ventas.', ['SUPERVISOR'])} />
+              <Route path="/equipo" element={<RutaPrivada roles={['SUPERVISOR']}><MiEquipo /></RutaPrivada>} />
+              <Route path="/aprobaciones" element={<RutaPrivada roles={['SUPERVISOR']}><BandejaVentas modo="aprobar" /></RutaPrivada>} />
 
-              <Route path="/reportes" element={pagina('Resumen general', 'Indicadores de toda la empresa.', ['GERENTE'])} />
-              <Route path="/revision" element={pagina('Revisión de ventas', 'Paso 2: observa o detén ventas sin frenarlas.', ['GERENTE'])} />
+              <Route path="/reportes" element={<RutaPrivada roles={['GERENTE']}><ResumenGerencia /></RutaPrivada>} />
+              <Route path="/revision" element={<RutaPrivada roles={['GERENTE']}><BandejaVentas modo="revisar" /></RutaPrivada>} />
               <Route path="/accesos-celular" element={pagina('Acceso desde celular', 'Solicitudes para usar el CRM en el celular.', ['GERENTE'])} />
 
-              <Route path="/validacion" element={pagina('Validación y posventa', 'Paso 3: valida ventas y registra la posventa.', ['BACKOFFICE'])} />
+              <Route path="/validacion" element={<RutaPrivada roles={['BACKOFFICE']}><BandejaVentas modo="validar" /></RutaPrivada>} />
               <Route path="/usuarios" element={pagina('Usuarios y equipos', 'Cuentas, equipos, roles y permisos.', ['BACKOFFICE', 'ADMIN'])} />
               {/* Todos */}
               <Route path="/perfil" element={pagina('Perfil y ajustes', 'Tus datos, contraseña, avisos y equipos de confianza.')} />

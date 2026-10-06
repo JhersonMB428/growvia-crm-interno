@@ -31,13 +31,15 @@ export function FormNegociacion() {
   const [error, setError] = useState('');
   const [bloqueo, setBloqueo] = useState('');
   const [guardando, setGuardando] = useState(false);
+  const [corrigiendo, setCorrigiendo] = useState(false);
 
   useEffect(() => {
     const falla = (e: unknown) => setBloqueo(e instanceof ErrorApi ? e.message : 'No se pudo cargar la información');
     negociacionesApi.catalogos().then(setCat).catch(falla);
     if (id) {
       negociacionesApi.detalle(id).then((n) => {
-        if (!n.puedeEditar) { setBloqueo('Esta negociación ya no se puede editar.'); return; }
+        if (!n.puedeEditar && !n.puedeCorregir) { setBloqueo('Esta negociación ya no se puede editar.'); return; }
+        setCorrigiendo(n.puedeCorregir);
         setEmpresa({ id: n.clienteId, nombre: n.razonSocial, codigo: n.codigo });
         setTipo(n.tipo);
         setFilas(n.items.map((i) => ({
@@ -85,7 +87,9 @@ export function FormNegociacion() {
       const n = id
         ? await negociacionesApi.actualizar(id, { tipo, items })
         : await negociacionesApi.crear(empresa.id, { tipo, items });
-      navegar(`/negociaciones/${n.id}`, { replace: true, state: { aviso: id ? 'Cambios guardados.' : `Se abrió la negociación ${n.codigo}.` } });
+      const aviso = !id ? `Se abrió la negociación ${n.codigo}.`
+        : corrigiendo ? 'Cambios guardados. Cuando esté todo listo, pulsa “Reenviar a aprobación”.' : 'Cambios guardados.';
+      navegar(`/negociaciones/${n.id}`, { replace: true, state: { aviso } });
     } catch (err) {
       setError(err instanceof ErrorApi ? err.message : 'No se pudo guardar la negociación');
     } finally {

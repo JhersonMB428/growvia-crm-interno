@@ -5,8 +5,8 @@ import {
   ETAPAS, negociacionesApi, resumenLineas, soles, TEXTO_ESTADO_VENTA, TEXTO_ETAPA, TEXTO_SERVICIO, TEXTO_TIPO,
   type Etapa, type NegociacionDetalle,
 } from '../../api/negociaciones';
+import { TEXTO_DECISION, TEXTO_EVENTO, validacionApi } from '../../api/validacion';
 import './negociaciones.css';
-
 const fecha = (iso: string) => new Date(iso).toLocaleString('es-PE', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' });
 const ORDEN: Etapa[] = ['PROSPECCION', 'CONTACTO', 'NEGOCIACION', 'CIERRE'];
 
@@ -53,8 +53,7 @@ export function FichaNegociacion() {
           {n.resultado === 'GANADA' && n.estadoVenta && <span className="chip chip--lima">Ganada · {TEXTO_ESTADO_VENTA[n.estadoVenta]}</span>}
           {n.resultado === 'PERDIDA' && <span className="chip chip--crema">Perdida</span>}
           <Link to={`/empresas/${n.clienteId}`} className="boton-secundario">Ver empresa</Link>
-          {n.puedeEditar && <Link to={`/negociaciones/${n.id}/editar`} className="boton-secundario">Editar planes</Link>}
-        </div>
+          {(n.puedeEditar || n.puedeCorregir) && <Link to={`/negociaciones/${n.id}/editar`} className="boton-secundario">{n.puedeCorregir ? 'Corregir planes' : 'Editar planes'}</Link>}        </div>
       </div>
 
       {aviso && <div className="aviso" role="status">{aviso}</div>}
@@ -82,9 +81,9 @@ export function FichaNegociacion() {
             </div>
 
             {n.resultado === 'PERDIDA' && <p style={{ margin: 0, color: 'var(--texto-suave)' }}><b>Motivo:</b> {n.motivoPerdida}</p>}
-            {n.resultado === 'GANADA' && (
+            {n.resultado === 'GANADA' && n.estadoVenta === 'EN_VALIDACION' && (
               <p style={{ margin: 0, color: 'var(--texto-suave)', lineHeight: 1.5 }}>
-                Se envió a validación: supervisor → gerencia → back office. Cuenta para la meta cuando el servicio queda activo.
+                En validación{n.pasoActual ? `: ${n.pasoActual.toLowerCase()}` : ''}. Cuenta para la meta cuando el servicio queda activo.
               </p>
             )}
 
@@ -132,8 +131,9 @@ export function FichaNegociacion() {
             )}
           </section>
 
-          {/* Planes */}
-          <section className="panel vidrio" style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+          {n.resultado === 'GANADA' && <SeccionValidacion n={n} onCambio={(d, m) => { setN(d); setAviso(m); }} />}
+
+          {/* Planes */}          <section className="panel vidrio" style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
             <h2 className="h2">Planes negociados</h2>
             <div className="planes planes--lectura">
               <div className="planes__cabecera" aria-hidden="true">
@@ -182,5 +182,66 @@ export function FichaNegociacion() {
         </aside>
       </div>
     </>
+  );
+}
+
+/** Estado de la venta en la cadena de validación, correcciones y posventa */
+function SeccionValidacion({ n, onCambio }: { n: NegociacionDetalle; onCambio: (d: NegociacionDetalle, mensaje: string) => void }) {
+  const [ocupado, setOcupado] = useState(false);
+  const [error, setError] = useState('');
+  const observacion = n.validaciones.find((v) => v.decision === 'OBSERVADA');
+  const eventos = [
+    ...n.validaciones.map((v) => ({ fecha: v.fecha, titulo: TEXTO_DECISION[v.decision] ?? v.decision, quien: v.usuario, detalle: v.comentario, paso: v.paso })),
+    ...n.posventa.map((e) => ({ fecha: e.fecha, titulo: TEXTO_EVENTO[e.evento], quien: e.usuario, detalle: e.comentario, paso: 'Posventa' })),
+  ].sort((a, b) => b.fecha.localeCompare(a.fecha));
+
+  async function reenviar() {
+    setOcupado(true); setError('');
+    try {
+      await validacionApi.reenviar(n.id);
+      onCambio(await negociacionesApi.detalle(n.id), 'Venta corregida y reenviada a la aprobación de tu supervisor.');
+    } catch (e) { setError(e instanceof ErrorApi ? e.message : 'No se pudo reenviar'); }
+    finally { setOcupado(false); }
+  }
+
+  return (
+    <section className="panel vidrio" style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+      <div className="fila-acciones">
+        <h2 className="h2">Validación</h2>
+        {n.correcciones > 0 && <span className="chip chip--crema">{n.correcciones} de {n.maxCorrecciones} correcciones usadas</span>}
+      </div>
+
+      {n.estadoVenta === 'OBSERVADA' && observacion && (
+        <div className="alerta" role="alert" style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+          <span><b>Observada por {observacion.usuario}:</b> “{observacion.comentario}”</span>
+          {n.puedeCorregir && (
+            <>
+              <span style={{ fontSize: 14 }}>
+                Corrige lo necesario y reenvíala. Te quedan {n.maxCorrecciones - n.correcciones} {n.maxCorrecciones - n.correcciones === 1 ? 'corrección' : 'correcciones'};
+                si vuelve a ser observada después, se anula.
+              </span>
+              <div className="fila-acciones" style={{ justifyContent: 'flex-end' }}>
+                <Link to={`/negociaciones/${n.id}/editar`} className="boton-secundario">Corregir planes</Link>
+                <button type="button" className="boton" disabled={ocupado} onClick={reenviar}>{ocupado ? 'Enviando…' : 'Reenviar a aprobación'}</button>
+              </div>
+            </>
+          )}
+        </div>
+      )}
+      {n.estadoVenta === 'ANULADA' && <div className="alerta" role="alert">Esta venta fue anulada y no cuenta para la meta.</div>}
+      {n.estadoVenta === 'ACTIVA' && n.fechaActivacion && <div className="aviso" role="status">Servicio activo desde el {fecha(n.fechaActivacion)}. Ya suma a la meta.</div>}
+      {error && <div className="alerta" role="alert">{error}</div>}
+
+      {eventos.length === 0 && <p style={{ margin: 0, color: 'var(--texto-suave)' }}>Esperando la aprobación del supervisor.</p>}
+      <ol style={{ listStyle: 'none', margin: 0, padding: 0, display: 'flex', flexDirection: 'column', gap: 12 }}>
+        {eventos.map((e, i) => (
+          <li key={i} style={{ display: 'flex', flexDirection: 'column', gap: 2, paddingLeft: 14, borderLeft: '2px solid var(--linea)' }}>
+            <b style={{ fontSize: 14 }}>{e.titulo}{e.paso ? <span style={{ fontWeight: 500, color: 'var(--texto-tenue)' }}> · {e.paso}</span> : null}</b>
+            {e.detalle && <span style={{ fontSize: 14 }}>“{e.detalle}”</span>}
+            <span style={{ fontSize: 13, color: 'var(--texto-suave)' }}>{e.quien} · {fecha(e.fecha)}</span>
+          </li>
+        ))}
+      </ol>
+    </section>
   );
 }

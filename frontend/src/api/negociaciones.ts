@@ -48,9 +48,17 @@ export interface ItemNegociacion {
 
 export interface NegociacionDetalle extends NegociacionResumen {
   correcciones: number;
+  maxCorrecciones: number;
+  pasoActual: string | null;
+  fechaValidacion: string | null;
+  fechaActivacion: string | null;
   items: ItemNegociacion[];
   historial: { etapaAnterior: Etapa | null; etapaNueva: Etapa; detalle: string | null; fecha: string; usuario: string }[];
+  validaciones: { decision: string; comentario: string | null; intento: number; fecha: string; paso: string | null; usuario: string }[];
+  posventa: { evento: 'CHIPS_ENTREGADOS' | 'PORTABILIDAD_EJECUTADA' | 'SERVICIO_ACTIVO'; fecha: string; comentario: string | null; usuario: string }[];
   puedeEditar: boolean;
+  /** Venta observada: el asesor puede corregir los planes y reenviarla */
+  puedeCorregir: boolean;
 }
 
 type Guardar = { tipo: 'NUEVA' | 'AMPLIACION'; items: ItemNegociacion[] };

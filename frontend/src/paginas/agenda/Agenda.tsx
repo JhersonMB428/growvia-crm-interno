@@ -73,7 +73,7 @@ export function Agenda() {
         <section className="panel vidrio calendario" style={{ flex: '1 1 300px', maxWidth: 380 }} aria-label="Calendario">
           <div className="calendario__mes">
             <button type="button" className="calendario__flecha" aria-label="Mes anterior" onClick={() => setMes(new Date(mes.getFullYear(), mes.getMonth() - 1, 1))}>‹</button>
-            <b>{mayuscula(mes.toLocaleDateString('es-PE', { month: 'long', year: 'numeric' }))}</b>
+            <b>{mayuscula(mes.toLocaleDateString('es-ES', { month: 'long', year: 'numeric' }))}</b>
             <button type="button" className="calendario__flecha" aria-label="Mes siguiente" onClick={() => setMes(new Date(mes.getFullYear(), mes.getMonth() + 1, 1))}>›</button>
           </div>
           <div className="calendario__rejilla">

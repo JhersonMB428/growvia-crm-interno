@@ -1,0 +1,25 @@
+/* ===== Bandejas de validación ===== */
+.venta { display: flex; flex-direction: column; gap: 12px; padding: 18px; border-radius: 22px; background: var(--campo-fondo); border: 1px solid transparent; }
+.venta--observada { border-color: rgba(244, 185, 171, 0.45); }
+.venta__cabecera { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 10px; align-items: flex-start; }
+.venta__titulo { display: flex; flex-direction: column; gap: 3px; min-width: 0; }
+.app .venta__titulo a { color: var(--texto); font-weight: 700; font-size: 16px; text-decoration: none; }
+.venta__titulo .tenue, .venta .tenue { color: var(--texto-suave); font-size: 13px; }
+.venta__datos { display: flex; flex-wrap: wrap; gap: 8px 22px; font-size: 14px; }
+.venta__datos b { font-family: var(--fuente-titulos); font-size: 18px; }
+.venta__observacion { font-size: 14px; padding: 10px 12px; border-radius: 12px; background: rgba(244, 185, 171, 0.12); color: var(--texto); }
+.app[data-tema='claro'] .venta__observacion { background: rgba(240, 150, 130, 0.18); }
+.venta__acciones { display: flex; flex-wrap: wrap; gap: 8px; justify-content: flex-end; align-items: center; }
+.venta__acciones .boton, .venta__acciones .boton-secundario { height: 42px; font-size: 14px; }
+.boton-peligro { color: var(--salir) !important; }
+.boton-peligro:hover { border-color: var(--salir) !important; }
+
+.pasos-posventa { display: flex; flex-wrap: wrap; gap: 8px; }
+.paso-posventa {
+  height: 42px; padding: 0 14px; border-radius: 999px; border: 1px dashed var(--campo-borde); background: transparent;
+  color: var(--texto); font: inherit; font-size: 14px; font-weight: 600; cursor: pointer;
+}
+.paso-posventa:hover:not(:disabled) { border-color: var(--acento); border-style: solid; }
+.paso-posventa--hecho { border-style: solid; border-color: transparent; background: rgba(199, 225, 150, 0.18); color: var(--acento); cursor: default; }
+.app[data-tema='claro'] .paso-posventa--hecho { background: rgba(199, 225, 150, 0.6); }
+.paso-posventa:disabled:not(.paso-posventa--hecho) { opacity: 0.45; cursor: not-allowed; }

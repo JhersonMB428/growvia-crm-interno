@@ -4,6 +4,7 @@ import {
 import { DataSource, EntityManager } from 'typeorm';
 import { SesionUsuario } from '../auth/decorators/usuario-actual.decorator';
 import { NotificacionesService } from '../notificaciones/notificaciones.service';
+import { ParametrosService } from '../sistema/parametros.service';
 import { CambiarEtapaDto, CerrarNegociacionDto } from './dto/etapa.dto';
 import { CrearNegociacionDto, GuardarNegociacionDto } from './dto/guardar-negociacion.dto';
 import { ItemDto } from './dto/item.dto';
@@ -40,8 +41,11 @@ const UNIONES = `
 
 @Injectable()
 export class NegociacionesService {
-  constructor(private readonly db: DataSource, private readonly notificaciones: NotificacionesService) {}
-  // ───────────── Catálogos para el formulario ─────────────
+  constructor(
+    private readonly db: DataSource,
+    private readonly notificaciones: NotificacionesService,
+    private readonly parametros: ParametrosService,
+  ) {}  // ───────────── Catálogos para el formulario ─────────────
   async catalogos() {
     const planes = await this.db.query(
       `SELECT id, tipo, nombre, cargo_ref::float8 AS "cargoRef" FROM planes_servicio WHERE activo ORDER BY tipo DESC, id`,
@@ -92,7 +96,9 @@ export class NegociacionesService {
   async detalle(id: string, s: SesionUsuario) {
     const [o] = await this.db.query(
       `SELECT ${COLUMNAS}, ua.equipo_id AS "equipoAsesorId", o.equipo_id AS "equipoVentaId",
-              c.asesor_id AS "duenoEmpresaId", o.correcciones
+              c.asesor_id AS "duenoEmpresaId", o.correcciones, o.fecha_validacion AS "fechaValidacion",
+              o.fecha_activacion AS "fechaActivacion",
+              (SELECT pv.nombre FROM pasos_validacion pv WHERE pv.id = o.paso_actual_id) AS "pasoActual"
        ${UNIONES} WHERE o.id = $1`, [id],
     );
     if (!o) throw new NotFoundException('La negociación no existe');
@@ -113,10 +119,27 @@ export class NegociacionesService {
        FROM historial_etapas h LEFT JOIN usuarios u ON u.id = h.usuario_id
        WHERE h.oportunidad_id = $1 ORDER BY h.created_at DESC`, [id],
     );
+    // Cadena de validación y posventa (solo si se ganó)
+    const validaciones = o.resultado !== 'GANADA' ? [] : await this.db.query(
+      `SELECT v.decision, v.comentario, v.intento, v.created_at AS fecha, p.nombre AS paso,
+              u.nombres || ' ' || u.apellidos AS usuario
+       FROM validaciones v LEFT JOIN pasos_validacion p ON p.id = v.paso_id JOIN usuarios u ON u.id = v.usuario_id
+       WHERE v.oportunidad_id = $1 ORDER BY v.created_at DESC`, [id],
+    );
+    const posventa = o.resultado !== 'GANADA' ? [] : await this.db.query(
+      `SELECT e.evento, e.fecha, e.comentario, u.nombres || ' ' || u.apellidos AS usuario
+       FROM posventa_eventos e JOIN usuarios u ON u.id = e.usuario_id WHERE e.oportunidad_id = $1 ORDER BY e.fecha`, [id],
+    );
+
     const { equipoAsesorId: _a, equipoVentaId: _v, duenoEmpresaId, ...datos } = o;
-    const editable = o.resultado === 'EN_CURSO' && o.asesorId === s.sub && duenoEmpresaId === s.sub
-      && s.permisos.includes('NEGOCIACION_GESTIONAR');
-    return { ...datos, items, historial, puedeEditar: editable };
+    const esDueno = o.asesorId === s.sub && duenoEmpresaId === s.sub && s.permisos.includes('NEGOCIACION_GESTIONAR');
+    return {
+      ...datos, items, historial, validaciones, posventa,
+      maxCorrecciones: await this.parametros.numero('max_correcciones_venta', 3),
+      puedeEditar: esDueno && o.resultado === 'EN_CURSO',
+      // Venta observada: el asesor corrige los planes y la reenvía
+      puedeCorregir: esDueno && o.resultado === 'GANADA' && o.estadoVenta === 'OBSERVADA',
+    };
   }
 
   // ───────────── Crear ─────────────
@@ -153,7 +176,7 @@ export class NegociacionesService {
   async actualizar(id: string, dto: GuardarNegociacionDto, s: SesionUsuario) {
     const items = await this.normalizarItems(dto.items);
     await this.db.transaction(async (tx) => {
-      const o = await this.bloquearEditable(tx, id, s);
+      const o = await this.bloquearEditable(tx, id, s, true);
       await tx.query(`UPDATE oportunidades SET tipo = $1, updated_at = now() WHERE id = $2`, [dto.tipo, id]);
       await this.reemplazarItems(tx, id, items);
       await this.marcarGestion(tx, o.clienteId);
@@ -253,14 +276,16 @@ export class NegociacionesService {
   }
 
   /** Bloquea la fila y comprueba que se pueda editar (en curso y del asesor a cargo) */
-  private async bloquearEditable(tx: EntityManager, id: string, s: SesionUsuario) {
+  private async bloquearEditable(tx: EntityManager, id: string, s: SesionUsuario, permitirObservada = false) {
     const [o] = await tx.query(
-      `SELECT o.etapa, o.resultado, o.asesor_id AS "asesorId", o.cliente_id AS "clienteId", c.asesor_id AS "duenoEmpresaId"
+      `SELECT o.etapa, o.resultado, o.estado_venta AS "estadoVenta", o.asesor_id AS "asesorId", o.cliente_id AS "clienteId",
+              c.asesor_id AS "duenoEmpresaId"
        FROM oportunidades o JOIN clientes c ON c.id = o.cliente_id WHERE o.id = $1 FOR UPDATE OF o`, [id],
     );
     if (!o) throw new NotFoundException('La negociación no existe');
     if (o.asesorId !== s.sub || o.duenoEmpresaId !== s.sub) throw new ForbiddenException('Solo el asesor a cargo puede modificar esta negociación');
-    if (o.resultado !== 'EN_CURSO') throw new BadRequestException('La negociación ya está cerrada');
+    const observada = o.resultado === 'GANADA' && o.estadoVenta === 'OBSERVADA';
+    if (o.resultado !== 'EN_CURSO' && !(permitirObservada && observada)) throw new BadRequestException('La negociación ya está cerrada');
     return o as { etapa: string; clienteId: string };
   }
 
