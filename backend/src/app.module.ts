@@ -1,7 +1,11 @@
 import { Module } from '@nestjs/common';
 import { ConfigModule, ConfigService } from '@nestjs/config';
 import { TypeOrmModule } from '@nestjs/typeorm';
+import { AuthModule } from './auth/auth.module';
+import { CorreoModule } from './correo/correo.module';
 import { SaludController } from './salud.controller';
+import { SistemaModule } from './sistema/sistema.module';
+import { UsuariosModule } from './usuarios/usuarios.module';
 
 @Module({
   imports: [
@@ -15,6 +19,10 @@ import { SaludController } from './salud.controller';
         synchronize: false, // las tablas solo se crean con migraciones
       }),
     }),
+    SistemaModule,
+    CorreoModule,
+    UsuariosModule,
+    AuthModule,
   ],
   controllers: [SaludController],
 })

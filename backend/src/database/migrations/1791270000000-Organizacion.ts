@@ -5,27 +5,22 @@ export class Organizacion1791270000000 implements MigrationInterface {
 
   public async up(q: QueryRunner): Promise<void> {
     await q.query(`
-      -- ===== Roles y permisos =====
       CREATE TABLE roles (
         id      SMALLSERIAL PRIMARY KEY,
         codigo  VARCHAR(30) NOT NULL UNIQUE,
         nombre  VARCHAR(60) NOT NULL
       );
-
       CREATE TABLE permisos (
         id          SMALLSERIAL PRIMARY KEY,
         codigo      VARCHAR(60)  NOT NULL UNIQUE,
         modulo      VARCHAR(40)  NOT NULL,
         descripcion VARCHAR(200) NOT NULL
       );
-
       CREATE TABLE rol_permisos (
         rol_id     SMALLINT NOT NULL REFERENCES roles(id) ON DELETE CASCADE,
         permiso_id SMALLINT NOT NULL REFERENCES permisos(id) ON DELETE CASCADE,
         PRIMARY KEY (rol_id, permiso_id)
       );
-
-      -- ===== Usuarios y equipos =====
       CREATE TABLE usuarios (
         id                   UUID PRIMARY KEY DEFAULT gen_random_uuid(),
         nombres              VARCHAR(80)  NOT NULL,
@@ -43,7 +38,6 @@ export class Organizacion1791270000000 implements MigrationInterface {
       );
       CREATE UNIQUE INDEX ux_usuarios_email ON usuarios (lower(email));
       CREATE INDEX ix_usuarios_rol ON usuarios (rol_id);
-
       CREATE TABLE equipos (
         id            UUID PRIMARY KEY DEFAULT gen_random_uuid(),
         nombre        VARCHAR(60) NOT NULL UNIQUE,
@@ -51,11 +45,9 @@ export class Organizacion1791270000000 implements MigrationInterface {
         activo        BOOLEAN NOT NULL DEFAULT TRUE,
         created_at    TIMESTAMPTZ NOT NULL DEFAULT now()
       );
-
       ALTER TABLE usuarios
         ADD CONSTRAINT fk_usuarios_equipo FOREIGN KEY (equipo_id) REFERENCES equipos(id);
       CREATE INDEX ix_usuarios_equipo ON usuarios (equipo_id);
-
       CREATE TABLE historial_equipos (
         id              UUID PRIMARY KEY DEFAULT gen_random_uuid(),
         usuario_id      UUID NOT NULL REFERENCES usuarios(id),
@@ -65,8 +57,6 @@ export class Organizacion1791270000000 implements MigrationInterface {
         created_at      TIMESTAMPTZ NOT NULL DEFAULT now()
       );
       CREATE INDEX ix_hist_equipos_usuario ON historial_equipos (usuario_id, created_at DESC);
-
-      -- ===== Acceso desde celular =====
       CREATE TABLE accesos_moviles (
         id           UUID PRIMARY KEY DEFAULT gen_random_uuid(),
         usuario_id   UUID NOT NULL REFERENCES usuarios(id),
@@ -85,8 +75,6 @@ export class Organizacion1791270000000 implements MigrationInterface {
         )
       );
       CREATE INDEX ix_accesos_usuario_estado ON accesos_moviles (usuario_id, estado);
-
-      -- ===== Verificación en dos pasos =====
       CREATE TABLE codigos_verificacion (
         id          UUID PRIMARY KEY DEFAULT gen_random_uuid(),
         usuario_id  UUID NOT NULL REFERENCES usuarios(id),
@@ -100,7 +88,6 @@ export class Organizacion1791270000000 implements MigrationInterface {
         CONSTRAINT ck_codigo_expira CHECK (expira_at > created_at)
       );
       CREATE INDEX ix_codigos_usuario ON codigos_verificacion (usuario_id, created_at DESC);
-
       CREATE TABLE dispositivos_confiables (
         id            UUID PRIMARY KEY DEFAULT gen_random_uuid(),
         usuario_id    UUID NOT NULL REFERENCES usuarios(id),
@@ -112,8 +99,6 @@ export class Organizacion1791270000000 implements MigrationInterface {
         created_at    TIMESTAMPTZ NOT NULL DEFAULT now(),
         CONSTRAINT ux_dispositivo UNIQUE (usuario_id, huella_hash)
       );
-
-      -- ===== Ubigeo (INEI) =====
       CREATE TABLE departamentos (
         id     CHAR(2) PRIMARY KEY,
         nombre VARCHAR(60) NOT NULL
@@ -130,8 +115,6 @@ export class Organizacion1791270000000 implements MigrationInterface {
         nombre       VARCHAR(80) NOT NULL
       );
       CREATE INDEX ix_distritos_prov ON distritos (provincia_id);
-
-      -- ===== Parámetros del sistema =====
       CREATE TABLE parametros (
         clave           VARCHAR(60) PRIMARY KEY,
         valor           VARCHAR(200) NOT NULL,
