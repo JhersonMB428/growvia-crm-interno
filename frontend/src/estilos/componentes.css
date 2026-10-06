@@ -1,0 +1,81 @@
+/* ===== Piezas reutilizables dentro del CRM (respetan modo claro y oscuro) ===== */
+.app .entrada { background: var(--campo-fondo); border-color: var(--campo-borde); color: var(--texto); }
+.app .entrada::placeholder { color: var(--texto-tenue); }
+.app .entrada:focus { border-color: var(--acento); }
+.app .etiqueta { color: var(--texto-suave); }
+.app select.entrada { appearance: auto; }
+.app select.entrada option { background: #0f3a36; color: #ffffff; }
+.app[data-tema='claro'] select.entrada option { background: #ffffff; color: #0f2422; }
+.app .entrada:disabled { opacity: 0.55; }
+.app .alerta { color: var(--texto); }
+.app[data-tema='claro'] .alerta { background: rgba(240, 150, 130, 0.22); border-color: rgba(163, 58, 36, 0.35); color: #6e2414; }
+.app[data-tema='claro'] .aviso { background: rgba(199, 225, 150, 0.45); border-color: rgba(63, 107, 28, 0.35); }
+.app .boton-texto { color: var(--acento); }
+
+.fila-acciones { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 14px; }
+.boton-secundario {
+  height: 46px; padding: 0 18px; border-radius: 999px; border: 1px solid var(--campo-borde);
+  background: var(--campo-fondo); color: var(--texto) !important; font-family: var(--fuente-titulos);
+  font-weight: 500; font-size: 15px; cursor: pointer; text-decoration: none;
+  display: inline-flex; align-items: center; justify-content: center; gap: 8px;
+}
+.boton-secundario:hover { border-color: var(--acento); }
+.app .boton { border-radius: 999px; padding: 0 22px; text-decoration: none; color: var(--verde); }
+.app[data-tema='claro'] .boton { background: var(--verde); color: var(--lima) !important; }
+.app[data-tema='claro'] .boton:disabled { background: rgba(1, 57, 54, 0.3); color: rgba(255, 255, 255, 0.8) !important; }
+
+/* Pestañas tipo "píldora" */
+.pestanas { display: inline-flex; flex-wrap: wrap; padding: 4px; border-radius: 999px; background: var(--campo-fondo); border: 1px solid var(--campo-borde); }
+.pestana {
+  height: 40px; padding: 0 16px; border: 0; border-radius: 999px; background: transparent; cursor: pointer;
+  color: var(--texto-suave) !important; font: inherit; font-size: 14px; font-weight: 600; text-decoration: none;
+  display: inline-flex; align-items: center;
+}
+.pestana--activa { background: var(--activo-fondo); color: var(--activo-texto) !important; font-weight: 700; }
+
+/* Chips de estado */
+.chip { display: inline-block; font-size: 12px; font-weight: 700; padding: 6px 11px; border-radius: 999px; white-space: nowrap; }
+.chip--lima { background: rgba(199, 225, 150, 0.18); color: #c7e196; }
+.chip--crema { background: rgba(248, 239, 210, 0.16); color: #f8efd2; }
+.chip--gris { background: rgba(255, 255, 255, 0.1); color: rgba(255, 255, 255, 0.85); }
+.app[data-tema='claro'] .chip--lima { background: rgba(199, 225, 150, 0.6); color: #2f5214; }
+.app[data-tema='claro'] .chip--crema { background: rgba(248, 239, 210, 1); color: #6b5414; }
+.app[data-tema='claro'] .chip--gris { background: rgba(1, 57, 54, 0.08); color: #4f625e; }
+
+/* Listas tipo tabla */
+.lista { display: flex; flex-direction: column; gap: 8px; }
+.lista__cabecera, .lista__fila {
+  display: grid; grid-template-columns: 130px minmax(0, 2fr) minmax(0, 1.4fr) minmax(0, 1.2fr) 120px; gap: 12px; align-items: center;
+}
+.lista__cabecera { padding: 0 16px; font-size: 12px; font-weight: 700; letter-spacing: .06em; text-transform: uppercase; color: var(--texto-tenue); }
+.lista__fila {
+  padding: 14px 16px; border-radius: 18px; background: var(--campo-fondo); border: 1px solid transparent;
+  color: var(--texto) !important; text-decoration: none; font-size: 14px;
+}
+.lista__fila { position: relative; }
+.lista__fila:hover { border-color: var(--acento); }
+/* Toda la fila es clicable: el enlace de la razón social se estira sobre ella */
+.app .lista__enlace { color: var(--texto); font-weight: 700; text-decoration: none; }
+.lista__enlace::after { content: ''; position: absolute; inset: 0; border-radius: 18px; }
+.lista__accion { position: relative; z-index: 1; }
+.lista__fila .tenue { color: var(--texto-suave); }
+.lista__vacia { padding: 32px; text-align: center; color: var(--texto-suave); }
+.recortar { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.numeros { font-variant-numeric: tabular-nums; }
+
+.paginacion { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; font-size: 14px; color: var(--texto-suave); }
+
+/* Formularios del CRM */
+.rejilla-2 { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 14px; }
+.rejilla-3 { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 14px; }
+.bloque { padding: 18px; border-radius: 22px; background: var(--campo-fondo); border: 1px solid var(--campo-borde); display: flex; flex-direction: column; gap: 14px; }
+.h2 { font-family: var(--fuente-titulos); font-weight: 600; font-size: 20px; margin: 0; }
+.dato { display: flex; flex-direction: column; gap: 4px; }
+.dato span:first-child { font-size: 12px; font-weight: 700; letter-spacing: .05em; text-transform: uppercase; color: var(--texto-tenue); }
+
+@media (max-width: 860px) {
+  .lista__cabecera { display: none; }
+  .lista__fila { grid-template-columns: 1fr auto; }
+  .lista__fila > :nth-child(1), .lista__fila > :nth-child(3) { display: none; }
+  .rejilla-2, .rejilla-3 { grid-template-columns: 1fr; }
+}

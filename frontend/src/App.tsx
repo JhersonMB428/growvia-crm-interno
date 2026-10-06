@@ -2,6 +2,10 @@ import type { ReactNode } from 'react';
 import { BrowserRouter, Route, Routes } from 'react-router-dom';
 import { AppLayout } from './layout/AppLayout';
 import { EnConstruccion } from './paginas/EnConstruccion';
+import { FichaEmpresa } from './paginas/empresas/FichaEmpresa';
+import { MisEmpresas } from './paginas/empresas/MisEmpresas';
+import { NuevoProspecto } from './paginas/empresas/NuevoProspecto';
+import { Repositorio } from './paginas/empresas/Repositorio';
 import { InicioPorRol } from './paginas/InicioPorRol';
 import { Login } from './paginas/Login';
 import { Verificar } from './paginas/Verificar';
@@ -30,11 +34,13 @@ export default function App() {
               <Route path="/" element={<InicioPorRol />} />
               {/* Asesor */}
               <Route path="/inicio" element={pagina('Inicio', 'Tus gestiones del día, tu avance y tus negociaciones.', ['ASESOR'])} />
-              <Route path="/empresas" element={pagina('Mis empresas', 'Tu cartera de prospectos y clientes.', ['ASESOR'])} />
+              <Route path="/empresas" element={<RutaPrivada roles={['ASESOR', 'SUPERVISOR']}><MisEmpresas /></RutaPrivada>} />
+              <Route path="/empresas/nueva" element={<RutaPrivada roles={['ASESOR', 'SUPERVISOR']}><NuevoProspecto /></RutaPrivada>} />
+              <Route path="/empresas/:id" element={<FichaEmpresa />} />
               <Route path="/agenda" element={pagina('Agenda', 'Tus gestiones programadas y el calendario.', ['ASESOR'])} />
               {/* Compartidas */}
               <Route path="/negociaciones" element={pagina('Negociaciones', 'El embudo de ventas.', ['ASESOR', 'SUPERVISOR', 'GERENTE'])} />
-              <Route path="/repositorio" element={pagina('Repositorio de empresas', 'Todas las empresas del CRM: libres y asignadas.')} />
+              <Route path="/repositorio" element={<Repositorio />} />
               <Route path="/metas" element={pagina('Metas', 'Avance de metas por asesor y por equipo.', ['SUPERVISOR', 'GERENTE'])} />
               <Route path="/bases" element={pagina('Cargar base', 'Carga de empresas desde Excel.', ['SUPERVISOR', 'GERENTE'])} />
               {/* Supervisor */}
