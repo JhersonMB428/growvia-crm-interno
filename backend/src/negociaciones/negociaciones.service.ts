@@ -3,6 +3,7 @@ import {
 } from '@nestjs/common';
 import { DataSource, EntityManager } from 'typeorm';
 import { SesionUsuario } from '../auth/decorators/usuario-actual.decorator';
+import { NotificacionesService } from '../notificaciones/notificaciones.service';
 import { CambiarEtapaDto, CerrarNegociacionDto } from './dto/etapa.dto';
 import { CrearNegociacionDto, GuardarNegociacionDto } from './dto/guardar-negociacion.dto';
 import { ItemDto } from './dto/item.dto';
@@ -39,8 +40,7 @@ const UNIONES = `
 
 @Injectable()
 export class NegociacionesService {
-  constructor(private readonly db: DataSource) {}
-
+  constructor(private readonly db: DataSource, private readonly notificaciones: NotificacionesService) {}
   // ───────────── Catálogos para el formulario ─────────────
   async catalogos() {
     const planes = await this.db.query(
@@ -198,6 +198,23 @@ export class NegociacionesService {
            WHERE id = $3`, [u.equipoId, paso.id, id],
         );
         await this.registrarEtapa(tx, id, o.etapa, 'CIERRE', 'Ganada · enviada a aprobación del supervisor', s.sub);
+
+        // Aviso al supervisor del equipo: tiene una venta por aprobar
+        const [v] = await tx.query(
+          `SELECT e.supervisor_id AS "supervisorId", op.codigo, c.razon_social AS "razonSocial",
+                  ua.nombres || ' ' || ua.apellidos AS asesor
+           FROM oportunidades op JOIN equipos e ON e.id = op.equipo_id JOIN clientes c ON c.id = op.cliente_id
+           JOIN usuarios ua ON ua.id = op.asesor_id WHERE op.id = $1`, [id],
+        );
+        if (v?.supervisorId && v.supervisorId !== s.sub) {
+          await this.notificaciones.crear(v.supervisorId, {
+            tipo: 'VENTA_POR_APROBAR',
+            titulo: 'Venta por aprobar',
+            mensaje: `${v.asesor} ganó ${v.codigo} (${v.razonSocial}). Revísala en Aprobaciones.`,
+            entidad: 'NEGOCIACION',
+            entidadId: id,
+          }, tx);
+        }
       }
       await this.marcarGestion(tx, o.clienteId);
     });
