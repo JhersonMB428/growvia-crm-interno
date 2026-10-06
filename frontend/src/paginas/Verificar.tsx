@@ -40,7 +40,7 @@ export function Verificar() {
         cuerpo: { desafio: estado!.desafio, codigo, recordar, huella: huellaDelEquipo() },
       });
       iniciar(r.token, r.usuario);
-      navegar(estado!.desde ?? '/inicio', { replace: true });
+      navegar(estado!.desde ?? '/', { replace: true });
     } catch (err) {
       setError(err instanceof ErrorApi ? err.message : 'Ocurrió un error inesperado');
       setCodigo('');
