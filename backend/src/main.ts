@@ -8,6 +8,9 @@ async function bootstrap() {
   // Todas las rutas empiezan con /api (ej. /api/salud)
   app.setGlobalPrefix('api');
 
+  // Detrás del balanceador de Azure, para leer la IP real del usuario
+  app.getHttpAdapter().getInstance().set('trust proxy', 1);
+
   // Solo el frontend del CRM puede llamar a la API
   app.enableCors({
     origin: process.env.FRONTEND_URL ?? 'http://localhost:5173',

@@ -1,0 +1,87 @@
+/* ===== Growvia CRM · estilos base ===== */
+:root {
+  --verde: #013936;
+  --verde-profundo: #01201d;
+  --lima: #c7e196;
+  --lima-hover: #d6eaae;
+  --crema: #f8efd2;
+  --blanco: #ffffff;
+  --rojo-suave: #f4b9ab;
+
+  --texto: #ffffff;
+  --texto-suave: rgba(255, 255, 255, 0.75);
+  --texto-tenue: rgba(255, 255, 255, 0.6);
+  --borde: rgba(255, 255, 255, 0.18);
+
+  /* Vidrio líquido */
+  --vidrio-fondo: rgba(255, 255, 255, 0.08);
+  --vidrio-borde: rgba(255, 255, 255, 0.16);
+  --vidrio-sombra: inset 0 1px 0 rgba(255, 255, 255, 0.22), 0 24px 60px rgba(0, 0, 0, 0.28);
+
+  --fuente-titulos: 'Outfit', system-ui, sans-serif;
+  --fuente-texto: 'Manrope', system-ui, sans-serif;
+  color-scheme: dark;
+}
+
+*, *::before, *::after { box-sizing: border-box; }
+html, body, #root { height: 100%; }
+body {
+  margin: 0;
+  background: var(--verde-profundo);
+  color: var(--texto);
+  font-family: var(--fuente-texto);
+  -webkit-font-smoothing: antialiased;
+}
+a { color: var(--lima); }
+a:hover { color: var(--crema); }
+h1, h2, h3 { font-family: var(--fuente-titulos); margin: 0; }
+p { margin: 0; }
+
+.vidrio {
+  background: var(--vidrio-fondo);
+  border: 1px solid var(--vidrio-borde);
+  backdrop-filter: blur(28px) saturate(170%);
+  -webkit-backdrop-filter: blur(28px) saturate(170%);
+  box-shadow: var(--vidrio-sombra);
+}
+
+/* Formularios */
+.campo { display: flex; flex-direction: column; gap: 8px; }
+.etiqueta { font-size: 13px; font-weight: 600; color: rgba(255, 255, 255, 0.85); }
+.entrada {
+  height: 52px; width: 100%; padding: 0 16px;
+  border-radius: 12px; border: 1px solid rgba(255, 255, 255, 0.22);
+  background: rgba(1, 43, 40, 0.55); color: var(--texto);
+  font: inherit; font-size: 15px;
+}
+.entrada::placeholder { color: rgba(255, 255, 255, 0.5); }
+.entrada:focus { outline: none; border-color: var(--lima); box-shadow: 0 0 0 3px rgba(199, 225, 150, 0.25); }
+.entrada[aria-invalid='true'] { border-color: var(--rojo-suave); }
+
+.boton {
+  height: 52px; border: 0; border-radius: 12px; cursor: pointer;
+  background: var(--lima); color: var(--verde);
+  font-family: var(--fuente-titulos); font-weight: 600; font-size: 17px;
+  display: inline-flex; align-items: center; justify-content: center; gap: 8px;
+}
+.boton:hover { background: var(--lima-hover); }
+.boton:disabled { background: rgba(199, 225, 150, 0.3); color: rgba(1, 57, 54, 0.75); cursor: not-allowed; }
+.boton:focus-visible, .boton-texto:focus-visible { outline: 3px solid var(--crema); outline-offset: 2px; }
+.boton-texto {
+  min-height: 44px; padding: 0; border: 0; background: transparent; cursor: pointer;
+  color: var(--lima); font: inherit; font-size: 14px; font-weight: 600;
+}
+.boton-texto:disabled { color: var(--texto-tenue); cursor: default; }
+
+.alerta {
+  padding: 12px 14px; border-radius: 12px; font-size: 14px; line-height: 1.45;
+  background: rgba(240, 150, 130, 0.14); border: 1px solid rgba(244, 185, 171, 0.45); color: #fde3dc;
+}
+.aviso {
+  padding: 12px 14px; border-radius: 12px; font-size: 14px; line-height: 1.45;
+  background: rgba(199, 225, 150, 0.14); border: 1px solid rgba(199, 225, 150, 0.4);
+}
+.casilla { display: flex; align-items: center; gap: 10px; min-height: 44px; font-size: 14px; color: rgba(255, 255, 255, 0.88); cursor: pointer; }
+.casilla input { width: 18px; height: 18px; accent-color: var(--lima); margin: 0; }
+
+.oculto-visual { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
