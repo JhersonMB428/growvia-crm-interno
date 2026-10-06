@@ -3,6 +3,7 @@ import { useLocation, useNavigate, useParams } from 'react-router-dom';
 import { ErrorApi } from '../../api/cliente';
 import { empresasApi, ubicacion, type Contacto, type EmpresaDetalle } from '../../api/empresas';
 import { contactosCompletos, EditorContactos, limpiarContactos } from '../../componentes/EditorContactos';
+import { NegociacionesEmpresa } from '../../componentes/NegociacionesEmpresa';
 import { useSesion } from '../../sesion/SesionContext';
 
 const MOTIVO: Record<string, string> = {
@@ -127,6 +128,9 @@ export function FichaEmpresa() {
           </ol>
         </aside>
       </div>
+
+      {/* Solo quien ve la información comercial ve sus negociaciones */}
+      {e.contactos !== null && <NegociacionesEmpresa empresaId={e.id} puedeAbrir={e.puedeEditar && puede('NEGOCIACION_GESTIONAR')} />}
     </>
   );
 }

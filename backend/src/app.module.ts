@@ -5,6 +5,7 @@ import { TypeOrmModule } from '@nestjs/typeorm';
 import { AuthModule } from './auth/auth.module';
 import { CorreoModule } from './correo/correo.module';
 import { EmpresasModule } from './empresas/empresas.module';
+import { NegociacionesModule } from './negociaciones/negociaciones.module';
 import { SaludController } from './salud.controller';
 import { SistemaModule } from './sistema/sistema.module';
 import { UbigeoModule } from './ubigeo/ubigeo.module';
@@ -29,6 +30,7 @@ import { UsuariosModule } from './usuarios/usuarios.module';
     AuthModule,
     UbigeoModule,
     EmpresasModule,
+    NegociacionesModule,
   ],
   controllers: [SaludController],
 })

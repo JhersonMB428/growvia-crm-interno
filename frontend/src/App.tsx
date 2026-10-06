@@ -13,6 +13,9 @@ import { RutaPrivada } from './sesion/RutaPrivada';
 import { SesionProvider } from './sesion/SesionContext';
 import type { Usuario } from './sesion/tipos';
 import { TemaProvider } from './tema/TemaContext';
+import { FichaNegociacion } from './paginas/negociaciones/FichaNegociacion';
+import { FormNegociacion } from './paginas/negociaciones/FormNegociacion';
+import { Negociaciones } from './paginas/negociaciones/Negociaciones';
 
 type Rol = Usuario['rol']['codigo'];
 
@@ -39,8 +42,10 @@ export default function App() {
               <Route path="/empresas/:id" element={<FichaEmpresa />} />
               <Route path="/agenda" element={pagina('Agenda', 'Tus gestiones programadas y el calendario.', ['ASESOR'])} />
               {/* Compartidas */}
-              <Route path="/negociaciones" element={pagina('Negociaciones', 'El embudo de ventas.', ['ASESOR', 'SUPERVISOR', 'GERENTE'])} />
-              <Route path="/repositorio" element={<Repositorio />} />
+              <Route path="/negociaciones" element={<RutaPrivada roles={['ASESOR', 'SUPERVISOR', 'GERENTE']}><Negociaciones /></RutaPrivada>} />
+              <Route path="/negociaciones/nueva" element={<RutaPrivada roles={['ASESOR']}><FormNegociacion /></RutaPrivada>} />
+              <Route path="/negociaciones/:id/editar" element={<RutaPrivada roles={['ASESOR']}><FormNegociacion /></RutaPrivada>} />
+              <Route path="/negociaciones/:id" element={<FichaNegociacion />} />              <Route path="/repositorio" element={<Repositorio />} />
               <Route path="/metas" element={pagina('Metas', 'Avance de metas por asesor y por equipo.', ['SUPERVISOR', 'GERENTE'])} />
               <Route path="/bases" element={pagina('Cargar base', 'Carga de empresas desde Excel.', ['SUPERVISOR', 'GERENTE'])} />
               {/* Supervisor */}
