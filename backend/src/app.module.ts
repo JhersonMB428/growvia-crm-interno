@@ -7,6 +7,7 @@ import { AuthModule } from './auth/auth.module';
 import { CorreoModule } from './correo/correo.module';
 import { EmpresasModule } from './empresas/empresas.module';
 import { ExpedienteModule } from './expediente/expediente.module';
+import { ExportacionModule } from './exportacion/exportacion.module';
 import { GestionesModule } from './gestiones/gestiones.module';
 import { NegociacionesModule } from './negociaciones/negociaciones.module';
 import { NotificacionesModule } from './notificaciones/notificaciones.module';import { SaludController } from './salud.controller';
@@ -15,6 +16,7 @@ import { TablerosModule } from './tableros/tableros.module';
 import { UbigeoModule } from './ubigeo/ubigeo.module';
 import { UsuariosModule } from './usuarios/usuarios.module';
 import { BasesModule } from './bases/bases.module';
+import { BitacoraModule } from './bitacora/bitacora.module';
 import { ValidacionModule } from './validacion/validacion.module';
 
 @Module({
@@ -44,6 +46,8 @@ import { ValidacionModule } from './validacion/validacion.module';
     BasesModule,
     AlmacenamientoModule,
     ExpedienteModule,
+    BitacoraModule,
+    ExportacionModule,
   ],
   controllers: [SaludController],
 })

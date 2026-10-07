@@ -23,6 +23,8 @@ import { InicioAsesor } from './paginas/tableros/InicioAsesor';
 import { Metas } from './paginas/tableros/Metas';
 import { MiEquipo } from './paginas/tableros/MiEquipo';
 import { ResumenGerencia } from './paginas/tableros/ResumenGerencia';
+import { Bitacora } from './paginas/auditoria/Bitacora';
+import { Exportar } from './paginas/auditoria/Exportar';
 import { ResumenBackoffice } from './paginas/tableros/ResumenBackoffice';
 import { Bases } from './paginas/bases/Bases';
 import { DetalleBase } from './paginas/bases/DetalleBase';
@@ -65,6 +67,8 @@ export default function App() {
 
               <Route path="/reportes" element={<RutaPrivada roles={['GERENTE']}><ResumenGerencia /></RutaPrivada>} />
               <Route path="/revision" element={<RutaPrivada roles={['GERENTE']}><BandejaVentas modo="revisar" /></RutaPrivada>} />
+              <Route path="/exportar" element={<RutaPrivada roles={['GERENTE']}><Exportar /></RutaPrivada>} />
+              <Route path="/bitacora" element={<RutaPrivada roles={['GERENTE', 'ADMIN']}><Bitacora /></RutaPrivada>} />
               <Route path="/accesos-celular" element={pagina('Acceso desde celular', 'Solicitudes para usar el CRM en el celular.', ['GERENTE'])} />
 
               <Route path="/resumen" element={<RutaPrivada roles={['BACKOFFICE']}><ResumenBackoffice /></RutaPrivada>} />
