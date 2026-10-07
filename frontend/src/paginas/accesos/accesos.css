@@ -1,0 +1,13 @@
+/* ===== Acceso desde celular (gerencia) ===== */
+.cel-acceso {
+  display: flex; flex-direction: column; gap: 12px; padding: 18px; border-radius: 22px;
+  background: var(--campo-fondo); border: 1px solid var(--campo-borde);
+}
+.cel-acceso--compacto { gap: 6px; padding: 14px 18px; }
+.cel-acceso__cabecera { display: flex; justify-content: space-between; align-items: flex-start; gap: 12px; }
+.cel-acceso__quien { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.cel-acceso__quien b { font-size: 16px; }
+.cel-acceso__quien .tenue { font-size: 13px; }
+.cel-acceso .tenue, .cel-acceso-vacio { color: var(--texto-suave); }
+.cel-acceso__motivo { margin: 0; font-size: 14.5px; line-height: 1.5; color: var(--texto-suave); }
+.cel-acceso__fin { display: flex; flex-wrap: wrap; gap: 12px; align-items: flex-end; }

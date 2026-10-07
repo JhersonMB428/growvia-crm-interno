@@ -60,7 +60,11 @@ export const TEXTO_ACCION: Record<string, string> = {
   VENTA_POSVENTA: 'Registró posventa', DOCUMENTO_SUBIR: 'Subió un documento', DOCUMENTO_VER: 'Abrió un documento',
   DOCUMENTO_ELIMINAR: 'Eliminó un documento', BASE_SUBIR: 'Subió una base', BASE_APROBAR: 'Aprobó una base', BASE_RECHAZAR: 'Rechazó una base',
   EXPORTAR: 'Exportó datos', META_DEFINIR: 'Definió una meta', OTRA: 'Otra acción',
+  ACCESO_MOVIL_SOLICITAR: 'Pidió acceso desde celular', ACCESO_MOVIL_APROBAR: 'Aprobó acceso desde celular',
+  ACCESO_MOVIL_RECHAZAR: 'Rechazó acceso desde celular', ACCESO_MOVIL_REVOCAR: 'Retiró acceso desde celular',
+  ACCESO_MOVIL_OTORGAR: 'Dio acceso desde celular', SESION_MOVIL_CORTADA: 'Celular sacado del CRM',
 };
 
 /** Acciones que conviene mirar con atención */
-export const ACCIONES_ALERTA = new Set(['LOGIN_FALLIDO', 'CODIGO_FALLIDO', 'LOGIN_BLOQUEADO', 'ACCESO_DENEGADO', 'VENTA_DETENER', 'DOCUMENTO_ELIMINAR', 'EXPORTAR']);
+export const ACCIONES_ALERTA = new Set(['LOGIN_FALLIDO', 'CODIGO_FALLIDO', 'LOGIN_BLOQUEADO', 'ACCESO_DENEGADO', 'VENTA_DETENER', 'DOCUMENTO_ELIMINAR', 'EXPORTAR',
+  'ACCESO_MOVIL_APROBAR', 'ACCESO_MOVIL_OTORGAR', 'ACCESO_MOVIL_REVOCAR', 'SESION_MOVIL_CORTADA']);

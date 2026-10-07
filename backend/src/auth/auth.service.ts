@@ -190,9 +190,13 @@ export class AuthService {
       where: { usuarioId, estado: 'APROBADA', desde: LessThanOrEqual(ahora), hasta: MoreThan(ahora) },
     });
     if (!vigente) {
+      const pendiente = await this.accesos.findOne({ where: { usuarioId, estado: 'PENDIENTE' } });
       throw new ForbiddenException({
         codigo: 'MOVIL_BLOQUEADO',
         message: 'Tu cuenta no tiene acceso desde el celular. Solicítalo a gerencia.',
+        // Permiso de 15 minutos para pedir el acceso desde esta misma pantalla (ya validó su contraseña)
+        permiso: await this.jwt.signAsync({ sub: usuarioId, tipo: 'solicitud-movil' }, { expiresIn: 15 * 60 }),
+        pendienteDesde: pendiente?.createdAt ?? null,
       });
     }
   }

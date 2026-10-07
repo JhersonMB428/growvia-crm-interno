@@ -25,6 +25,12 @@ export function SesionProvider({ children }: { children: ReactNode }) {
       .finally(() => setCargando(false));
   }, []);
 
+  // Si la API corta la sesión (venció o se retiró el acceso del celular), se vuelve al login
+  useEffect(() => {
+    const terminar = () => setUsuario(null);
+    window.addEventListener('gv-sesion-terminada', terminar);
+    return () => window.removeEventListener('gv-sesion-terminada', terminar);
+  }, []);
   const iniciar = useCallback((t: string, u: Usuario) => { token.guardar(t); setUsuario(u); }, []);
   const cerrar = useCallback(() => { token.borrar(); setUsuario(null); }, []);
   const puede = useCallback((p: string) => !!usuario?.permisos.includes(p), [usuario]);

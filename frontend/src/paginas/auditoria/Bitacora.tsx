@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { ACCIONES_ALERTA, bitacoraApi, TEXTO_ACCION, type Categoria, type FiltrosBitacora, type RegistroBitacora } from '../../api/auditoria';
+import { diaLargo } from '../../api/accesosMovil';
 import { ErrorApi } from '../../api/cliente';
 import { TEXTO_DOCUMENTO, type TipoDocumento } from '../../api/expediente';
 import { TEXTO_CANAL, TEXTO_RESULTADO, type Canal, type ResultadoGestion } from '../../api/gestiones';
@@ -34,6 +35,10 @@ function detalle(r: RegistroBitacora): string {
     case 'GESTION_REGISTRAR': return `${TEXTO_CANAL[d.canal as Canal] ?? ''} · ${TEXTO_RESULTADO[d.resultado as ResultadoGestion] ?? ''}`;
     case 'META_DEFINIR': return `${d.alcance === 'EQUIPO' ? 'Equipo' : 'Asesor'} · ${d.mes} · ${d.metaLineas} líneas`;
     case 'BASE_SUBIR': return r.otroUsuario ? `para ${r.otroUsuario}` : d.asignarA === 'repositorio' ? 'al repositorio' : '';
+    case 'ACCESO_MOVIL_SOLICITAR': return `${d.dias} ${d.dias === 1 ? 'día' : 'días'}${d.desde === 'celular' ? ' · desde el celular' : ''}`;
+    case 'ACCESO_MOVIL_APROBAR': return `hasta el ${diaLargo(String(d.hasta))}`;
+    case 'ACCESO_MOVIL_OTORGAR': return `${r.otroUsuario ? `a ${r.otroUsuario} ` : ''}hasta el ${diaLargo(String(d.hasta))}`;
+    case 'ACCESO_MOVIL_RECHAZAR': case 'ACCESO_MOVIL_REVOCAR': return String(d.respuesta ?? '');
     case 'OTRA': return String(d.ruta ?? '');
     default: return '';
   }
@@ -45,6 +50,7 @@ function enlace(r: RegistroBitacora) {
   if (r.entidad === 'EMPRESA') return `/empresas/${r.enlaceId}`;
   if (r.entidad === 'NEGOCIACION' || r.entidad === 'DOCUMENTO') return `/negociaciones/${r.enlaceId}`;
   if (r.entidad === 'CARGA') return `/bases/${r.enlaceId}`;
+  if (r.entidad === 'ACCESO') return '/accesos-celular';
   return null;
 }
 

@@ -23,6 +23,7 @@ import { InicioAsesor } from './paginas/tableros/InicioAsesor';
 import { Metas } from './paginas/tableros/Metas';
 import { MiEquipo } from './paginas/tableros/MiEquipo';
 import { ResumenGerencia } from './paginas/tableros/ResumenGerencia';
+import { AccesosCelular } from './paginas/accesos/AccesosCelular';
 import { Bitacora } from './paginas/auditoria/Bitacora';
 import { Exportar } from './paginas/auditoria/Exportar';
 import { ResumenBackoffice } from './paginas/tableros/ResumenBackoffice';
@@ -69,8 +70,8 @@ export default function App() {
               <Route path="/revision" element={<RutaPrivada roles={['GERENTE']}><BandejaVentas modo="revisar" /></RutaPrivada>} />
               <Route path="/exportar" element={<RutaPrivada roles={['GERENTE']}><Exportar /></RutaPrivada>} />
               <Route path="/bitacora" element={<RutaPrivada roles={['GERENTE', 'ADMIN']}><Bitacora /></RutaPrivada>} />
-              <Route path="/accesos-celular" element={pagina('Acceso desde celular', 'Solicitudes para usar el CRM en el celular.', ['GERENTE'])} />
-
+              <Route path="/accesos-celular" element={<RutaPrivada roles={['GERENTE']}><AccesosCelular /></RutaPrivada>} />
+              
               <Route path="/resumen" element={<RutaPrivada roles={['BACKOFFICE']}><ResumenBackoffice /></RutaPrivada>} />
               <Route path="/validacion" element={<RutaPrivada roles={['BACKOFFICE']}><BandejaVentas modo="validar" /></RutaPrivada>} />
               <Route path="/usuarios" element={pagina('Usuarios y equipos', 'Cuentas, equipos, roles y permisos.', ['BACKOFFICE', 'ADMIN'])} />

@@ -2,6 +2,7 @@ import { Module } from '@nestjs/common';
 import { ConfigModule, ConfigService } from '@nestjs/config';
 import { ScheduleModule } from '@nestjs/schedule';
 import { TypeOrmModule } from '@nestjs/typeorm';
+import { AccesosMovilModule } from './accesos-movil/accesos-movil.module';
 import { AlmacenamientoModule } from './almacenamiento/almacenamiento.module';
 import { AuthModule } from './auth/auth.module';
 import { CorreoModule } from './correo/correo.module';
@@ -48,6 +49,7 @@ import { ValidacionModule } from './validacion/validacion.module';
     ExpedienteModule,
     BitacoraModule,
     ExportacionModule,
+    AccesosMovilModule,
   ],
   controllers: [SaludController],
 })

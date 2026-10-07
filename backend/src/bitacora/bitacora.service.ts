@@ -45,6 +45,11 @@ const REGLAS: Record<string, Regla> = {
   'POST /bases/:id/rechazar': { accion: 'BASE_RECHAZAR', entidad: 'CARGA', campos: ['motivo'] },
   'PUT /metas': { accion: 'META_DEFINIR', campos: ['mes', 'alcance', 'id', 'metaLineas'] },
   'GET /exportar/:tipo': { accion: 'EXPORTAR', query: true },
+  'POST /accesos-moviles': { accion: 'ACCESO_MOVIL_SOLICITAR', campos: ['dias'] },
+  'POST /accesos-moviles/:id/aprobar': { accion: 'ACCESO_MOVIL_APROBAR', entidad: 'ACCESO', campos: ['hasta'] },
+  'POST /accesos-moviles/:id/rechazar': { accion: 'ACCESO_MOVIL_RECHAZAR', entidad: 'ACCESO', campos: ['respuesta'] },
+  'POST /accesos-moviles/:id/revocar': { accion: 'ACCESO_MOVIL_REVOCAR', entidad: 'ACCESO', campos: ['respuesta'] },
+  'POST /accesos-moviles/otorgar': { accion: 'ACCESO_MOVIL_OTORGAR', campos: ['usuarioId', 'hasta'] },
 };
 
 /** Acciones sin valor de auditoría */
@@ -52,7 +57,8 @@ const IGNORAR = new Set(['POST /notificaciones/leer-todas', 'POST /notificacione
 
 /** Grupos para el filtro de la pantalla */
 export const CATEGORIAS: Record<string, string[]> = {
-  accesos: ['LOGIN', 'LOGIN_FALLIDO', 'CODIGO_FALLIDO', 'LOGIN_BLOQUEADO', 'ACCESO_DENEGADO'],
+  accesos: ['LOGIN', 'LOGIN_FALLIDO', 'CODIGO_FALLIDO', 'LOGIN_BLOQUEADO', 'ACCESO_DENEGADO', 'SESION_MOVIL_CORTADA',
+    'ACCESO_MOVIL_SOLICITAR', 'ACCESO_MOVIL_APROBAR', 'ACCESO_MOVIL_RECHAZAR', 'ACCESO_MOVIL_REVOCAR', 'ACCESO_MOVIL_OTORGAR'],
   empresas: ['EMPRESA_CREAR', 'EMPRESA_TOMAR', 'EMPRESA_REASIGNAR', 'EMPRESA_CORREGIR', 'CONTACTOS_EDITAR', 'GESTION_REGISTRAR', 'GESTION_REPROGRAMAR'],
   ventas: ['NEGOCIACION_CREAR', 'NEGOCIACION_EDITAR', 'NEGOCIACION_ETAPA', 'NEGOCIACION_CERRAR', 'VENTA_REENVIAR', 'VENTA_APROBAR',
     'VENTA_REVISAR', 'VENTA_OBSERVAR', 'VENTA_DETENER', 'VENTA_VALIDAR', 'VENTA_POSVENTA'],
@@ -73,7 +79,7 @@ export class BitacoraService {
     await this.db.query(
       `INSERT INTO bitacora (usuario_id, accion, entidad, entidad_id, detalle, ip)
        VALUES (COALESCE($1::uuid, (SELECT id FROM usuarios WHERE lower(email) = lower($7))), $2, $3, $4, $5, $6)`,
-      [usuarioId, accion, o.entidad ?? null, o.entidadId ?? null, o.detalle && Object.keys(o.detalle).length ? JSON.stringify(o.detalle) : null, o.ip ?? null, o.email ?? null],
+      [usuarioId, accion, o.entidad ?? null, o.entidadId ?? null, o.detalle && Object.keys(o.detalle).length ? JSON.stringify(o.detalle) : null, o.ip?.replace(/^::ffff:/, '') ?? null, o.email ?? null], // "::ffff:127.0.0.1" → "127.0.0.1"
     );
   }
 
@@ -160,13 +166,14 @@ export class BitacoraService {
                 WHEN 'NEGOCIACION' THEN (SELECT o.codigo || ' · ' || c.razon_social FROM oportunidades o JOIN clientes c ON c.id = o.cliente_id WHERE o.id::text = b.entidad_id)
                 WHEN 'DOCUMENTO' THEN (SELECT d.nombre || ' · ' || o.codigo FROM documentos_venta d JOIN oportunidades o ON o.id = d.oportunidad_id WHERE d.id::text = b.entidad_id)
                 WHEN 'CARGA' THEN (SELECT l.archivo_nombre FROM lotes_importacion l WHERE l.id::text = b.entidad_id)
+                WHEN 'ACCESO' THEN (SELECT 'Celular de ' || u2.nombres || ' ' || u2.apellidos FROM accesos_moviles a JOIN usuarios u2 ON u2.id = a.usuario_id WHERE a.id::text = b.entidad_id)
               END AS referencia,
               -- Para enlazar a la ficha
               CASE b.entidad
                 WHEN 'DOCUMENTO' THEN (SELECT d.oportunidad_id::text FROM documentos_venta d WHERE d.id::text = b.entidad_id)
                 ELSE b.entidad_id
               END AS "enlaceId",
-              (SELECT a.nombres || ' ' || a.apellidos FROM usuarios a WHERE a.id::text = COALESCE(b.detalle->>'asesorId', b.detalle->>'asignarA')) AS "otroUsuario"
+              (SELECT a.nombres || ' ' || a.apellidos FROM usuarios a WHERE a.id::text = COALESCE(b.detalle->>'asesorId', b.detalle->>'asignarA', b.detalle->>'usuarioId')) AS "otroUsuario"
        FROM bitacora b
        LEFT JOIN usuarios u ON u.id = b.usuario_id
        LEFT JOIN roles r ON r.id = u.rol_id
