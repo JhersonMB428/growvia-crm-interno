@@ -98,12 +98,17 @@ export class TablerosService {
        FROM oportunidades o JOIN clientes c ON c.id = o.cliente_id ${TOTALES}
        WHERE o.asesor_id = $1 ORDER BY o.updated_at DESC LIMIT 5`, [s.sub],
     );
+    // Tasa de conversión del mes: ganadas / (ganadas + perdidas), por fecha de cierre
+    const [conversion] = await this.db.query(
+      `SELECT count(*) FILTER (WHERE resultado = 'GANADA')::int AS ganadas, count(*) FILTER (WHERE resultado = 'PERDIDA')::int AS perdidas
+       FROM oportunidades o WHERE o.asesor_id = $1 AND o.fecha_cierre >= ${DESDE(2)} AND o.fecha_cierre < ${HASTA(2)}`, [s.sub, mes],
+    );
     const ranking = s.equipoId ? await this.rankingEquipo(s.equipoId, mes) : [];
     const posicion = ranking.findIndex((r: { id: string }) => r.id === s.sub) + 1;
 
     return {
       mes, metaLineas: meta?.metaLineas ?? null, activas: act, lineasMesAnterior: ant.lineas,
-      proyeccion: proyectar(act.lineas, mes), porActivar, embudo, prospectos, agendaHoy, noRealizadas, ultimas,
+      proyeccion: proyectar(act.lineas, mes), porActivar, embudo, prospectos, agendaHoy, noRealizadas, ultimas, conversion,
       posicion: posicion || null, tamanoEquipo: ranking.length,
     };
   }
@@ -156,10 +161,11 @@ export class TablerosService {
     );
     // Calidad del proceso: ventas ganadas en el mes, cuántas fueron observadas y cuánto tardaron en cerrarse
     const [proceso] = await this.db.query(
-      `SELECT count(*)::int AS ganadas,
-              count(*) FILTER (WHERE EXISTS (SELECT 1 FROM validaciones v WHERE v.oportunidad_id = o.id AND v.decision = 'OBSERVADA'))::int AS observadas,
-              COALESCE(round(avg(extract(epoch FROM o.fecha_cierre - o.created_at) / 86400)::numeric, 1), 0)::float8 AS "diasCierre"
-       FROM oportunidades o WHERE o.resultado = 'GANADA' AND o.fecha_cierre >= ${DESDE(1)} AND o.fecha_cierre < ${HASTA(1)}`, [mes],
+      `SELECT count(*) FILTER (WHERE o.resultado = 'GANADA')::int AS ganadas,
+              count(*) FILTER (WHERE o.resultado = 'PERDIDA')::int AS perdidas,
+              count(*) FILTER (WHERE o.resultado = 'GANADA' AND EXISTS (SELECT 1 FROM validaciones v WHERE v.oportunidad_id = o.id AND v.decision = 'OBSERVADA'))::int AS observadas,
+              COALESCE(round((avg(extract(epoch FROM o.fecha_cierre - o.created_at) / 86400) FILTER (WHERE o.resultado = 'GANADA'))::numeric, 1), 0)::float8 AS "diasCierre"
+       FROM oportunidades o WHERE o.resultado IN ('GANADA','PERDIDA') AND o.fecha_cierre >= ${DESDE(1)} AND o.fecha_cierre < ${HASTA(1)}`, [mes],
     );
     const [{ porActivar }] = await this.db.query(
       `SELECT count(*)::int AS "porActivar" FROM oportunidades o WHERE o.estado_venta IN ${POR_ACTIVAR}`,
@@ -294,6 +300,7 @@ export class TablerosService {
       `SELECT u.id, u.nombres || ' ' || u.apellidos AS nombre, m.meta_lineas AS "metaLineas",
               COALESCE(a.lineas, 0)::int AS lineas, COALESCE(a.ventas, 0)::int AS ventas, COALESCE(a.cargo, 0)::float8 AS cargo,
               COALESCE(p.lineas, 0)::int AS "porActivar",
+              COALESCE(cv.ganadas, 0)::int AS ganadas, COALESCE(cv.perdidas, 0)::int AS perdidas, COALESCE(cv.observadas, 0)::int AS observadas,
               (SELECT count(*)::int FROM oportunidades o WHERE o.asesor_id = u.id AND o.resultado = 'EN_CURSO') AS abiertas,
               (SELECT count(*)::int FROM gestiones g WHERE g.usuario_id = u.id
                  AND (g.created_at AT TIME ZONE '${ZONA}')::date = (now() AT TIME ZONE '${ZONA}')::date) AS "gestionesHoy",
@@ -309,6 +316,13 @@ export class TablerosService {
        LEFT JOIN LATERAL (
          SELECT sum(t.lineas) AS lineas FROM oportunidades o ${TOTALES} WHERE o.asesor_id = u.id AND o.estado_venta IN ${POR_ACTIVAR}
        ) p ON true
+       -- Conversión y calidad del mes (ventas cerradas en el mes y cuántas fueron observadas)
+       LEFT JOIN LATERAL (
+         SELECT count(*) FILTER (WHERE o.resultado = 'GANADA') AS ganadas, count(*) FILTER (WHERE o.resultado = 'PERDIDA') AS perdidas,
+                count(*) FILTER (WHERE o.resultado = 'GANADA' AND EXISTS (
+                  SELECT 1 FROM validaciones v WHERE v.oportunidad_id = o.id AND v.decision = 'OBSERVADA')) AS observadas
+         FROM oportunidades o WHERE o.asesor_id = u.id AND o.fecha_cierre >= ${DESDE(2)} AND o.fecha_cierre < ${HASTA(2)}
+       ) cv ON true
        WHERE u.equipo_id = $1 AND u.activo AND r.codigo = 'ASESOR'
        ORDER BY lineas DESC, nombre`, [equipoId, mes],
     );

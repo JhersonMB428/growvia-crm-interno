@@ -70,6 +70,9 @@ export function InicioAsesor() {
         <section className="kpi vidrio">
           <span className="kpi__titulo">Posición en tu equipo</span>
           <span className="kpi__valor numeros">{t.posicion ? `${t.posicion}.º` : '—'}{t.tamanoEquipo > 0 && <small> de {t.tamanoEquipo}</small>}</span>
+          <span className="kpi__detalle">
+            Conversión del mes: <b>{pct(t.conversion.ganadas, t.conversion.ganadas + t.conversion.perdidas) ?? 0}%</b> ({t.conversion.ganadas} de {t.conversion.ganadas + t.conversion.perdidas} cerradas)
+          </span>
           <span className="kpi__detalle">{t.prospectos} prospectos en tu cartera</span>
         </section>
       </div>

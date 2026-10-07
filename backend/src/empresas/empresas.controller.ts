@@ -1,7 +1,7 @@
 import { Body, Controller, Get, Param, ParseUUIDPipe, Post, Put, Query } from '@nestjs/common';
 import { RequierePermisos } from '../auth/decorators/requiere-permisos.decorator';
 import { SesionUsuario, UsuarioActual } from '../auth/decorators/usuario-actual.decorator';
-import { CrearEmpresaDto, GuardarContactosDto } from './dto/crear-empresa.dto';
+import { CorregirEmpresaDto, CrearEmpresaDto, GuardarContactosDto } from './dto/crear-empresa.dto';
 import { ListarEmpresasDto } from './dto/listar.dto';
 import { ReasignarDto } from './dto/reasignar.dto';
 import { EmpresasService } from './empresas.service';
@@ -49,10 +49,17 @@ export class EmpresasController {
     return this.empresas.tomar(id, s);
   }
 
+  /** El asesor a cargo o back office (el servicio revisa quién puede) */
   @Put(':id/contactos')
-  @RequierePermisos('PROSPECTO_CREAR')
+  @RequierePermisos('INFO_COMERCIAL_VER')
   contactos(@Param('id', ParseUUIDPipe) id: string, @Body() dto: GuardarContactosDto, @UsuarioActual() s: SesionUsuario) {
     return this.empresas.guardarContactos(id, dto.contactos, s);
+  }
+
+  @Put(':id')
+  @RequierePermisos('EMPRESA_EDITAR')
+  corregir(@Param('id', ParseUUIDPipe) id: string, @Body() dto: CorregirEmpresaDto, @UsuarioActual() s: SesionUsuario) {
+    return this.empresas.corregirDatos(id, dto.razonSocial, dto.distritoId, s);
   }
 
   @Post(':id/reasignar')

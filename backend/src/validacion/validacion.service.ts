@@ -10,7 +10,7 @@ export type EventoPosventa = 'CHIPS_ENTREGADOS' | 'PORTABILIDAD_EJECUTADA' | 'SE
 /** Lo que muestra cada tarjeta de las bandejas */
 const COLUMNAS = `
   o.id, o.codigo, o.tipo, o.estado_venta AS "estadoVenta", o.correcciones, o.fecha_cierre AS "fechaCierre",
-  o.fecha_validacion AS "fechaValidacion", o.cliente_id AS "clienteId", c.razon_social AS "razonSocial", c.ruc,
+  o.fecha_validacion AS "fechaValidacion", o.orden_operador AS "ordenOperador", o.cliente_id AS "clienteId", c.razon_social AS "razonSocial", c.ruc,
   ua.nombres || ' ' || ua.apellidos AS asesor, eq.nombre AS equipo, pv.nombre AS "pasoActual",
   t.lineas, t.portabilidades, t.total,
   (SELECT v.comentario FROM validaciones v WHERE v.oportunidad_id = o.id AND v.decision = 'OBSERVADA'
@@ -85,6 +85,60 @@ export class ValidacionService {
        WHERE o.resultado = 'GANADA'`, [s.equipoId],
     );
     return r;
+  }
+
+  /** Puntos que back office revisa antes de validar */
+  checklist() {
+    return this.db.query(
+      `SELECT id, texto, solo_portabilidad AS "soloPortabilidad" FROM checklist_validacion WHERE activo ORDER BY orden`,
+    );
+  }
+
+  // ───────────── Resumen de back office (indicadores del perfil de puesto) ─────────────
+  async resumenBackoffice() {
+    const Z = `'America/Lima'`;
+    const MES = `date_trunc('month', now() AT TIME ZONE ${Z}) AT TIME ZONE ${Z}`;
+    const HOY = `date_trunc('day', now() AT TIME ZONE ${Z}) AT TIME ZONE ${Z}`;
+    const [k] = await this.db.query(
+      `SELECT
+         (SELECT count(*)::int FROM oportunidades o JOIN pasos_validacion p ON p.id = o.paso_actual_id JOIN roles r ON r.id = p.rol_id
+          WHERE o.estado_venta = 'EN_VALIDACION' AND r.codigo = 'BACKOFFICE') AS "porValidar",
+         (SELECT count(*)::int FROM oportunidades WHERE estado_venta IN ('VALIDADA','EN_POSVENTA')) AS "enPosventa",
+         (SELECT count(*)::int FROM validaciones WHERE decision = 'VALIDADA' AND created_at >= ${HOY}) AS "validadasHoy",
+         (SELECT count(*)::int FROM validaciones WHERE decision = 'VALIDADA' AND created_at >= ${MES}) AS "validadasMes",
+         (SELECT count(*)::int FROM validaciones v JOIN pasos_validacion p ON p.id = v.paso_id JOIN roles r ON r.id = p.rol_id
+          WHERE v.decision = 'OBSERVADA' AND r.codigo = 'BACKOFFICE' AND v.created_at >= ${MES}) AS "observadasMes",
+         (SELECT count(*)::int FROM oportunidades WHERE estado_venta = 'ACTIVA' AND fecha_activacion >= ${MES}) AS "activadasMes",
+         -- Horas desde que el supervisor aprobó hasta que back office validó
+         (SELECT COALESCE(round(avg(extract(epoch FROM v.created_at - (
+             SELECT max(a.created_at) FROM validaciones a WHERE a.oportunidad_id = v.oportunidad_id AND a.decision = 'APROBADA' AND a.created_at < v.created_at
+           )) / 3600)::numeric, 1), 0)::float8
+          FROM validaciones v WHERE v.decision = 'VALIDADA' AND v.created_at >= ${MES}) AS "horasProcesamiento",
+         -- Días desde la validación hasta la activación
+         (SELECT COALESCE(round(avg(extract(epoch FROM fecha_activacion - fecha_validacion) / 86400)::numeric, 1), 0)::float8
+          FROM oportunidades WHERE estado_venta = 'ACTIVA' AND fecha_activacion >= ${MES}) AS "diasActivacion",
+         -- De lo validado en los últimos 90 días, cuánto terminó activo
+         (SELECT count(*) FILTER (WHERE estado_venta = 'ACTIVA')::int FROM oportunidades WHERE fecha_validacion >= now() - interval '90 days') AS "activas90",
+         (SELECT count(*)::int FROM oportunidades WHERE fecha_validacion >= now() - interval '90 days') AS "validadas90"`,
+    );
+    const porDia = await this.db.query(
+      `SELECT to_char(d, 'YYYY-MM-DD') AS dia,
+              (SELECT count(*)::int FROM validaciones v WHERE v.decision = 'VALIDADA'
+                 AND v.created_at >= d AT TIME ZONE ${Z} AND v.created_at < (d + interval '1 day') AT TIME ZONE ${Z}) AS validadas
+       FROM generate_series(((now() AT TIME ZONE ${Z})::date - 13)::timestamp, (now() AT TIME ZONE ${Z})::date::timestamp, interval '1 day') AS d
+       ORDER BY d`,
+    );
+    // Las que más tiempo llevan esperando validación (para cuidar el SLA)
+    const esperando = await this.db.query(
+      `SELECT o.id, o.codigo, c.razon_social AS "razonSocial", ua.nombres || ' ' || ua.apellidos AS asesor,
+              round(extract(epoch FROM now() - (SELECT max(a.created_at) FROM validaciones a
+                    WHERE a.oportunidad_id = o.id AND a.decision IN ('APROBADA','REENVIADA'))) / 3600)::int AS horas
+       FROM oportunidades o JOIN clientes c ON c.id = o.cliente_id JOIN usuarios ua ON ua.id = o.asesor_id
+       JOIN pasos_validacion p ON p.id = o.paso_actual_id JOIN roles r ON r.id = p.rol_id
+       WHERE o.estado_venta = 'EN_VALIDACION' AND r.codigo = 'BACKOFFICE'
+       ORDER BY horas DESC NULLS LAST LIMIT 5`,
+    );
+    return { ...k, porDia, esperando };
   }
 
   // ───────────── Paso 1 · Supervisor aprueba ─────────────
@@ -168,11 +222,20 @@ export class ValidacionService {
   }
 
   // ───────────── Paso 3 · Back office valida ─────────────
-  async validar(id: string, comentario: string | undefined, s: SesionUsuario) {
+  async validar(id: string, comentario: string | undefined, marcados: number[], s: SesionUsuario) {
     await this.db.transaction(async (tx) => {
       const v = await this.bloquear(tx, id);
       this.exigirPaso(v, 'BACKOFFICE');
-      await this.registrar(tx, v, s.sub, 'VALIDADA', comentario);
+      // Todos los puntos del checklist que aplican a esta venta deben estar marcados
+      const puntos: { id: number; texto: string }[] = await tx.query(
+        `SELECT cv.id, cv.texto FROM checklist_validacion cv
+         WHERE cv.activo AND (NOT cv.solo_portabilidad OR EXISTS (
+           SELECT 1 FROM oportunidad_items i WHERE i.oportunidad_id = $1 AND i.modalidad = 'PORTABILIDAD'))
+         ORDER BY cv.orden`, [id],
+      );
+      const faltan = puntos.filter((p) => !marcados.includes(Number(p.id)));
+      if (faltan.length) throw new BadRequestException(`Falta revisar: ${faltan.map((f) => f.texto.toLowerCase()).join('; ')}`);
+      await this.registrar(tx, v, s.sub, 'VALIDADA', comentario, undefined, puntos.map((p) => Number(p.id)));
       const siguiente = await this.siguientePaso(tx, v.pasoOrden!);
       await this.avanzar(tx, v, siguiente, s);
     });
@@ -180,10 +243,17 @@ export class ValidacionService {
   }
 
   // ───────────── Posventa (back office) ─────────────
-  async posventa(id: string, evento: EventoPosventa, comentario: string | undefined, s: SesionUsuario) {
+  async posventa(id: string, evento: EventoPosventa, comentario: string | undefined, ordenOperador: string | undefined, s: SesionUsuario) {
     await this.db.transaction(async (tx) => {
       const v = await this.bloquear(tx, id);
       if (!['VALIDADA', 'EN_POSVENTA'].includes(v.estadoVenta)) throw new BadRequestException('La venta debe estar validada para registrar la posventa');
+      if (ordenOperador?.trim()) {
+        await tx.query(`UPDATE oportunidades SET orden_operador = $1 WHERE id = $2`, [ordenOperador.trim(), id]);
+      }
+      if (evento === 'SERVICIO_ACTIVO') {
+        const [{ orden }] = await tx.query(`SELECT orden_operador AS orden FROM oportunidades WHERE id = $1`, [id]);
+        if (!orden) throw new BadRequestException('Registra el N° de orden del operador antes de activar');
+      }
       const [{ portas }] = await tx.query(
         `SELECT COALESCE(sum(cantidad) FILTER (WHERE modalidad = 'PORTABILIDAD'), 0)::int AS portas FROM oportunidad_items WHERE oportunidad_id = $1`, [id],
       );
@@ -302,10 +372,10 @@ export class ValidacionService {
       `${v.codigo} (${v.razonSocial}) fue validada. Back office se encarga ahora de los chips y la activación.`, v.id);
   }
 
-  private registrar(tx: EntityManager, v: VentaBloqueada, usuarioId: string, decision: string, comentario?: string, pasoId?: number | null) {
+  private registrar(tx: EntityManager, v: VentaBloqueada, usuarioId: string, decision: string, comentario?: string, pasoId?: number | null, checklist?: number[]) {
     return tx.query(
-      `INSERT INTO validaciones (oportunidad_id, paso_id, usuario_id, decision, comentario, intento) VALUES ($1, $2, $3, $4, $5, $6)`,
-      [v.id, pasoId !== undefined ? pasoId : v.pasoId, usuarioId, decision, comentario?.trim() || null, v.correcciones + 1],
+      `INSERT INTO validaciones (oportunidad_id, paso_id, usuario_id, decision, comentario, intento, checklist) VALUES ($1, $2, $3, $4, $5, $6, $7)`,
+      [v.id, pasoId !== undefined ? pasoId : v.pasoId, usuarioId, decision, comentario?.trim() || null, v.correcciones + 1, checklist ?? null],
     );
   }
 

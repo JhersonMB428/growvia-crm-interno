@@ -25,6 +25,8 @@ export interface EmpresaDetalle extends EmpresaResumen {
   contactos: Contacto[] | null; // null = no tiene permiso para verlos
   historial: { motivo: string; fecha: string; asesorAnterior: string | null; asesorNuevo: string | null; hechoPor: string }[] | null;
   puedeEditar: boolean;
+  /** Back office / admin: puede corregir razón social, ubicación y contactos */
+  puedeCorregirDatos?: boolean;
 }
 
 export interface Pagina<T> { total: number; pagina: number; porPagina: number; paginas: number; filas: T[] }
@@ -47,6 +49,8 @@ export const empresasApi = {
   crear: (datos: { ruc: string; razonSocial: string; distritoId: string; contactos: Contacto[] }) =>
     api<EmpresaDetalle>('/empresas', { metodo: 'POST', cuerpo: datos }),
   tomar: (id: string) => api<EmpresaDetalle>(`/empresas/${id}/tomar`, { metodo: 'POST' }),
+  corregir: (id: string, datos: { razonSocial: string; distritoId: string }) =>
+    api<EmpresaDetalle>(`/empresas/${id}`, { metodo: 'PUT', cuerpo: datos }),
   guardarContactos: (id: string, contactos: Contacto[]) =>
     api<EmpresaDetalle>(`/empresas/${id}/contactos`, { metodo: 'PUT', cuerpo: { contactos } }),
 };

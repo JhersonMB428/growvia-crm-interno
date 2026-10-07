@@ -66,7 +66,7 @@ export function ResumenGerencia() {
               <span className="kpi__titulo">Ventas activas</span>
               <span className="kpi__valor numeros">{k.ventas}</span>
               <span className="kpi__detalle">Ticket promedio {soles(k.ventas ? Math.round(k.cargo / k.ventas) : 0)}</span>
-            </section>
+              <span className="kpi__detalle">Conversión {pct(t.proceso.ganadas, t.proceso.ganadas + t.proceso.perdidas) ?? 0}% ({t.proceso.ganadas} ganadas de {t.proceso.ganadas + t.proceso.perdidas} cerradas)</span>            </section>
             <section className="kpi vidrio">
               <span className="kpi__titulo">Portabilidad</span>
               <span className="kpi__valor numeros">{pct(k.portas, k.lineas) ?? 0}%</span>

@@ -18,11 +18,13 @@ export interface TableroAsesor {
   ultimas: { id: string; codigo: string; razonSocial: string; etapa: Etapa; resultado: Resultado; estadoVenta: EstadoVenta | null; lineas: number; total: number }[];
   posicion: number | null;
   tamanoEquipo: number;
+  conversion: { ganadas: number; perdidas: number };
 }
 
 export interface AsesorEquipo {
   id: string; nombre: string; metaLineas: number | null; lineas: number; ventas: number; cargo: number;
   porActivar: number; abiertas: number; gestionesHoy: number; noRealizadas: number;
+  ganadas: number; perdidas: number; observadas: number;
 }
 
 export interface TableroEquipo {
@@ -36,7 +38,7 @@ export interface TableroGerencia {
   mes: string;
   kpi: Activas & { metaLineas: number | null; proyeccion: number; porActivar: number };
   mesAnterior: { ventas: number; lineas: number; cargo: number };
-  proceso: { ganadas: number; observadas: number; diasCierre: number };
+  proceso: { ganadas: number; perdidas: number; observadas: number; diasCierre: number };
   equipos: { id: string; nombre: string; supervisor: string | null; lineas: number; ventas: number; cargo: number; metaLineas: number | null }[];
   distritos: { distrito: string; provincia: string | null; ventas: number; lineas: number; cargo: number; lineasMesAnterior: number }[];
   operadores: { nombre: string; lineas: number }[];

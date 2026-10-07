@@ -52,6 +52,7 @@ export interface NegociacionDetalle extends NegociacionResumen {
   pasoActual: string | null;
   fechaValidacion: string | null;
   fechaActivacion: string | null;
+  ordenOperador: string | null;
   items: ItemNegociacion[];
   historial: { etapaAnterior: Etapa | null; etapaNueva: Etapa; detalle: string | null; fecha: string; usuario: string }[];
   validaciones: { decision: string; comentario: string | null; intento: number; fecha: string; paso: string | null; usuario: string }[];

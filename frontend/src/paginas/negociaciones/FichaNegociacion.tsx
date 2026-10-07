@@ -228,6 +228,7 @@ function SeccionValidacion({ n, onCambio }: { n: NegociacionDetalle; onCambio: (
           )}
         </div>
       )}
+      {n.ordenOperador && <p style={{ margin: 0, fontSize: 14 }}><b>N° de orden del operador:</b> <span className="numeros">{n.ordenOperador}</span></p>}
       {n.estadoVenta === 'ANULADA' && <div className="alerta" role="alert">Esta venta fue anulada y no cuenta para la meta.</div>}
       {n.estadoVenta === 'ACTIVA' && n.fechaActivacion && <div className="aviso" role="status">Servicio activo desde el {fecha(n.fechaActivacion)}. Ya suma a la meta.</div>}
       {error && <div className="alerta" role="alert">{error}</div>}

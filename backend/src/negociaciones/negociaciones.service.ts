@@ -97,7 +97,7 @@ export class NegociacionesService {
     const [o] = await this.db.query(
       `SELECT ${COLUMNAS}, ua.equipo_id AS "equipoAsesorId", o.equipo_id AS "equipoVentaId",
               c.asesor_id AS "duenoEmpresaId", o.correcciones, o.fecha_validacion AS "fechaValidacion",
-              o.fecha_activacion AS "fechaActivacion",
+              o.fecha_activacion AS "fechaActivacion", o.orden_operador AS "ordenOperador",
               (SELECT pv.nombre FROM pasos_validacion pv WHERE pv.id = o.paso_actual_id) AS "pasoActual"
        ${UNIONES} WHERE o.id = $1`, [id],
     );

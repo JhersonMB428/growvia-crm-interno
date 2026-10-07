@@ -12,6 +12,7 @@ export interface VentaEnBandeja {
   correcciones: number;
   fechaCierre: string;
   fechaValidacion: string | null;
+  ordenOperador: string | null;
   clienteId: string;
   razonSocial: string;
   ruc: string;
@@ -26,6 +27,15 @@ export interface VentaEnBandeja {
   eventos: EventoPosventa[];
 }
 
+export interface PuntoChecklist { id: number; texto: string; soloPortabilidad: boolean }
+
+export interface ResumenBackoffice {
+  porValidar: number; enPosventa: number; validadasHoy: number; validadasMes: number; observadasMes: number;
+  activadasMes: number; horasProcesamiento: number; diasActivacion: number; activas90: number; validadas90: number;
+  porDia: { dia: string; validadas: number }[];
+  esperando: { id: string; codigo: string; razonSocial: string; asesor: string; horas: number | null }[];
+}
+
 const post = (ruta: string, cuerpo: object = {}) => api<{ ok: boolean; anulada?: boolean }>(ruta, { metodo: 'POST', cuerpo });
 
 export const validacionApi = {
@@ -35,8 +45,10 @@ export const validacionApi = {
   revisar: (id: string, comentario?: string) => post(`/validacion/${id}/revisar`, { comentario }),
   observar: (id: string, comentario: string) => post(`/validacion/${id}/observar`, { comentario }),
   detener: (id: string, comentario: string) => post(`/validacion/${id}/detener`, { comentario }),
-  validar: (id: string, comentario?: string) => post(`/validacion/${id}/validar`, { comentario }),
-  posventa: (id: string, evento: EventoPosventa, comentario?: string) => post(`/validacion/${id}/posventa`, { evento, comentario }),
+  validar: (id: string, checklist: number[], comentario?: string) => post(`/validacion/${id}/validar`, { checklist, comentario }),
+  posventa: (id: string, evento: EventoPosventa, ordenOperador?: string) => post(`/validacion/${id}/posventa`, { evento, ordenOperador }),
+  checklist: () => api<PuntoChecklist[]>('/validacion/checklist'),
+  resumen: () => api<ResumenBackoffice>('/validacion/resumen'),
   reenviar: (id: string) => post(`/negociaciones/${id}/reenviar`),
 };
 
