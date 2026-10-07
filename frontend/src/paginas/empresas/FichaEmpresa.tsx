@@ -3,6 +3,8 @@ import { useLocation, useNavigate, useParams } from 'react-router-dom';
 import { ErrorApi } from '../../api/cliente';
 import { empresasApi, ubicacion, type Contacto, type EmpresaDetalle } from '../../api/empresas';
 import { contactosCompletos, EditorContactos, limpiarContactos } from '../../componentes/EditorContactos';
+import { NegociacionesEmpresa } from '../../componentes/NegociacionesEmpresa';
+import { GestionesEmpresa } from '../../componentes/GestionesEmpresa';
 import { useSesion } from '../../sesion/SesionContext';
 
 const MOTIVO: Record<string, string> = {
@@ -54,8 +56,10 @@ export function FichaEmpresa() {
         <div style={{ display: 'flex', gap: 10, alignItems: 'center', flexWrap: 'wrap' }}>
           <span className={`chip ${e.estado === 'VENTA' ? 'chip--lima' : 'chip--gris'}`}>{e.estado === 'VENTA' ? 'Venta' : 'Prospecto'}</span>
           {e.libre && <span className="chip chip--crema">Libre</span>}
-          {e.libre && puede('EMPRESA_TOMAR') && <button type="button" className="boton" onClick={tomar} disabled={ocupado}>{ocupado ? 'Tomando…' : 'Tomar empresa'}</button>}
-        </div>
+          {e.puedeEditar && puede('NEGOCIACION_GESTIONAR') && (
+            <button type="button" className="boton"
+              onClick={() => document.getElementById('gestiones')?.scrollIntoView({ behavior: 'smooth' })}>Registrar gestión</button>
+          )}        </div>
       </div>
 
       {aviso && <div className="aviso" role="status">{aviso}</div>}
@@ -127,6 +131,10 @@ export function FichaEmpresa() {
           </ol>
         </aside>
       </div>
+
+      {/* Solo quien ve la información comercial ve sus negociaciones */}
+      {e.contactos !== null && <NegociacionesEmpresa empresaId={e.id} puedeAbrir={e.puedeEditar && puede('NEGOCIACION_GESTIONAR')} />}
+      {e.contactos !== null && <GestionesEmpresa empresaId={e.id} />}
     </>
   );
 }

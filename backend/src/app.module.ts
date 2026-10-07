@@ -5,10 +5,15 @@ import { TypeOrmModule } from '@nestjs/typeorm';
 import { AuthModule } from './auth/auth.module';
 import { CorreoModule } from './correo/correo.module';
 import { EmpresasModule } from './empresas/empresas.module';
-import { SaludController } from './salud.controller';
+import { GestionesModule } from './gestiones/gestiones.module';
+import { NegociacionesModule } from './negociaciones/negociaciones.module';
+import { NotificacionesModule } from './notificaciones/notificaciones.module';import { SaludController } from './salud.controller';
 import { SistemaModule } from './sistema/sistema.module';
+import { TablerosModule } from './tableros/tableros.module';
 import { UbigeoModule } from './ubigeo/ubigeo.module';
 import { UsuariosModule } from './usuarios/usuarios.module';
+import { BasesModule } from './bases/bases.module';
+import { ValidacionModule } from './validacion/validacion.module';
 
 @Module({
   imports: [
@@ -29,6 +34,12 @@ import { UsuariosModule } from './usuarios/usuarios.module';
     AuthModule,
     UbigeoModule,
     EmpresasModule,
+    NegociacionesModule,
+    NotificacionesModule,
+    GestionesModule,
+    ValidacionModule,
+    TablerosModule,
+    BasesModule,  
   ],
   controllers: [SaludController],
 })

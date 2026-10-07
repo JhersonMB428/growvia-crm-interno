@@ -170,6 +170,11 @@ export class EmpresasService {
          VALUES ($1, $2, $3, 'REASIGNACION', $4)`,
         [id, actual.asesorId, asesorId, sesion.sub],
       );
+      // La negociación abierta (si hay) pasa al nuevo asesor junto con la empresa
+      await tx.query(
+        `UPDATE oportunidades SET asesor_id = $1, updated_at = now() WHERE cliente_id = $2 AND resultado = 'EN_CURSO'`,
+        [asesorId, id],
+      );
     });
     return this.detalle(id, sesion);
   }

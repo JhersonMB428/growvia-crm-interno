@@ -23,6 +23,9 @@ export class LiberacionService {
            SELECT id, asesor_id FROM clientes
            WHERE asesor_id IS NOT NULL AND estado = 'PROSPECTO'
              AND COALESCE(ultima_gestion_at, asignado_at) < now() - make_interval(days => $1)
+             -- una venta ganada que sigue en validación o posventa no se libera
+             AND NOT EXISTS (SELECT 1 FROM oportunidades o WHERE o.cliente_id = clientes.id
+                             AND o.resultado = 'GANADA' AND o.estado_venta <> 'ANULADA')
            FOR UPDATE
          )
          UPDATE clientes c SET asesor_id = NULL, asignado_at = NULL, updated_at = now()
@@ -36,6 +39,20 @@ export class LiberacionService {
           `INSERT INTO asignaciones (cliente_id, asesor_anterior, motivo) VALUES ($1, $2, 'LIBERACION')`,
           [l.id, l.asesor_id],
         );
+        // Si tenía una negociación abierta, se cierra como perdida (usuario NULL = el sistema)
+        const abiertas = await tx.query(
+          `UPDATE oportunidades SET etapa = 'CIERRE', resultado = 'PERDIDA', fecha_cierre = now(), updated_at = now(),
+                  motivo_perdida = 'Empresa liberada por inactividad'
+           FROM (SELECT id, etapa FROM oportunidades WHERE cliente_id = $1 AND resultado = 'EN_CURSO' FOR UPDATE) a
+           WHERE oportunidades.id = a.id RETURNING oportunidades.id, a.etapa`,
+          [l.id],
+        );
+        for (const o of Array.isArray(abiertas[0]) ? abiertas[0] : abiertas) {
+          await tx.query(
+            `INSERT INTO historial_etapas (oportunidad_id, etapa_anterior, etapa_nueva, detalle) VALUES ($1, $2, 'CIERRE', $3)`,
+            [o.id, o.etapa, 'Perdida: la empresa volvió al repositorio por inactividad'],
+          );
+        }
       }
       return lista;
     });

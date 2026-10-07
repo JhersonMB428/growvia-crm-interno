@@ -1,0 +1,66 @@
+/* ===== Negociaciones: embudo, tabla de planes y etapas ===== */
+.embudo { display: grid; grid-template-columns: repeat(5, minmax(220px, 1fr)); gap: 14px; overflow-x: auto; padding-bottom: 6px; }
+.embudo__columna { display: flex; flex-direction: column; gap: 10px; min-width: 0; }
+.embudo__cabecera { display: flex; align-items: baseline; justify-content: space-between; gap: 8px; padding: 0 6px; }
+.embudo__cabecera h2 { font-size: 15px; font-weight: 700; margin: 0; }
+.embudo__cabecera span { font-size: 13px; color: var(--texto-suave); }
+.embudo__vacia { padding: 18px 12px; border-radius: 18px; border: 1px dashed var(--campo-borde); color: var(--texto-tenue); font-size: 13px; text-align: center; }
+
+.tarjeta-op {
+  position: relative; display: flex; flex-direction: column; gap: 6px; padding: 14px; border-radius: 18px;
+  background: var(--campo-fondo); border: 1px solid transparent; color: var(--texto); font-size: 13px;
+}
+.tarjeta-op:hover { border-color: var(--acento); }
+.app .tarjeta-op a { color: var(--texto); font-weight: 700; font-size: 14px; text-decoration: none; }
+.tarjeta-op a::after { content: ''; position: absolute; inset: 0; border-radius: 18px; }
+.tarjeta-op .tenue { color: var(--texto-suave); }
+.tarjeta-op__pie { display: flex; justify-content: space-between; align-items: center; gap: 8px; }
+
+/* Fila de negociación en la ficha de empresa (toda la fila es clicable) */
+.fila-op {
+  position: relative; display: grid; grid-template-columns: minmax(0, 1fr) auto auto; gap: 14px; align-items: center;
+  padding: 14px 16px; border-radius: 18px; background: var(--campo-fondo); border: 1px solid transparent; font-size: 14px;
+}
+.fila-op:hover { border-color: var(--acento); }
+.app .fila-op a { color: var(--texto); font-weight: 700; text-decoration: none; }
+.fila-op a::after { content: ''; position: absolute; inset: 0; border-radius: 18px; }
+.fila-op .tenue { color: var(--texto-suave); }
+
+/* Etapas tipo "pasos" */
+.etapas { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 6px; }
+.etapa {
+  height: 44px; border-radius: 999px; border: 1px solid var(--campo-borde); background: var(--campo-fondo);
+  color: var(--texto-suave); font: inherit; font-size: 14px; font-weight: 600; display: flex; align-items: center; justify-content: center;
+}
+button.etapa { cursor: pointer; }
+button.etapa:hover:not(:disabled) { border-color: var(--acento); color: var(--texto); }
+.etapa--hecha { color: var(--texto); }
+.etapa--actual { background: var(--activo-fondo); color: var(--activo-texto); border-color: transparent; font-weight: 700; }
+.etapa:disabled { cursor: default; }
+
+/* Tabla de planes */
+.planes { display: flex; flex-direction: column; gap: 8px; }
+.planes__fila, .planes__cabecera {
+  display: grid; grid-template-columns: minmax(0, 1.4fr) minmax(0, 1.2fr) minmax(0, 1.1fr) 90px 120px 110px 40px; gap: 10px; align-items: center;
+}
+.planes__cabecera { padding: 0 4px; font-size: 12px; font-weight: 700; letter-spacing: .05em; text-transform: uppercase; color: var(--texto-tenue); }
+.planes__fila .entrada { height: 46px; padding: 0 12px; }
+.planes__subtotal { text-align: right; font-weight: 700; }
+.boton-quitar {
+  width: 40px; height: 40px; border-radius: 999px; border: 1px solid var(--campo-borde); background: transparent;
+  color: var(--texto-suave); cursor: pointer; font-size: 18px; line-height: 1;
+}
+.boton-quitar:hover:not(:disabled) { border-color: var(--salir); color: var(--salir); }
+.boton-quitar:disabled { opacity: .35; cursor: default; }
+.planes--lectura .planes__fila, .planes--lectura .planes__cabecera { grid-template-columns: minmax(0, 1.4fr) minmax(0, 1.2fr) minmax(0, 1fr) 80px 110px 110px; }
+.planes--lectura .planes__fila { padding: 12px 14px; border-radius: 16px; background: var(--campo-fondo); font-size: 14px; }
+
+.total-grande { font-family: var(--fuente-titulos); font-size: 34px; font-weight: 600; letter-spacing: -0.02em; }
+
+@media (max-width: 960px) {
+  .planes__cabecera { display: none; }
+  .planes__fila { grid-template-columns: 1fr 1fr; padding: 12px; border-radius: 16px; background: var(--campo-fondo); }
+  .planes__subtotal { text-align: left; }
+  .planes--lectura .planes__fila { grid-template-columns: 1fr 1fr; }
+  .etapas { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
