@@ -39,6 +39,7 @@ function detalle(r: RegistroBitacora): string {
     case 'ACCESO_MOVIL_APROBAR': return `hasta el ${diaLargo(String(d.hasta))}`;
     case 'ACCESO_MOVIL_OTORGAR': return `${r.otroUsuario ? `a ${r.otroUsuario} ` : ''}hasta el ${diaLargo(String(d.hasta))}`;
     case 'ACCESO_MOVIL_RECHAZAR': case 'ACCESO_MOVIL_REVOCAR': return String(d.respuesta ?? '');
+    case 'PERFIL_AVISOS': return `Recordatorio ${d.minutosRecordatorio} min antes · resumen por correo: ${d.avisoCorreo ? 'sí' : 'no'}`;
     case 'OTRA': return String(d.ruta ?? '');
     default: return '';
   }

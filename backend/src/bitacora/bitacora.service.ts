@@ -50,6 +50,10 @@ const REGLAS: Record<string, Regla> = {
   'POST /accesos-moviles/:id/rechazar': { accion: 'ACCESO_MOVIL_RECHAZAR', entidad: 'ACCESO', campos: ['respuesta'] },
   'POST /accesos-moviles/:id/revocar': { accion: 'ACCESO_MOVIL_REVOCAR', entidad: 'ACCESO', campos: ['respuesta'] },
   'POST /accesos-moviles/otorgar': { accion: 'ACCESO_MOVIL_OTORGAR', campos: ['usuarioId', 'hasta'] },
+  'PUT /perfil/clave': { accion: 'CLAVE_CAMBIAR' },
+  'PUT /perfil/avisos': { accion: 'PERFIL_AVISOS', campos: ['avisoCorreo', 'minutosRecordatorio'] },
+  'DELETE /perfil/dispositivos/:id': { accion: 'DISPOSITIVO_QUITAR' },
+  'DELETE /perfil/dispositivos': { accion: 'DISPOSITIVOS_QUITAR_TODOS' },
 };
 
 /** Acciones sin valor de auditoría */
@@ -58,7 +62,8 @@ const IGNORAR = new Set(['POST /notificaciones/leer-todas', 'POST /notificacione
 /** Grupos para el filtro de la pantalla */
 export const CATEGORIAS: Record<string, string[]> = {
   accesos: ['LOGIN', 'LOGIN_FALLIDO', 'CODIGO_FALLIDO', 'LOGIN_BLOQUEADO', 'ACCESO_DENEGADO', 'SESION_MOVIL_CORTADA',
-    'ACCESO_MOVIL_SOLICITAR', 'ACCESO_MOVIL_APROBAR', 'ACCESO_MOVIL_RECHAZAR', 'ACCESO_MOVIL_REVOCAR', 'ACCESO_MOVIL_OTORGAR'],
+        'ACCESO_MOVIL_SOLICITAR', 'ACCESO_MOVIL_APROBAR', 'ACCESO_MOVIL_RECHAZAR', 'ACCESO_MOVIL_REVOCAR', 'ACCESO_MOVIL_OTORGAR',
+    'CLAVE_CAMBIAR', 'CLAVE_FALLIDA', 'DISPOSITIVO_QUITAR', 'DISPOSITIVOS_QUITAR_TODOS'],
   empresas: ['EMPRESA_CREAR', 'EMPRESA_TOMAR', 'EMPRESA_REASIGNAR', 'EMPRESA_CORREGIR', 'CONTACTOS_EDITAR', 'GESTION_REGISTRAR', 'GESTION_REPROGRAMAR'],
   ventas: ['NEGOCIACION_CREAR', 'NEGOCIACION_EDITAR', 'NEGOCIACION_ETAPA', 'NEGOCIACION_CERRAR', 'VENTA_REENVIAR', 'VENTA_APROBAR',
     'VENTA_REVISAR', 'VENTA_OBSERVAR', 'VENTA_DETENER', 'VENTA_VALIDAR', 'VENTA_POSVENTA'],

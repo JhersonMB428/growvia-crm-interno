@@ -10,6 +10,7 @@ import { IsNull, LessThanOrEqual, MoreThan, Repository } from 'typeorm';
 import { CorreoService } from '../correo/correo.service';
 import { ParametrosService } from '../sistema/parametros.service';
 import { Usuario } from '../usuarios/entities/usuario.entity';
+import { nombreDelEquipo } from './clave';
 import { LoginDto } from './dto/login.dto';
 import { VerificarDto } from './dto/verificar.dto';
 import { AccesoMovil } from './entities/acceso-movil.entity';
@@ -73,7 +74,7 @@ export class AuthService {
   }
 
   // ───────────────────────── 2. Código del correo ─────────────────────────
-  async verificar(dto: VerificarDto) {
+  async verificar(dto: VerificarDto, userAgent = '') {
     const usuarioId = await this.leerDesafio(dto.desafio);
     const maxIntentos = await this.parametros.numero('max_intentos_codigo', 5);
 
@@ -105,9 +106,9 @@ export class AuthService {
       const huellaHash = this.hash(dto.huella);
       const existente = await this.dispositivos.findOne({ where: { usuarioId, huellaHash } });
       if (existente) {
-        await this.dispositivos.update(existente.id, { expiraAt, revocadoAt: null, ultimoUsoAt: new Date() });
+        await this.dispositivos.update(existente.id, { expiraAt, revocadoAt: null, ultimoUsoAt: new Date(), nombre: nombreDelEquipo(userAgent) });
       } else {
-        await this.dispositivos.insert({ usuarioId, huellaHash, expiraAt, ultimoUsoAt: new Date() });
+        await this.dispositivos.insert({ usuarioId, huellaHash, expiraAt, ultimoUsoAt: new Date(), nombre: nombreDelEquipo(userAgent) });
       }
     }
     return this.emitirSesion(usuarioId);
@@ -147,7 +148,8 @@ export class AuthService {
   }
 
   // ───────────────────────── Ayudantes ─────────────────────────
-  private async emitirSesion(usuarioId: string) {
+  /** También lo usa el perfil para dar un token nuevo al cambiar la contraseña */
+  async emitirSesion(usuarioId: string) {
     const usuario = await this.perfil(usuarioId);
     const token = await this.jwt.signAsync(
       { sub: usuario.id, tipo: 'acceso', rol: usuario.rol.codigo, equipoId: usuario.equipo?.id ?? null, permisos: usuario.permisos },

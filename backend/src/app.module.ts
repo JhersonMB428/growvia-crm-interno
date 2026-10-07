@@ -11,7 +11,9 @@ import { ExpedienteModule } from './expediente/expediente.module';
 import { ExportacionModule } from './exportacion/exportacion.module';
 import { GestionesModule } from './gestiones/gestiones.module';
 import { NegociacionesModule } from './negociaciones/negociaciones.module';
-import { NotificacionesModule } from './notificaciones/notificaciones.module';import { SaludController } from './salud.controller';
+import { NotificacionesModule } from './notificaciones/notificaciones.module';
+import { PerfilModule } from './perfil/perfil.module';
+import { SaludController } from './salud.controller';
 import { SistemaModule } from './sistema/sistema.module';
 import { TablerosModule } from './tableros/tableros.module';
 import { UbigeoModule } from './ubigeo/ubigeo.module';
@@ -50,6 +52,7 @@ import { ValidacionModule } from './validacion/validacion.module';
     BitacoraModule,
     ExportacionModule,
     AccesosMovilModule,
+    PerfilModule,
   ],
   controllers: [SaludController],
 })

@@ -6,8 +6,7 @@ import { BitacoraService } from '../../bitacora/bitacora.service';
 import { ES_PUBLICO } from '../decorators/publico.decorator';
 
 const ES_CELULAR = /Android|iPhone|iPad|iPod|Mobile|Windows Phone/i;
-/** La pantalla hace varias consultas a la vez: el corte del celular se registra una sola vez por minuto */
-const ultimoCorte = new Map<string, number>();
+
 /** Exige un token de sesión válido en todas las rutas, salvo las marcadas con @Publico() */
 @Injectable()
 export class JwtAuthGuard implements CanActivate {
@@ -26,7 +25,7 @@ export class JwtAuthGuard implements CanActivate {
     const [tipo, token] = (req.headers.authorization ?? '').split(' ');
     if (tipo !== 'Bearer' || !token) throw new UnauthorizedException('Inicia sesión para continuar');
 
-    let payload: { sub: string; tipo: string };
+    let payload: { sub: string; tipo: string; iat: number };
     try {
       payload = await this.jwt.verifyAsync(token);
       if (payload.tipo !== 'acceso') throw new Error('token no es de sesión');
@@ -34,18 +33,22 @@ export class JwtAuthGuard implements CanActivate {
       throw new UnauthorizedException('Tu sesión venció. Vuelve a iniciar sesión');
     }
 
-    // Desde el celular, el acceso tiene que seguir vigente en cada acción (si venció o lo revocaron, se corta ya)
-    if (ES_CELULAR.test(req.headers['user-agent'] ?? '')) {
-      const [vigente] = await this.db.query(
-        `SELECT 1 FROM accesos_moviles WHERE usuario_id = $1 AND estado = 'APROBADA' AND desde <= now() AND hasta > now()`, [payload.sub],
-      );
-      if (!vigente) {
-      if (Date.now() - (ultimoCorte.get(payload.sub) ?? 0) > 60_000) {
-        ultimoCorte.set(payload.sub, Date.now());
-        await this.bitacora.registrar(payload.sub, 'SESION_MOVIL_CORTADA', { ip: req.ip }).catch(() => undefined);
-      }
-        throw new UnauthorizedException({ codigo: 'MOVIL_VENCIDO', message: 'Tu acceso desde el celular venció o fue retirado. Úsalo desde la computadora o pide uno nuevo.' });
-      }
+    // En cada acción: el usuario sigue activo, la sesión es posterior al último cambio de contraseña
+    // y, si es un celular, su acceso sigue vigente (si venció o lo revocaron, se corta ya)
+    const esCelular = ES_CELULAR.test(req.headers['user-agent'] ?? '');
+    const [u] = await this.db.query(
+      `SELECT u.activo, floor(extract(epoch FROM u.credenciales_at))::bigint AS credenciales,
+              ($2 AND NOT EXISTS (SELECT 1 FROM accesos_moviles a WHERE a.usuario_id = u.id AND a.estado = 'APROBADA'
+                                   AND a.desde <= now() AND a.hasta > now())) AS "celularBloqueado"
+       FROM usuarios u WHERE u.id = $1`, [payload.sub, esCelular],
+    );
+    if (!u?.activo) throw new UnauthorizedException('Tu usuario fue desactivado. Habla con tu supervisor.');
+    if (u.credenciales && payload.iat < Number(u.credenciales)) {
+      throw new UnauthorizedException('Tu contraseña cambió. Vuelve a iniciar sesión con la nueva.');
+    }
+    if (u.celularBloqueado) {
+      await this.bitacora.registrar(payload.sub, 'SESION_MOVIL_CORTADA', { ip: req.ip }).catch(() => undefined);
+      throw new UnauthorizedException({ codigo: 'MOVIL_VENCIDO', message: 'Tu acceso desde el celular venció o fue retirado. Úsalo desde la computadora o pide uno nuevo.' });
     }
 
     req.usuario = payload;

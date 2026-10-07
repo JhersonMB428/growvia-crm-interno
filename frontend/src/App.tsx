@@ -26,6 +26,7 @@ import { ResumenGerencia } from './paginas/tableros/ResumenGerencia';
 import { AccesosCelular } from './paginas/accesos/AccesosCelular';
 import { Bitacora } from './paginas/auditoria/Bitacora';
 import { Exportar } from './paginas/auditoria/Exportar';
+import { Perfil } from './paginas/perfil/Perfil';
 import { ResumenBackoffice } from './paginas/tableros/ResumenBackoffice';
 import { Bases } from './paginas/bases/Bases';
 import { DetalleBase } from './paginas/bases/DetalleBase';
@@ -76,7 +77,7 @@ export default function App() {
               <Route path="/validacion" element={<RutaPrivada roles={['BACKOFFICE']}><BandejaVentas modo="validar" /></RutaPrivada>} />
               <Route path="/usuarios" element={pagina('Usuarios y equipos', 'Cuentas, equipos, roles y permisos.', ['BACKOFFICE', 'ADMIN'])} />
               {/* Todos */}
-              <Route path="/perfil" element={pagina('Perfil y ajustes', 'Tus datos, contraseña, avisos y equipos de confianza.')} />
+              <Route path="/perfil" element={<Perfil />} />
               <Route path="/notificaciones" element={<Notificaciones />} />
               <Route path="*" element={<InicioPorRol />} />
             </Route>

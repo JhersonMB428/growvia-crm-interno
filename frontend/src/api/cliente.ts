@@ -24,8 +24,8 @@ export const token = {
   borrar: () => sessionStorage.removeItem(CLAVE_TOKEN),
 };
 
-export async function api<T>(ruta: string, opciones: { metodo?: string; cuerpo?: unknown } = {}): Promise<T> {
-  const headers: Record<string, string> = { 'Content-Type': 'application/json' };
+export async function api<T>(ruta: string, opciones: { metodo?: string; cuerpo?: unknown; cabeceras?: Record<string, string> } = {}): Promise<T> {
+  const headers: Record<string, string> = { 'Content-Type': 'application/json', ...opciones.cabeceras };
   const t = token.leer();
   if (t) headers.Authorization = `Bearer ${t}`;
 
