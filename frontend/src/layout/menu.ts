@@ -40,6 +40,7 @@ export const MENU_POR_ROL: Record<Rol, ItemMenu[]> = {
     I('/empresas', 'Mis empresas', 'empresas'),
     I('/negociaciones', 'Negociaciones', 'negociaciones'),
     I('/agenda', 'Agenda', 'agenda'),
+    I('/bases', 'Cargar base', 'base'),
   ],
   SUPERVISOR: [
     I('/equipo', 'Mi equipo', 'equipo'),

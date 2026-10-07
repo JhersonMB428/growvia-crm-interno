@@ -23,6 +23,8 @@ import { InicioAsesor } from './paginas/tableros/InicioAsesor';
 import { Metas } from './paginas/tableros/Metas';
 import { MiEquipo } from './paginas/tableros/MiEquipo';
 import { ResumenGerencia } from './paginas/tableros/ResumenGerencia';
+import { Bases } from './paginas/bases/Bases';
+import { DetalleBase } from './paginas/bases/DetalleBase';
 
 type Rol = Usuario['rol']['codigo'];
 
@@ -55,7 +57,8 @@ export default function App() {
               <Route path="/negociaciones/:id" element={<FichaNegociacion />} />              <Route path="/repositorio" element={<Repositorio />} />
 
               <Route path="/metas" element={<RutaPrivada roles={['SUPERVISOR', 'GERENTE']}><Metas /></RutaPrivada>} />
-              <Route path="/bases" element={pagina('Cargar base', 'Carga de empresas desde Excel.', ['SUPERVISOR', 'GERENTE'])} />
+              <Route path="/bases" element={<RutaPrivada roles={['ASESOR', 'SUPERVISOR', 'GERENTE']}><Bases /></RutaPrivada>} />
+              <Route path="/bases/:id" element={<RutaPrivada roles={['ASESOR', 'SUPERVISOR', 'GERENTE']}><DetalleBase /></RutaPrivada>} />
               <Route path="/equipo" element={<RutaPrivada roles={['SUPERVISOR']}><MiEquipo /></RutaPrivada>} />
               <Route path="/aprobaciones" element={<RutaPrivada roles={['SUPERVISOR']}><BandejaVentas modo="aprobar" /></RutaPrivada>} />
 

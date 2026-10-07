@@ -12,6 +12,7 @@ import { SistemaModule } from './sistema/sistema.module';
 import { TablerosModule } from './tableros/tableros.module';
 import { UbigeoModule } from './ubigeo/ubigeo.module';
 import { UsuariosModule } from './usuarios/usuarios.module';
+import { BasesModule } from './bases/bases.module';
 import { ValidacionModule } from './validacion/validacion.module';
 
 @Module({
@@ -37,7 +38,8 @@ import { ValidacionModule } from './validacion/validacion.module';
     NotificacionesModule,
     GestionesModule,
     ValidacionModule,
-    TablerosModule,  
+    TablerosModule,
+    BasesModule,  
   ],
   controllers: [SaludController],
 })

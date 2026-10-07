@@ -8,6 +8,7 @@ import '../componentes/gestiones.css';
 function enlace(n: Notificacion): string {
   if (n.entidad === 'EMPRESA' && n.entidadId) return `/empresas/${n.entidadId}#gestiones`;
   if (n.entidad === 'NEGOCIACION' && n.entidadId) return `/negociaciones/${n.entidadId}`;
+  if (n.entidad === 'LOTE' && n.entidadId) return `/bases/${n.entidadId}`;
   if (n.tipo.startsWith('GESTION')) return '/agenda';
   return '/notificaciones';
 }
