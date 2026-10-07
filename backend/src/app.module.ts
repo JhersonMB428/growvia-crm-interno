@@ -2,9 +2,11 @@ import { Module } from '@nestjs/common';
 import { ConfigModule, ConfigService } from '@nestjs/config';
 import { ScheduleModule } from '@nestjs/schedule';
 import { TypeOrmModule } from '@nestjs/typeorm';
+import { AlmacenamientoModule } from './almacenamiento/almacenamiento.module';
 import { AuthModule } from './auth/auth.module';
 import { CorreoModule } from './correo/correo.module';
 import { EmpresasModule } from './empresas/empresas.module';
+import { ExpedienteModule } from './expediente/expediente.module';
 import { GestionesModule } from './gestiones/gestiones.module';
 import { NegociacionesModule } from './negociaciones/negociaciones.module';
 import { NotificacionesModule } from './notificaciones/notificaciones.module';import { SaludController } from './salud.controller';
@@ -39,7 +41,9 @@ import { ValidacionModule } from './validacion/validacion.module';
     GestionesModule,
     ValidacionModule,
     TablerosModule,
-    BasesModule,  
+    BasesModule,
+    AlmacenamientoModule,
+    ExpedienteModule,
   ],
   controllers: [SaludController],
 })

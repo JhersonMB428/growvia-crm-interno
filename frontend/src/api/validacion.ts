@@ -25,6 +25,7 @@ export interface VentaEnBandeja {
   ultimaObservacion: string | null;
   revisada: boolean;
   eventos: EventoPosventa[];
+  documentos: number;
 }
 
 export interface PuntoChecklist { id: number; texto: string; soloPortabilidad: boolean }

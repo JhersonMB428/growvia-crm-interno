@@ -17,7 +17,8 @@ const COLUMNAS = `
    ORDER BY v.created_at DESC LIMIT 1) AS "ultimaObservacion",
   EXISTS (SELECT 1 FROM validaciones v JOIN pasos_validacion p ON p.id = v.paso_id JOIN roles r ON r.id = p.rol_id
           WHERE v.oportunidad_id = o.id AND v.intento = o.correcciones + 1 AND r.codigo = 'GERENTE') AS "revisada",
-  COALESCE((SELECT array_agg(e.evento) FROM posventa_eventos e WHERE e.oportunidad_id = o.id), '{}') AS eventos`;
+  COALESCE((SELECT array_agg(e.evento) FROM posventa_eventos e WHERE e.oportunidad_id = o.id), '{}') AS eventos,
+  (SELECT count(*)::int FROM documentos_venta d WHERE d.oportunidad_id = o.id AND d.eliminado_at IS NULL) AS documentos`;
 
 const UNIONES = `
   FROM oportunidades o

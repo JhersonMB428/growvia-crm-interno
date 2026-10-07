@@ -12,6 +12,7 @@
     "migration:show": "typeorm-ts-node-commonjs -d src/database/data-source.ts migration:show"
   },
   "dependencies": {
+    "@azure/storage-blob": "^12.34.0",
     "@nestjs/common": "^11.0.0",
     "@nestjs/config": "^4.0.0",
     "@nestjs/core": "^11.0.0",
