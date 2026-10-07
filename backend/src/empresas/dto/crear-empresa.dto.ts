@@ -29,3 +29,13 @@ export class GuardarContactosDto {
   @Type(() => ContactoDto)
   contactos: ContactoDto[];
 }
+
+/** Back office corrige datos de la empresa (el RUC no se cambia) */
+export class CorregirEmpresaDto {
+  @IsString()
+  @Length(3, 200, { message: 'Ingresa la razón social' })
+  razonSocial: string;
+
+  @Matches(/^\d{6}$/, { message: 'Elige el distrito' })
+  distritoId: string;
+}

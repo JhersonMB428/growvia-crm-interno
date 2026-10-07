@@ -69,14 +69,15 @@ export function MiEquipo() {
         </section>
       </div>
 
-      <div className="rejilla-tablero">
+      {/* El ranking va a todo el ancho porque tiene muchas columnas */}
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
         <section className="panel vidrio" style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
           <h2 className="h2">Ranking del equipo</h2>
           {t.asesores.length === 0 && <p style={{ margin: 0, color: 'var(--texto-suave)' }}>Tu equipo todavía no tiene asesores.</p>}
           {t.asesores.length > 0 && (
             <div className="tabla-scroll">
               <table className="tabla">
-                <thead><tr><th>#</th><th>Asesor</th><th style={{ minWidth: 160 }}>Líneas / meta</th><th className="num">Por activar</th><th className="num">Cargo fijo</th><th className="num">Gestiones hoy</th></tr></thead>
+                <thead><tr><th>#</th><th>Asesor</th><th style={{ minWidth: 160 }}>Líneas / meta</th><th className="num">Por activar</th><th className="num">Cargo fijo</th><th className="num" title="Ganadas / cerradas en el mes">Conversión</th><th className="num" title="Ventas ganadas sin observaciones">Calidad</th><th className="num">Gestiones hoy</th></tr></thead>
                 <tbody>
                   {t.asesores.map((a, i) => (
                     <tr key={a.id}>
@@ -95,6 +96,8 @@ export function MiEquipo() {
                       </td>
                       <td className="num">{a.porActivar}</td>
                       <td className="num">{soles(a.cargo)}</td>
+                      <td className="num">{a.ganadas + a.perdidas ? `${pct(a.ganadas, a.ganadas + a.perdidas)}%` : '—'}</td>
+                      <td className="num">{a.ganadas ? `${100 - (pct(a.observadas, a.ganadas) ?? 0)}%` : '—'}</td>
                       <td className="num">{a.gestionesHoy}</td>
                     </tr>
                   ))}

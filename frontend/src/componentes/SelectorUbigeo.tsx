@@ -2,13 +2,14 @@ import { useEffect, useState } from 'react';
 import { ubigeoApi, type Lugar } from '../api/empresas';
 
 /** Departamento → provincia → distrito en cascada. Devuelve el código del distrito (6 dígitos). */
-export function SelectorUbigeo({ onCambio }: { onCambio: (distritoId: string) => void }) {
+export function SelectorUbigeo({ onCambio, inicial }: { onCambio: (distritoId: string) => void; inicial?: string | null }) {
   const [deps, setDeps] = useState<Lugar[]>([]);
   const [provs, setProvs] = useState<Lugar[]>([]);
   const [dists, setDists] = useState<Lugar[]>([]);
-  const [dep, setDep] = useState('15'); // Lima por defecto
-  const [prov, setProv] = useState('1501');
-  const [dist, setDist] = useState('');
+  // Si ya tiene distrito (al corregir una empresa) arranca en él; si no, en Lima / Lima
+  const [dep, setDep] = useState(inicial ? inicial.slice(0, 2) : '15');
+  const [prov, setProv] = useState(inicial ? inicial.slice(0, 4) : '1501');
+  const [dist, setDist] = useState(inicial ?? '');
 
   useEffect(() => { ubigeoApi.departamentos().then(setDeps); }, []);
   useEffect(() => {

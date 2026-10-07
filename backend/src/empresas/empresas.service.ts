@@ -105,7 +105,11 @@ export class EmpresasService {
        LEFT JOIN usuarios up ON up.id = a.asignado_por
        WHERE a.cliente_id = $1 ORDER BY a.created_at DESC LIMIT 20`, [id],
     );
-    return { ...general, libre: !e.asesorId, contactos, historial, puedeEditar: e.asesorId === sesion.sub };
+    return {
+      ...general, libre: !e.asesorId, contactos, historial, puedeEditar: e.asesorId === sesion.sub,
+      // Back office y admin mantienen la base de clientes actualizada
+      puedeCorregirDatos: sesion.permisos.includes('EMPRESA_EDITAR'),
+    };
   }
 
   // ───────────── Tomar una empresa libre (inmediato, gana el primero) ─────────────
@@ -144,8 +148,23 @@ export class EmpresasService {
   async guardarContactos(id: string, contactos: ContactoDto[], sesion: SesionUsuario) {
     const [e] = await this.db.query(`SELECT asesor_id AS "asesorId" FROM clientes WHERE id = $1`, [id]);
     if (!e) throw new NotFoundException('La empresa no existe');
-    if (e.asesorId !== sesion.sub) throw new ForbiddenException('Solo el asesor a cargo puede editar los contactos');
+    const esDueno = e.asesorId === sesion.sub && sesion.permisos.includes('PROSPECTO_CREAR');
+    if (!esDueno && !sesion.permisos.includes('EMPRESA_EDITAR')) {
+      throw new ForbiddenException('Solo el asesor a cargo o back office pueden editar los contactos');
+    }
     await this.db.transaction((tx) => this.reemplazarContactos(tx, id, contactos));
+    return this.detalle(id, sesion);
+  }
+
+  // ───────────── Corregir razón social y ubicación (back office / admin) ─────────────
+  async corregirDatos(id: string, razonSocial: string, distritoId: string, sesion: SesionUsuario) {
+    const [d] = await this.db.query(`SELECT 1 FROM distritos WHERE id = $1`, [distritoId]);
+    if (!d) throw new BadRequestException('El distrito elegido no existe');
+    const filas = await this.db.query(
+      `UPDATE clientes SET razon_social = $1, distrito_id = $2, updated_at = now() WHERE id = $3 RETURNING id`,
+      [razonSocial.trim(), distritoId, id],
+    );
+    if (!(Array.isArray(filas[0]) ? filas[0] : filas).length) throw new NotFoundException('La empresa no existe');
     return this.detalle(id, sesion);
   }
 

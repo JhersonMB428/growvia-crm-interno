@@ -3,6 +3,8 @@
 .app .entrada::placeholder { color: var(--texto-tenue); }
 .app .entrada:focus { border-color: var(--acento); }
 .app .etiqueta { color: var(--texto-suave); }
+.app .casilla { color: var(--texto); }
+.app .casilla input { accent-color: var(--acento); }
 .app select.entrada { appearance: auto; }
 .app select.entrada option { background: #0f3a36; color: #ffffff; }
 .app[data-tema='claro'] select.entrada option { background: #ffffff; color: #0f2422; }

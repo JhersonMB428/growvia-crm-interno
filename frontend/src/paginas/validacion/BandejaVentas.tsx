@@ -3,7 +3,7 @@ import { Link } from 'react-router-dom';
 import { ErrorApi } from '../../api/cliente';
 import { avisarCampana } from '../../api/gestiones';
 import { resumenLineas, soles, TEXTO_TIPO } from '../../api/negociaciones';
-import { TEXTO_EVENTO, validacionApi, type Bandeja, type EventoPosventa, type VentaEnBandeja } from '../../api/validacion';
+import { TEXTO_EVENTO, validacionApi, type Bandeja, type EventoPosventa, type PuntoChecklist, type VentaEnBandeja } from '../../api/validacion';
 import './validacion.css';
 
 type Modo = 'aprobar' | 'revisar' | 'validar';
@@ -34,7 +34,12 @@ export function BandejaVentas({ modo }: { modo: Modo }) {
   const [filas, setFilas] = useState<VentaEnBandeja[] | null>(null);
   const [error, setError] = useState('');
   const [aviso, setAviso] = useState('');
+  const [checklist, setChecklist] = useState<PuntoChecklist[]>([]);
   const t = TEXTOS[modo];
+
+  useEffect(() => {
+    if (modo === 'validar') validacionApi.checklist().then(setChecklist).catch(() => undefined);
+  }, [modo]);
 
   const cargar = useCallback(() => {
     validacionApi.bandeja(pestana)
@@ -69,15 +74,20 @@ export function BandejaVentas({ modo }: { modo: Modo }) {
         {error && <div className="alerta" role="alert">{error}</div>}
         {!filas && !error && <p style={{ color: 'var(--texto-suave)', margin: 0 }}>Cargando…</p>}
         {filas?.length === 0 && <p style={{ color: 'var(--texto-suave)', margin: 0 }}>{pestana === 'posventa' ? 'No hay ventas en posventa.' : t.vacio}</p>}
-        {filas?.map((v) => <TarjetaVenta key={v.id} v={v} bandeja={pestana} onHecho={hecho} />)}
+        {filas?.map((v) => <TarjetaVenta key={v.id} v={v} bandeja={pestana} checklist={checklist} onHecho={hecho} />)}
       </section>
     </>
   );
 }
 
-function TarjetaVenta({ v, bandeja, onHecho }: { v: VentaEnBandeja; bandeja: Bandeja; onHecho: (m: string) => void }) {
-  const [panel, setPanel] = useState<'' | 'observar' | 'detener'>('');
+function TarjetaVenta({ v, bandeja, checklist, onHecho }: { v: VentaEnBandeja; bandeja: Bandeja; checklist: PuntoChecklist[]; onHecho: (m: string) => void }) {
+  const [panel, setPanel] = useState<'' | 'observar' | 'detener' | 'validar'>('');
   const [motivo, setMotivo] = useState('');
+  const [marcados, setMarcados] = useState<number[]>([]);
+  const [orden, setOrden] = useState(v.ordenOperador ?? '');
+  // Puntos que aplican a esta venta (la carta de portabilidad solo si hay portabilidades)
+  const puntos = checklist.filter((p) => !p.soloPortabilidad || v.portabilidades > 0);
+  const faltan = puntos.filter((p) => !marcados.includes(p.id));
   const [ocupado, setOcupado] = useState(false);
   const [error, setError] = useState('');
 
@@ -118,7 +128,7 @@ function TarjetaVenta({ v, bandeja, onHecho }: { v: VentaEnBandeja; bandeja: Ban
 
       {v.ultimaObservacion && <div className="venta__observacion"><b>Última observación:</b> {v.ultimaObservacion}</div>}
 
-      {panel && (
+      {(panel === 'observar' || panel === 'detener') && (
         <div className="bloque">
           <label className="etiqueta" htmlFor={`m-${v.id}`}>{panel === 'observar' ? '¿Qué debe corregir el asesor?' : '¿Por qué se detiene la venta?'}</label>
           <textarea id={`m-${v.id}`} className="entrada" rows={3} style={{ height: 'auto', padding: '12px 16px', font: 'inherit' }}
@@ -132,6 +142,32 @@ function TarjetaVenta({ v, bandeja, onHecho }: { v: VentaEnBandeja; bandeja: Ban
                 panel === 'observar' ? `${v.codigo} volvió a ${v.asesor} para corregir.` : `${v.codigo} se detuvo y quedó anulada.`,
               )}>
               {panel === 'observar' ? 'Enviar observación' : 'Detener venta'}
+            </button>
+          </div>
+        </div>
+      )}
+
+      {panel === 'validar' && (
+        <div className="bloque" role="group" aria-label="Checklist de validación">
+          <b>Checklist de back office</b>
+          {puntos.map((p) => (
+            <label key={p.id} className="casilla">
+              <input type="checkbox" checked={marcados.includes(p.id)}
+                onChange={(e) => setMarcados((m) => (e.target.checked ? [...m, p.id] : m.filter((x) => x !== p.id)))} />
+              {p.texto}
+            </label>
+          ))}
+          <div className="fila-acciones" style={{ justifyContent: 'flex-end' }}>
+            <button type="button" className="boton-secundario" onClick={() => setPanel('')}>Cancelar</button>
+            {faltan.length > 0 && marcados.length > 0 && (
+              <button type="button" className="boton-secundario"
+                onClick={() => { setMotivo(`Falta: ${faltan.map((f) => f.texto.toLowerCase()).join('; ')}.`); setPanel('observar'); }}>
+                Observar lo que falta
+              </button>
+            )}
+            <button type="button" className="boton" disabled={ocupado || faltan.length > 0}
+              onClick={() => ejecutar(() => validacionApi.validar(v.id, marcados), `${v.codigo} validada. Pasa a posventa.`)}>
+              {faltan.length ? `Marca los ${faltan.length} puntos que faltan` : 'Validar'}
             </button>
           </div>
         </div>
@@ -152,18 +188,24 @@ function TarjetaVenta({ v, bandeja, onHecho }: { v: VentaEnBandeja; bandeja: Ban
               onClick={() => ejecutar(() => validacionApi.revisar(v.id), `Diste visto bueno a ${v.codigo}.`)}>Visto bueno</button>
           )}
           {bandeja === 'validar' && (
-            <button type="button" className="boton" disabled={ocupado}
-              onClick={() => ejecutar(() => validacionApi.validar(v.id), `${v.codigo} validada. Pasa a posventa.`)}>Validar</button>
+            <button type="button" className="boton" onClick={() => { setMarcados([]); setPanel('validar'); }}>Revisar y validar</button>
           )}
         </div>
       )}
 
       {bandeja === 'posventa' && (
+        <div className="campo" style={{ maxWidth: 360 }}>
+          <label htmlFor={`orden-${v.id}`} className="etiqueta">N° de orden del operador</label>
+          <input id={`orden-${v.id}`} className="entrada" maxLength={40} placeholder="Ej. MOV-2026-884512" value={orden} onChange={(e) => setOrden(e.target.value)} />
+        </div>
+      )}
+      {bandeja === 'posventa' && (
         <div className="pasos-posventa" aria-label="Pasos de posventa">
           {(['CHIPS_ENTREGADOS', ...(v.portabilidades > 0 ? ['PORTABILIDAD_EJECUTADA'] : []), 'SERVICIO_ACTIVO'] as EventoPosventa[]).map((e) => (
             <button key={e} type="button" className={`paso-posventa${hecho(e) ? ' paso-posventa--hecho' : ''}`}
-              disabled={ocupado || hecho(e) || (e === 'SERVICIO_ACTIVO' && !listoActivar)}
-              onClick={() => ejecutar(() => validacionApi.posventa(v.id, e),
+              disabled={ocupado || hecho(e) || (e === 'SERVICIO_ACTIVO' && (!listoActivar || !orden.trim()))}
+              title={e === 'SERVICIO_ACTIVO' && !orden.trim() ? 'Registra primero el N° de orden del operador' : undefined}
+              onClick={() => ejecutar(() => validacionApi.posventa(v.id, e, orden.trim() || undefined),
                 e === 'SERVICIO_ACTIVO' ? `${v.codigo} ya está activa y suma a la meta.` : `${v.codigo}: ${TEXTO_EVENTO[e].toLowerCase()}.`)}>
               {hecho(e) ? '✓ ' : ''}{TEXTO_EVENTO[e]}
             </button>

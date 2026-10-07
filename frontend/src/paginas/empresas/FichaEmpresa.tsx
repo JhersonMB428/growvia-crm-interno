@@ -1,10 +1,11 @@
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { useLocation, useNavigate, useParams } from 'react-router-dom';
 import { ErrorApi } from '../../api/cliente';
 import { empresasApi, ubicacion, type Contacto, type EmpresaDetalle } from '../../api/empresas';
 import { contactosCompletos, EditorContactos, limpiarContactos } from '../../componentes/EditorContactos';
-import { NegociacionesEmpresa } from '../../componentes/NegociacionesEmpresa';
 import { GestionesEmpresa } from '../../componentes/GestionesEmpresa';
+import { NegociacionesEmpresa } from '../../componentes/NegociacionesEmpresa';
+import { SelectorUbigeo } from '../../componentes/SelectorUbigeo';
 import { useSesion } from '../../sesion/SesionContext';
 
 const MOTIVO: Record<string, string> = {
@@ -22,6 +23,9 @@ export function FichaEmpresa() {
   const [error, setError] = useState('');
   const [editando, setEditando] = useState<Contacto[] | null>(null);
   const [ocupado, setOcupado] = useState(false);
+  const [corrigiendo, setCorrigiendo] = useState<{ razonSocial: string; distritoId: string } | null>(null);
+  // Estable para que el selector de ubigeo no se re-ejecute en cada render
+  const alCambiarDistrito = useCallback((d: string) => setCorrigiendo((c) => (c && c.distritoId !== d ? { ...c, distritoId: d } : c)), []);
 
   useEffect(() => {
     empresasApi.detalle(id).then(setE).catch((err) => setError(err instanceof ErrorApi ? err.message : 'No se pudo cargar la empresa'));
@@ -42,6 +46,14 @@ export function FichaEmpresa() {
     finally { setOcupado(false); }
   }
 
+  async function guardarDatos() {
+    if (!corrigiendo) return;
+    setOcupado(true); setError('');
+    try { setE(await empresasApi.corregir(id, { razonSocial: corrigiendo.razonSocial.trim(), distritoId: corrigiendo.distritoId })); setCorrigiendo(null); setAviso('Datos de la empresa corregidos.'); }
+    catch (err) { setError(err instanceof ErrorApi ? err.message : 'No se pudieron guardar los datos'); }
+    finally { setOcupado(false); }
+  }
+
   if (error && !e) return <div className="alerta" role="alert">{error}</div>;
   if (!e) return <p style={{ color: 'var(--texto-suave)' }}>Cargando…</p>;
 
@@ -56,10 +68,12 @@ export function FichaEmpresa() {
         <div style={{ display: 'flex', gap: 10, alignItems: 'center', flexWrap: 'wrap' }}>
           <span className={`chip ${e.estado === 'VENTA' ? 'chip--lima' : 'chip--gris'}`}>{e.estado === 'VENTA' ? 'Venta' : 'Prospecto'}</span>
           {e.libre && <span className="chip chip--crema">Libre</span>}
+          {e.libre && puede('EMPRESA_TOMAR') && <button type="button" className="boton" onClick={tomar} disabled={ocupado}>{ocupado ? 'Tomando…' : 'Tomar empresa'}</button>}
           {e.puedeEditar && puede('NEGOCIACION_GESTIONAR') && (
             <button type="button" className="boton"
               onClick={() => document.getElementById('gestiones')?.scrollIntoView({ behavior: 'smooth' })}>Registrar gestión</button>
-          )}        </div>
+          )}
+        </div>
       </div>
 
       {aviso && <div className="aviso" role="status">{aviso}</div>}
@@ -67,6 +81,27 @@ export function FichaEmpresa() {
 
       <div style={{ display: 'flex', flexWrap: 'wrap', gap: 20, alignItems: 'flex-start' }}>
         <section className="panel vidrio" style={{ flex: '2 1 520px', minWidth: 0, display: 'flex', flexDirection: 'column', gap: 18 }}>
+          {e.puedeCorregirDatos && !corrigiendo && (
+            <div className="fila-acciones" style={{ justifyContent: 'flex-end', marginBottom: -8 }}>
+              <button type="button" className="boton-secundario" onClick={() => setCorrigiendo({ razonSocial: e.razonSocial, distritoId: e.distritoId ?? '' })}>Corregir datos</button>
+            </div>
+          )}
+          {corrigiendo && (
+            <div className="bloque">
+              <b>Corregir datos de la empresa</b>
+              <div className="campo">
+                <label htmlFor="razon-corr" className="etiqueta">Razón social</label>
+                <input id="razon-corr" className="entrada" maxLength={200} value={corrigiendo.razonSocial}
+                  onChange={(ev) => setCorrigiendo({ ...corrigiendo, razonSocial: ev.target.value })} />
+              </div>
+              <SelectorUbigeo inicial={e.distritoId} onCambio={alCambiarDistrito} />
+              <span style={{ fontSize: 13, color: 'var(--texto-tenue)' }}>El RUC no se puede cambiar.</span>
+              <div className="fila-acciones" style={{ justifyContent: 'flex-end' }}>
+                <button type="button" className="boton-secundario" onClick={() => setCorrigiendo(null)}>Cancelar</button>
+                <button type="button" className="boton" disabled={ocupado || corrigiendo.razonSocial.trim().length < 3 || !corrigiendo.distritoId} onClick={guardarDatos}>Guardar datos</button>
+              </div>
+            </div>
+          )}
           <div className="rejilla-3">
             <div className="dato"><span>Asesor a cargo</span><b>{e.asesor ?? 'Nadie (libre)'}</b></div>
             <div className="dato"><span>Equipo</span><b>{e.equipo ?? '—'}</b></div>
@@ -80,7 +115,7 @@ export function FichaEmpresa() {
 
           <div className="fila-acciones">
             <h2 className="h2">Contactos</h2>
-            {e.puedeEditar && !editando && e.contactos && (
+            {(e.puedeEditar || e.puedeCorregirDatos) && !editando && e.contactos && (
               <button type="button" className="boton-secundario" onClick={() => setEditando(e.contactos!.map((c) => ({ nombre: c.nombre, celular: c.celular, correo: c.correo ?? '' })))}>Editar</button>
             )}
           </div>

@@ -60,6 +60,7 @@ export const MENU_POR_ROL: Record<Rol, ItemMenu[]> = {
     I('/accesos-celular', 'Acceso celular', 'celular'),
   ],
   BACKOFFICE: [
+    I('/resumen', 'Resumen', 'inicio'),
     I('/validacion', 'Validar ventas', 'validar'),
     I('/repositorio', 'Empresas', 'empresas'),
     I('/usuarios', 'Usuarios', 'usuarios'),
@@ -75,6 +76,6 @@ export const INICIO_POR_ROL: Record<Rol, string> = {
   ASESOR: '/inicio',
   SUPERVISOR: '/equipo',
   GERENTE: '/reportes',
-  BACKOFFICE: '/validacion',
+  BACKOFFICE: '/resumen',
   ADMIN: '/usuarios',
 };

@@ -1,7 +1,7 @@
 import { Body, Controller, ForbiddenException, Get, Param, ParseUUIDPipe, Post } from '@nestjs/common';
 import { RequierePermisos } from '../auth/decorators/requiere-permisos.decorator';
 import { SesionUsuario, UsuarioActual } from '../auth/decorators/usuario-actual.decorator';
-import { DecisionDto, MotivoDto, PosventaDto } from './dto/decision.dto';
+import { DecisionDto, MotivoDto, PosventaDto, ValidarDto } from './dto/decision.dto';
 import { ValidacionService, type Bandeja } from './validacion.service';
 
 /** Permiso que necesita cada bandeja */
@@ -20,6 +20,19 @@ export class ValidacionController {
     if (!permiso) throw new ForbiddenException('Bandeja no válida');
     if (!s.permisos.includes(permiso)) throw new ForbiddenException('No tienes permiso para esta bandeja');
     return this.validacion.bandeja(tipo as Bandeja, s);
+  }
+
+  @Get('validacion/checklist')
+  @RequierePermisos('VENTA_VALIDAR')
+  checklist() {
+    return this.validacion.checklist();
+  }
+
+  /** Inicio de back office: validadas por día, tiempos, errores detectados y activaciones */
+  @Get('validacion/resumen')
+  @RequierePermisos('VENTA_VALIDAR')
+  resumen() {
+    return this.validacion.resumenBackoffice();
   }
 
   @Get('validacion/contadores')
@@ -56,14 +69,14 @@ export class ValidacionController {
 
   @Post('validacion/:id/validar')
   @RequierePermisos('VENTA_VALIDAR')
-  validar(@Param('id', ParseUUIDPipe) id: string, @Body() dto: DecisionDto, @UsuarioActual() s: SesionUsuario) {
-    return this.validacion.validar(id, dto.comentario, s);
+  validar(@Param('id', ParseUUIDPipe) id: string, @Body() dto: ValidarDto, @UsuarioActual() s: SesionUsuario) {
+    return this.validacion.validar(id, dto.comentario, dto.checklist, s);
   }
 
   @Post('validacion/:id/posventa')
   @RequierePermisos('VENTA_VALIDAR')
   posventa(@Param('id', ParseUUIDPipe) id: string, @Body() dto: PosventaDto, @UsuarioActual() s: SesionUsuario) {
-    return this.validacion.posventa(id, dto.evento, dto.comentario, s);
+    return this.validacion.posventa(id, dto.evento, dto.comentario, dto.ordenOperador, s);
   }
 
   /** El asesor reenvía una venta observada después de corregirla */
