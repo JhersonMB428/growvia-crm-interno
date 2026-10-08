@@ -3,6 +3,7 @@ import { ConfigModule, ConfigService } from '@nestjs/config';
 import { ScheduleModule } from '@nestjs/schedule';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { AccesosMovilModule } from './accesos-movil/accesos-movil.module';
+import { AdministracionModule } from './administracion/administracion.module';
 import { AlmacenamientoModule } from './almacenamiento/almacenamiento.module';
 import { AuthModule } from './auth/auth.module';
 import { CorreoModule } from './correo/correo.module';
@@ -52,6 +53,7 @@ import { ValidacionModule } from './validacion/validacion.module';
     BitacoraModule,
     ExportacionModule,
     AccesosMovilModule,
+    AdministracionModule,
     PerfilModule,
   ],
   controllers: [SaludController],

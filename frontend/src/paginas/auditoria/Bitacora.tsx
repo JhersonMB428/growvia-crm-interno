@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { ACCIONES_ALERTA, bitacoraApi, TEXTO_ACCION, type Categoria, type FiltrosBitacora, type RegistroBitacora } from '../../api/auditoria';
 import { diaLargo } from '../../api/accesosMovil';
+import { TEXTO_PARAMETRO } from '../../api/administracion';
 import { ErrorApi } from '../../api/cliente';
 import { TEXTO_DOCUMENTO, type TipoDocumento } from '../../api/expediente';
 import { TEXTO_CANAL, TEXTO_RESULTADO, type Canal, type ResultadoGestion } from '../../api/gestiones';
@@ -10,7 +11,7 @@ import { TEXTO_EVENTO, type EventoPosventa } from '../../api/validacion';
 import './auditoria.css';
 
 const CATEGORIAS: [Categoria | '', string][] = [
-  ['', 'Todo'], ['accesos', 'Accesos'], ['empresas', 'Empresas'], ['ventas', 'Ventas'], ['documentos', 'Documentos'], ['datos', 'Bases y exportaciones'],
+  ['', 'Todo'], ['accesos', 'Accesos'], ['empresas', 'Empresas'], ['ventas', 'Ventas'], ['documentos', 'Documentos'], ['datos', 'Bases y exportaciones'], ['admin', 'Administración'],
 ];
 const REPORTE: Record<string, string> = { ventas: 'Ventas', negociaciones: 'Negociaciones', gestiones: 'Gestiones', cartera: 'Cartera', metas: 'Metas' };
 
@@ -40,6 +41,13 @@ function detalle(r: RegistroBitacora): string {
     case 'ACCESO_MOVIL_OTORGAR': return `${r.otroUsuario ? `a ${r.otroUsuario} ` : ''}hasta el ${diaLargo(String(d.hasta))}`;
     case 'ACCESO_MOVIL_RECHAZAR': case 'ACCESO_MOVIL_REVOCAR': return String(d.respuesta ?? '');
     case 'PERFIL_AVISOS': return `Recordatorio ${d.minutosRecordatorio} min antes · resumen por correo: ${d.avisoCorreo ? 'sí' : 'no'}`;
+    case 'USUARIO_CREAR': return `${d.email} · ${d.rol}`;
+    case 'USUARIO_EDITAR': return `${d.email} · ${d.rol}`;
+    case 'USUARIO_DESACTIVAR': return d.destino === 'repositorio' ? 'Empresas al repositorio' : r.otroUsuario ? `Empresas a ${r.otroUsuario}` : '';
+    case 'EQUIPO_CREAR': case 'EQUIPO_EDITAR': return `${d.nombre}${r.otroUsuario ? ` · supervisor ${r.otroUsuario}` : ''}${d.activo === false ? ' · desactivado' : ''}`;
+    case 'PLAN_GUARDAR': return `${d.nombre} · S/ ${d.cargoRef}${d.activo === false ? ' · desactivado' : ''}`;
+    case 'OPERADOR_GUARDAR': return `${d.nombre}${d.activo === false ? ' · desactivado' : ''}`;
+    case 'PARAMETRO_EDITAR': return `${TEXTO_PARAMETRO[String(d.clave)] ?? d.clave}: ${d.valor}`;
     case 'OTRA': return String(d.ruta ?? '');
     default: return '';
   }

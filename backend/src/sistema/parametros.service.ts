@@ -21,7 +21,10 @@ export class ParametrosService {
     this.cache.set(clave, { valor, hasta: Date.now() + 60_000 });
     return valor;
   }
-
+    /** Al editar un parámetro, el valor nuevo se usa de inmediato */
+  limpiar(clave: string) {
+    this.cache.delete(clave);
+  }
   async numero(clave: string, porDefecto: number): Promise<number> {
     const n = Number(await this.texto(clave, String(porDefecto)));
     return Number.isFinite(n) ? n : porDefecto;

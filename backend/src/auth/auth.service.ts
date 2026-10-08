@@ -144,6 +144,7 @@ export class AuthService {
       rol: { codigo: u.rol.codigo, nombre: u.rol.nombre },
       equipo: u.equipo ? { id: u.equipo.id, nombre: u.equipo.nombre } : null,
       permisos: u.rol.permisos.map((p) => p.codigo).sort(),
+      debeCambiarClave: u.claveTemporal,
     };
   }
 

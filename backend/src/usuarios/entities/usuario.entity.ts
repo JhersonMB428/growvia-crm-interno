@@ -45,6 +45,10 @@ export class Usuario {
   @Column({ name: 'minutos_recordatorio', type: 'smallint', default: 30 })
   minutosRecordatorio: number;
 
+  /** Usuario nuevo o contraseña restablecida: debe elegir una propia al entrar */
+  @Column({ name: 'clave_temporal', default: false })
+  claveTemporal: boolean;
+
   @Column({ name: 'creado_por', type: 'uuid', nullable: true })
   creadoPor: string | null;
 

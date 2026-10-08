@@ -60,7 +60,7 @@ export class PerfilService {
     validarClave(nueva, u.email, u.nombres);
 
     await this.db.transaction(async (tx) => {
-      await tx.query(`UPDATE usuarios SET password_hash = $2, credenciales_at = now(), updated_at = now() WHERE id = $1`, [s.sub, await bcrypt.hash(nueva, 12)]);
+      await tx.query(`UPDATE usuarios SET password_hash = $2, clave_temporal = false, credenciales_at = now(), updated_at = now() WHERE id = $1`, [s.sub, await bcrypt.hash(nueva, 12)]);
       // Los demás equipos de confianza vuelven a pedir código; este se queda
       await tx.query(
         `UPDATE dispositivos_confiables SET revocado_at = now() WHERE usuario_id = $1 AND revocado_at IS NULL AND huella_hash <> $2`,

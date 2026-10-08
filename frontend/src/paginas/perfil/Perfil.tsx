@@ -17,6 +17,7 @@ const hace = (iso: string | null) => {
 
 /** Mi perfil: datos, contraseña, avisos, equipos de confianza y acceso desde celular */
 export function Perfil() {
+  const { usuario } = useSesion();
   const [p, setP] = useState<MiPerfil | null>(null);
   const [error, setError] = useState('');
   const cargar = () => perfilApi.datos().then(setP).catch((e) => setError(e instanceof ErrorApi ? e.message : 'No se pudo cargar tu perfil'));
@@ -31,6 +32,9 @@ export function Perfil() {
         <h1>Mi perfil</h1>
         <p>Tus datos, tu contraseña y cómo te avisa el CRM.</p>
       </div>
+      {usuario?.debeCambiarClave && (
+        <div className="aviso" role="status"><b>Bienvenido/a.</b> Entraste con una contraseña temporal: elige una propia para empezar a usar el CRM.</div>
+      )}
       <div className="perfil-rejilla">
         <div className="perfil-columna">
           <section className="panel vidrio perfil-panel">

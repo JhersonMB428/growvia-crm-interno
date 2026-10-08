@@ -54,6 +54,18 @@ const REGLAS: Record<string, Regla> = {
   'PUT /perfil/avisos': { accion: 'PERFIL_AVISOS', campos: ['avisoCorreo', 'minutosRecordatorio'] },
   'DELETE /perfil/dispositivos/:id': { accion: 'DISPOSITIVO_QUITAR' },
   'DELETE /perfil/dispositivos': { accion: 'DISPOSITIVOS_QUITAR_TODOS' },
+  'POST /admin/usuarios': { accion: 'USUARIO_CREAR', campos: ['email', 'rol', 'equipoId'] },
+  'PUT /admin/usuarios/:id': { accion: 'USUARIO_EDITAR', entidad: 'USUARIO', campos: ['email', 'rol', 'equipoId'] },
+  'POST /admin/usuarios/:id/clave': { accion: 'USUARIO_CLAVE', entidad: 'USUARIO' },
+  'POST /admin/usuarios/:id/desactivar': { accion: 'USUARIO_DESACTIVAR', entidad: 'USUARIO', campos: ['destino'] },
+  'POST /admin/usuarios/:id/reactivar': { accion: 'USUARIO_REACTIVAR', entidad: 'USUARIO' },
+  'POST /admin/equipos': { accion: 'EQUIPO_CREAR', campos: ['nombre', 'supervisorId'] },
+  'PUT /admin/equipos/:id': { accion: 'EQUIPO_EDITAR', entidad: 'EQUIPO', campos: ['nombre', 'supervisorId', 'activo'] },
+  'POST /admin/planes': { accion: 'PLAN_GUARDAR', campos: ['tipo', 'nombre', 'cargoRef'] },
+  'PUT /admin/planes/:id': { accion: 'PLAN_GUARDAR', campos: ['tipo', 'nombre', 'cargoRef', 'activo'] },
+  'POST /admin/operadores': { accion: 'OPERADOR_GUARDAR', campos: ['nombre'] },
+  'PUT /admin/operadores/:id': { accion: 'OPERADOR_GUARDAR', campos: ['nombre', 'activo'] },
+  'PUT /admin/parametros/:clave': { accion: 'PARAMETRO_EDITAR', campos: ['valor'] },
 };
 
 /** Acciones sin valor de auditoría */
@@ -69,6 +81,8 @@ export const CATEGORIAS: Record<string, string[]> = {
     'VENTA_REVISAR', 'VENTA_OBSERVAR', 'VENTA_DETENER', 'VENTA_VALIDAR', 'VENTA_POSVENTA'],
   documentos: ['DOCUMENTO_SUBIR', 'DOCUMENTO_VER', 'DOCUMENTO_ELIMINAR'],
   datos: ['BASE_SUBIR', 'BASE_APROBAR', 'BASE_RECHAZAR', 'EXPORTAR', 'META_DEFINIR'],
+  admin: ['USUARIO_CREAR', 'USUARIO_EDITAR', 'USUARIO_CLAVE', 'USUARIO_DESACTIVAR', 'USUARIO_REACTIVAR', 'EQUIPO_CREAR', 'EQUIPO_EDITAR',
+    'PLAN_GUARDAR', 'OPERADOR_GUARDAR', 'PARAMETRO_EDITAR'],
 };
 
 const recortar = (v: unknown) => (typeof v === 'string' && v.length > 300 ? `${v.slice(0, 300)}…` : v);
@@ -128,6 +142,7 @@ export class BitacoraService {
       for (const c of regla.campos ?? []) if (cuerpo[c] !== undefined && cuerpo[c] !== '') detalle[c] = recortar(cuerpo[c]);
       if (regla.query) Object.assign(detalle, req.query);
       if (req.params?.tipo) detalle.tipo = req.params.tipo;
+      if (req.params?.clave) detalle.clave = req.params.clave;
       Object.assign(detalle, res.locals.bitacora ?? {}); // datos extra que deja el controlador (p. ej. filas exportadas)
       const entidadId = regla.idDe ? cuerpo[regla.idDe] : req.params?.id;
       await this.registrar(sesion.sub, regla.accion, {
@@ -171,6 +186,8 @@ export class BitacoraService {
                 WHEN 'NEGOCIACION' THEN (SELECT o.codigo || ' · ' || c.razon_social FROM oportunidades o JOIN clientes c ON c.id = o.cliente_id WHERE o.id::text = b.entidad_id)
                 WHEN 'DOCUMENTO' THEN (SELECT d.nombre || ' · ' || o.codigo FROM documentos_venta d JOIN oportunidades o ON o.id = d.oportunidad_id WHERE d.id::text = b.entidad_id)
                 WHEN 'CARGA' THEN (SELECT l.archivo_nombre FROM lotes_importacion l WHERE l.id::text = b.entidad_id)
+                WHEN 'USUARIO' THEN (SELECT u2.nombres || ' ' || u2.apellidos FROM usuarios u2 WHERE u2.id::text = b.entidad_id)
+                WHEN 'EQUIPO' THEN (SELECT e2.nombre FROM equipos e2 WHERE e2.id::text = b.entidad_id)                
                 WHEN 'ACCESO' THEN (SELECT 'Celular de ' || u2.nombres || ' ' || u2.apellidos FROM accesos_moviles a JOIN usuarios u2 ON u2.id = a.usuario_id WHERE a.id::text = b.entidad_id)
               END AS referencia,
               -- Para enlazar a la ficha
@@ -178,7 +195,7 @@ export class BitacoraService {
                 WHEN 'DOCUMENTO' THEN (SELECT d.oportunidad_id::text FROM documentos_venta d WHERE d.id::text = b.entidad_id)
                 ELSE b.entidad_id
               END AS "enlaceId",
-              (SELECT a.nombres || ' ' || a.apellidos FROM usuarios a WHERE a.id::text = COALESCE(b.detalle->>'asesorId', b.detalle->>'asignarA', b.detalle->>'usuarioId')) AS "otroUsuario"
+              (SELECT a.nombres || ' ' || a.apellidos FROM usuarios a WHERE a.id::text = COALESCE(b.detalle->>'asesorId', b.detalle->>'asignarA', b.detalle->>'usuarioId', b.detalle->>'destino', b.detalle->>'supervisorId')) AS "otroUsuario"
        FROM bitacora b
        LEFT JOIN usuarios u ON u.id = b.usuario_id
        LEFT JOIN roles r ON r.id = u.rol_id

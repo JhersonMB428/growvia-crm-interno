@@ -30,7 +30,7 @@ export const exportacionApi = {
 };
 
 // ───────── Bitácora (gerencia y administración) ─────────
-export type Categoria = 'accesos' | 'empresas' | 'ventas' | 'documentos' | 'datos';
+export type Categoria = 'accesos' | 'empresas' | 'ventas' | 'documentos' | 'datos' | 'admin';
 
 export interface RegistroBitacora {
   id: string; fecha: string; accion: string; entidad: string | null; entidadId: string | null;
@@ -65,8 +65,12 @@ export const TEXTO_ACCION: Record<string, string> = {
   ACCESO_MOVIL_OTORGAR: 'Dio acceso desde celular', SESION_MOVIL_CORTADA: 'Celular sacado del CRM',
   CLAVE_CAMBIAR: 'Cambió su contraseña', CLAVE_FALLIDA: 'Contraseña actual incorrecta (perfil)', PERFIL_AVISOS: 'Cambió sus avisos',
   DISPOSITIVO_QUITAR: 'Quitó un equipo de confianza', DISPOSITIVOS_QUITAR_TODOS: 'Quitó todos sus equipos de confianza',
+  USUARIO_CREAR: 'Creó un usuario', USUARIO_EDITAR: 'Editó un usuario', USUARIO_CLAVE: 'Restableció una contraseña',
+  USUARIO_DESACTIVAR: 'Desactivó un usuario', USUARIO_REACTIVAR: 'Reactivó un usuario', EQUIPO_CREAR: 'Creó un equipo',
+  EQUIPO_EDITAR: 'Editó un equipo', PLAN_GUARDAR: 'Guardó un plan', OPERADOR_GUARDAR: 'Guardó un operador', PARAMETRO_EDITAR: 'Cambió un parámetro',
 };
 
 /** Acciones que conviene mirar con atención */
 export const ACCIONES_ALERTA = new Set(['LOGIN_FALLIDO', 'CODIGO_FALLIDO', 'LOGIN_BLOQUEADO', 'ACCESO_DENEGADO', 'VENTA_DETENER', 'DOCUMENTO_ELIMINAR', 'EXPORTAR',
-  'ACCESO_MOVIL_APROBAR', 'ACCESO_MOVIL_OTORGAR', 'ACCESO_MOVIL_REVOCAR', 'SESION_MOVIL_CORTADA', 'CLAVE_FALLIDA']);
+  'ACCESO_MOVIL_APROBAR', 'ACCESO_MOVIL_OTORGAR', 'ACCESO_MOVIL_REVOCAR', 'SESION_MOVIL_CORTADA', 'CLAVE_FALLIDA',
+  'USUARIO_DESACTIVAR', 'USUARIO_CLAVE', 'PARAMETRO_EDITAR']);

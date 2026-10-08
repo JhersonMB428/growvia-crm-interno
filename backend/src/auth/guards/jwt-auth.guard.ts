@@ -44,7 +44,7 @@ export class JwtAuthGuard implements CanActivate {
     );
     if (!u?.activo) throw new UnauthorizedException('Tu usuario fue desactivado. Habla con tu supervisor.');
     if (u.credenciales && payload.iat < Number(u.credenciales)) {
-      throw new UnauthorizedException('Tu contraseña cambió. Vuelve a iniciar sesión con la nueva.');
+      throw new UnauthorizedException('Tu contraseña, rol o equipo cambió. Vuelve a iniciar sesión.');
     }
     if (u.celularBloqueado) {
       await this.bitacora.registrar(payload.sub, 'SESION_MOVIL_CORTADA', { ip: req.ip }).catch(() => undefined);
