@@ -3,11 +3,11 @@ import { Link, useNavigate, useParams, useSearchParams } from 'react-router-dom'
 import { ErrorApi } from '../../api/cliente';
 import { empresasApi } from '../../api/empresas';
 import {
-  negociacionesApi, soles, type Catalogos, type ItemNegociacion, type Modalidad,
+  negociacionesApi, PLAZOS, soles, textoPlazo, TEXTO_TIPO, type Catalogos, type ItemNegociacion, type Modalidad, type TipoNegociacion,
 } from '../../api/negociaciones';
 import './negociaciones.css';
 
-type Tipo = 'NUEVA' | 'AMPLIACION';
+type Tipo = TipoNegociacion;
 /** En el formulario los números se editan como texto para no pelear con el cursor */
 type Fila = { planId: number | ''; modalidad: Modalidad; operadorOrigenId: number | ''; cantidad: string; cargo: string };
 
@@ -27,6 +27,8 @@ export function FormNegociacion() {
   const [cat, setCat] = useState<Catalogos | null>(null);
   const [empresa, setEmpresa] = useState<{ id: string; nombre: string; codigo?: string } | null>(null);
   const [tipo, setTipo] = useState<Tipo>('NUEVA');
+  const [plazo, setPlazo] = useState(18);
+  const [renueva, setRenueva] = useState<string | null>(null);
   const [filas, setFilas] = useState<Fila[]>([filaVacia()]);
   const [error, setError] = useState('');
   const [bloqueo, setBloqueo] = useState('');
@@ -42,6 +44,8 @@ export function FormNegociacion() {
         setCorrigiendo(n.puedeCorregir);
         setEmpresa({ id: n.clienteId, nombre: n.razonSocial, codigo: n.codigo });
         setTipo(n.tipo);
+        setPlazo(n.plazoMeses);
+        setRenueva(n.renuevaCodigo);
         setFilas(n.items.map((i) => ({
           planId: i.planId, modalidad: i.modalidad, operadorOrigenId: i.operadorOrigenId ?? '',
           cantidad: String(i.cantidad), cargo: String(i.cargoFijoUnit),
@@ -85,8 +89,8 @@ export function FormNegociacion() {
     }));
     try {
       const n = id
-        ? await negociacionesApi.actualizar(id, { tipo, items })
-        : await negociacionesApi.crear(empresa.id, { tipo, items });
+        ? await negociacionesApi.actualizar(id, { tipo, plazoMeses: plazo, items })
+        : await negociacionesApi.crear(empresa.id, { tipo, plazoMeses: plazo, items });
       const aviso = !id ? `Se abrió la negociación ${n.codigo}.`
         : corrigiendo ? 'Cambios guardados. Cuando esté todo listo, pulsa “Reenviar a aprobación”.' : 'Cambios guardados.';
       navegar(`/negociaciones/${n.id}`, { replace: true, state: { aviso } });
@@ -119,25 +123,43 @@ export function FormNegociacion() {
           <Link to={`/empresas/${empresa.id}`} style={{ textDecoration: 'none' }}>{empresa.nombre}</Link>
           <span style={{ color: 'var(--texto-tenue)' }}> / {id ? `Editar ${empresa.codigo}` : 'Nueva negociación'}</span>
         </nav>
-        <h1>{id ? 'Editar negociación' : 'Nueva negociación'}</h1>
+        <h1>{renueva ? 'Editar renovación' : id ? 'Editar negociación' : 'Nueva negociación'}</h1>
         <p>Registra los planes que estás ofreciendo. El total se calcula solo.</p>
       </div>
 
       <form onSubmit={guardar} noValidate style={{ display: 'flex', flexWrap: 'wrap', gap: 20, alignItems: 'flex-start' }}>
         <section className="panel vidrio" style={{ flex: '3 1 640px', minWidth: 0, display: 'flex', flexDirection: 'column', gap: 22 }}>
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-            <h2 className="h2">Tipo de negociación</h2>
-            <div className="pestanas" role="radiogroup" aria-label="Tipo de negociación" style={{ alignSelf: 'flex-start' }}>
-              {(['NUEVA', 'AMPLIACION'] as Tipo[]).map((t) => (
-                <button key={t} type="button" role="radio" aria-checked={tipo === t}
-                  className={`pestana${tipo === t ? ' pestana--activa' : ''}`} onClick={() => setTipo(t)}>
-                  {t === 'NUEVA' ? 'Nueva' : 'Ampliación'}
-                </button>
-              ))}
+          <div className="form-negociacion__cabecera">
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+              <h2 className="h2">Tipo de negociación</h2>
+              {renueva ? (
+                <>
+                  <span className="chip chip--lima" style={{ alignSelf: 'flex-start' }}>Renovación de {renueva}</span>
+                  <span style={{ fontSize: 13, color: 'var(--texto-tenue)' }}>El cliente renueva su contrato. Ajusta planes, cantidades o precios si cambian.</span>
+                </>
+              ) : (
+                <>
+                  <div className="pestanas" role="radiogroup" aria-label="Tipo de negociación" style={{ alignSelf: 'flex-start' }}>
+                    {(['NUEVA', 'AMPLIACION'] as Tipo[]).map((t) => (
+                      <button key={t} type="button" role="radio" aria-checked={tipo === t}
+                        className={`pestana${tipo === t ? ' pestana--activa' : ''}`} onClick={() => setTipo(t)}>
+                        {TEXTO_TIPO[t]}
+                      </button>
+                    ))}
+                  </div>
+                  <span style={{ fontSize: 13, color: 'var(--texto-tenue)' }}>
+                    {tipo === 'NUEVA' ? 'La empresa aún no tiene servicios con nosotros.' : 'La empresa ya es cliente y suma más líneas o servicios.'}
+                  </span>
+                </>
+              )}
             </div>
-            <span style={{ fontSize: 13, color: 'var(--texto-tenue)' }}>
-              {tipo === 'NUEVA' ? 'La empresa aún no tiene servicios con nosotros.' : 'La empresa ya es cliente y suma más líneas o servicios.'}
-            </span>
+            <div className="campo" style={{ minWidth: 200 }}>
+              <label htmlFor="plazo" className="etiqueta">Plazo del contrato</label>
+              <select id="plazo" className="entrada" value={plazo} onChange={(e) => setPlazo(Number(e.target.value))}>
+                {PLAZOS.map((p) => <option key={p} value={p}>{textoPlazo(p)}</option>)}
+              </select>
+              <span style={{ fontSize: 13, color: 'var(--texto-tenue)' }}>{plazo ? 'Te avisaremos antes de que venza para renovarlo.' : 'No se seguirá su renovación.'}</span>
+            </div>
           </div>
 
           <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
@@ -154,11 +176,17 @@ export function FormNegociacion() {
                     {moviles.length > 0 && <optgroup label="Línea móvil">{moviles.map((p) => <option key={p.id} value={p.id}>{p.nombre}</option>)}</optgroup>}
                     {fijas.length > 0 && <optgroup label="Línea fija">{fijas.map((p) => <option key={p.id} value={p.id}>{p.nombre}</option>)}</optgroup>}
                   </select>
-                  <select className="entrada" aria-label={`Modalidad del plan ${i + 1}`} value={f.modalidad}
-                    onChange={(e) => cambiar(i, { modalidad: e.target.value as Modalidad, operadorOrigenId: '' })}>
-                    <option value="NUEVA">Línea nueva</option>
-                    <option value="PORTABILIDAD">Portabilidad</option>
-                  </select>
+                  {renueva ? (
+                    <select className="entrada" aria-label={`Modalidad del plan ${i + 1}`} value="NUEVA" disabled>
+                      <option value="NUEVA">Renovación</option>
+                    </select>
+                  ) : (
+                    <select className="entrada" aria-label={`Modalidad del plan ${i + 1}`} value={f.modalidad}
+                      onChange={(e) => cambiar(i, { modalidad: e.target.value as Modalidad, operadorOrigenId: '' })}>
+                      <option value="NUEVA">Línea nueva</option>
+                      <option value="PORTABILIDAD">Portabilidad</option>
+                    </select>
+                  )}
                   <select className="entrada" aria-label={`Operador de origen del plan ${i + 1}`} value={f.operadorOrigenId}
                     disabled={f.modalidad !== 'PORTABILIDAD'}
                     onChange={(e) => cambiar(i, { operadorOrigenId: e.target.value === '' ? '' : Number(e.target.value) })}>
@@ -184,10 +212,11 @@ export function FormNegociacion() {
           <span style={{ fontSize: 13, color: 'var(--texto-tenue)' }} className="numeros">{empresa.codigo ?? 'El código OP se asigna al guardar'}</span>
           <b style={{ fontSize: 17 }}>{empresa.nombre}</b>
           <div className="rejilla-2">
-            <div className="dato"><span>Tipo</span><b>{tipo === 'NUEVA' ? 'Nueva' : 'Ampliación'}</b></div>
+            <div className="dato"><span>Tipo</span><b>{TEXTO_TIPO[tipo]}</b></div>
+            <div className="dato"><span>Plazo</span><b>{textoPlazo(plazo)}</b></div>
             <div className="dato"><span>Total de líneas</span><b className="numeros">{lineas}</b></div>
-            <div className="dato"><span>Portabilidades</span><b className="numeros">{portas}</b></div>
-            <div className="dato"><span>Líneas nuevas</span><b className="numeros">{lineas - portas}</b></div>
+            {!renueva && <div className="dato"><span>Portabilidades</span><b className="numeros">{portas}</b></div>}
+            {!renueva && <div className="dato"><span>Líneas nuevas</span><b className="numeros">{lineas - portas}</b></div>}
           </div>
           <div className="dato">
             <span>Cargo fijo total</span>

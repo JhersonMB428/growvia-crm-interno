@@ -2,6 +2,7 @@ import { BadRequestException, Injectable } from '@nestjs/common';
 import * as ExcelJS from 'exceljs';
 import { DataSource } from 'typeorm';
 import { SesionUsuario } from '../auth/decorators/usuario-actual.decorator';
+import { FIN_CONTRATO_SQL } from '../negociaciones/negociaciones.service';
 
 export const REPORTES = ['ventas', 'negociaciones', 'gestiones', 'cartera', 'metas'] as const;
 export type Reporte = (typeof REPORTES)[number];
@@ -25,7 +26,7 @@ const RESULTADO: Record<string, string> = { EN_CURSO: 'En curso', GANADA: 'Ganad
 const ESTADO_VENTA: Record<string, string> = {
   EN_VALIDACION: 'Por validar', OBSERVADA: 'Observada', VALIDADA: 'Validada', EN_POSVENTA: 'En posventa', ACTIVA: 'Activa', ANULADA: 'Anulada',
 };
-const TIPO: Record<string, string> = { NUEVA: 'Nueva', AMPLIACION: 'Ampliación' };
+const TIPO: Record<string, string> = { NUEVA: 'Nueva', AMPLIACION: 'Ampliación', RENOVACION: 'Renovación' };
 const CANAL: Record<string, string> = { LLAMADA: 'Llamada', WHATSAPP: 'WhatsApp', CORREO: 'Correo', VISITA: 'Visita' };
 const RES_GESTION: Record<string, string> = {
   INTERESADO: 'Interesado', NO_CONTESTA: 'No contesta', VOLVER_A_LLAMAR: 'Volver a llamar', RECHAZA: 'Rechaza', OTRO: 'Otro',
@@ -71,12 +72,14 @@ export class ExportacionService {
         { titulo: 'Cargo fijo mensual', clave: 'cargo', formato: 'soles', total: true, ancho: 18 },
         { titulo: 'Validada', clave: 'validada', formato: 'fechaHora', ancho: 17 }, { titulo: 'Activada', clave: 'activada', formato: 'fechaHora', ancho: 17 },
         { titulo: 'N° orden operador', clave: 'orden', ancho: 18 }, { titulo: 'Correcciones', clave: 'correcciones', formato: 'numero', ancho: 12 },
+        { titulo: 'Plazo (meses)', clave: 'plazo', formato: 'numero', ancho: 13 }, { titulo: 'Fin de contrato', clave: 'finContrato', formato: 'fecha', ancho: 15 },
       ];
       filas = (await this.db.query(
         `SELECT o.codigo, ${LIMA('o.fecha_cierre')} AS cierre, c.razon_social AS empresa, c.ruc, d.nombre AS distrito,
                 ua.nombres || ' ' || ua.apellidos AS asesor, eq.nombre AS equipo, o.tipo, o.estado_venta AS estado,
                 t.lineas, t.portas, t.cargo, ${LIMA('o.fecha_validacion')} AS validada, ${LIMA('o.fecha_activacion')} AS activada,
-                o.orden_operador AS orden, o.correcciones
+                o.orden_operador AS orden, o.correcciones, NULLIF(o.plazo_meses, 0) AS plazo,
+                CASE WHEN o.estado_venta = 'ACTIVA' AND o.plazo_meses > 0 THEN to_char(${FIN_CONTRATO_SQL}, 'YYYY-MM-DD') END AS "finContrato"
          FROM oportunidades o JOIN clientes c ON c.id = o.cliente_id LEFT JOIN distritos d ON d.id = c.distrito_id
          JOIN usuarios ua ON ua.id = o.asesor_id LEFT JOIN equipos eq ON eq.id = COALESCE(o.equipo_id, ua.equipo_id) ${TOTALES}
          WHERE o.resultado = 'GANADA' AND o.fecha_cierre >= ${INICIO(1)} AND o.fecha_cierre < ${FIN(2)}

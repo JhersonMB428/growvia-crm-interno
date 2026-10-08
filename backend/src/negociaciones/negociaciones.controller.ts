@@ -54,6 +54,13 @@ export class NegociacionesController {
     return this.negociaciones.cambiarEtapa(id, dto, s);
   }
 
+  /** Abre la renovación de un contrato activo (el :id es la venta que se renueva) */
+  @Post(':id/renovar')
+  @RequierePermisos('NEGOCIACION_GESTIONAR')
+  renovar(@Param('id', ParseUUIDPipe) id: string, @UsuarioActual() s: SesionUsuario) {
+    return this.negociaciones.iniciarRenovacion(id, s);
+  }
+
   @Post(':id/cerrar')
   @RequierePermisos('NEGOCIACION_GESTIONAR')
   cerrar(@Param('id', ParseUUIDPipe) id: string, @Body() dto: CerrarNegociacionDto, @UsuarioActual() s: SesionUsuario) {

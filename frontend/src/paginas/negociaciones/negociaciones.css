@@ -64,3 +64,11 @@ button.etapa:hover:not(:disabled) { border-color: var(--acento); color: var(--te
   .planes--lectura .planes__fila { grid-template-columns: 1fr 1fr; }
   .etapas { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 }
+
+/* Tipo y plazo del contrato, lado a lado */
+.form-negociacion__cabecera { display: flex; flex-wrap: wrap; gap: 20px; justify-content: space-between; align-items: flex-start; }
+.form-negociacion__cabecera .campo { flex: 0 1 240px; }
+/* Contrato activo: hasta cuándo y su renovación */
+.contrato-venta { display: flex; flex-wrap: wrap; gap: 12px; align-items: center; justify-content: space-between; padding: 14px 16px; border-radius: 18px; background: var(--campo-fondo); border: 1px solid var(--campo-borde); }
+.contrato-venta__texto { display: flex; flex-direction: column; gap: 3px; font-size: 14px; }
+.contrato-venta__texto span { color: var(--texto-suave); font-size: 13px; }

@@ -21,6 +21,7 @@ import { Administracion } from './paginas/administracion/Administracion';
 import { Bitacora } from './paginas/auditoria/Bitacora';
 import { Exportar } from './paginas/auditoria/Exportar';
 import { Perfil } from './paginas/perfil/Perfil';
+import { Renovaciones } from './paginas/renovaciones/Renovaciones';
 import { ResumenBackoffice } from './paginas/tableros/ResumenBackoffice';
 import { ResumenGerencia } from './paginas/tableros/ResumenGerencia';
 import { BandejaVentas } from './paginas/validacion/BandejaVentas';
@@ -52,6 +53,7 @@ export default function App() {
               <Route path="/negociaciones/:id/editar" element={<RutaPrivada roles={['ASESOR']}><FormNegociacion /></RutaPrivada>} />
               <Route path="/negociaciones/:id" element={<FichaNegociacion />} />
               <Route path="/repositorio" element={<Repositorio />} />
+              <Route path="/renovaciones" element={<RutaPrivada roles={['ASESOR', 'SUPERVISOR', 'GERENTE']}><Renovaciones /></RutaPrivada>} />
               <Route path="/metas" element={<RutaPrivada roles={['SUPERVISOR', 'GERENTE']}><Metas /></RutaPrivada>} />
               <Route path="/bases" element={<RutaPrivada roles={['ASESOR', 'SUPERVISOR', 'GERENTE']}><Bases /></RutaPrivada>} />
               <Route path="/bases/:id" element={<RutaPrivada roles={['ASESOR', 'SUPERVISOR', 'GERENTE']}><DetalleBase /></RutaPrivada>} />

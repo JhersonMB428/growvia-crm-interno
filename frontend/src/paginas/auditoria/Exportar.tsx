@@ -9,7 +9,7 @@ interface Tarjeta { tipo: Reporte; titulo: string; descripcion: string; periodo:
 
 const REPORTES: Tarjeta[] = [
   { tipo: 'ventas', titulo: 'Ventas ganadas', periodo: 'rango',
-    descripcion: 'Cada venta con empresa, asesor, equipo, estado, líneas, portabilidades, cargo fijo, fechas de validación y activación, y N° de orden.' },
+    descripcion: 'Cada venta con empresa, asesor, equipo, estado, líneas, portabilidades, cargo fijo, fechas de validación y activación, N° de orden, plazo y fin de contrato.' },
   { tipo: 'negociaciones', titulo: 'Negociaciones', periodo: 'rango',
     descripcion: 'El embudo completo: abiertas o cerradas en el periodo, con etapa, resultado y motivo de pérdida.' },
   { tipo: 'gestiones', titulo: 'Gestiones', periodo: 'rango',

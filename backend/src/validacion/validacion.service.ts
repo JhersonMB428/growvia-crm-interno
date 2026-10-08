@@ -9,7 +9,7 @@ export type EventoPosventa = 'CHIPS_ENTREGADOS' | 'PORTABILIDAD_EJECUTADA' | 'SE
 
 /** Lo que muestra cada tarjeta de las bandejas */
 const COLUMNAS = `
-  o.id, o.codigo, o.tipo, o.estado_venta AS "estadoVenta", o.correcciones, o.fecha_cierre AS "fechaCierre",
+  o.id, o.codigo, o.tipo, o.plazo_meses AS "plazoMeses", o.estado_venta AS "estadoVenta", o.correcciones, o.fecha_cierre AS "fechaCierre",
   o.fecha_validacion AS "fechaValidacion", o.orden_operador AS "ordenOperador", o.cliente_id AS "clienteId", c.razon_social AS "razonSocial", c.ruc,
   ua.nombres || ' ' || ua.apellidos AS asesor, eq.nombre AS equipo, pv.nombre AS "pasoActual",
   t.lineas, t.portabilidades, t.total,

@@ -4,7 +4,8 @@ import { DataSource, EntityManager } from 'typeorm';
 export type TipoNotificacion =
   | 'GESTION_HOY' | 'GESTION_PROXIMA' | 'GESTIONES_ATRASADAS'
   | 'VENTA_POR_APROBAR' | 'VENTA_OBSERVADA' | 'VENTA_APROBADA' | 'VENTA_VALIDADA' | 'VENTA_ACTIVA' | 'VENTA_ANULADA'
-  | 'EMPRESA_ASIGNADA' | 'BASE_APROBADA' | 'ACCESO_MOVIL';
+  | 'EMPRESA_ASIGNADA' | 'BASE_APROBADA' | 'ACCESO_MOVIL'
+  | 'RENOVACION_PROXIMA' | 'CONTRATO_COMPETENCIA';
 
 export interface NuevaNotificacion {
   tipo: TipoNotificacion;

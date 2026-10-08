@@ -59,4 +59,5 @@ export const TEXTO_PARAMETRO: Record<string, string> = {
   max_intentos_codigo: 'Intentos para ingresar el código',
   dias_max_acceso_movil: 'Días máximos de acceso desde celular',
   dias_aviso_liberacion: 'Días de aviso antes de liberar',
+  dias_primer_aviso_renovacion: 'Días antes del fin de contrato para el primer aviso',
 };
