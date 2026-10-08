@@ -2,14 +2,20 @@ import { useEffect, useState } from 'react';
 import { Link, useLocation, useNavigate, useParams } from 'react-router-dom';
 import { ErrorApi } from '../../api/cliente';
 import {
-  ETAPAS, negociacionesApi, resumenLineas, soles, TEXTO_ESTADO_VENTA, TEXTO_ETAPA, TEXTO_SERVICIO, TEXTO_TIPO,
+  ETAPAS, fechaLarga, negociacionesApi, resumenLineas, soles, textoPlazo, TEXTO_ESTADO_VENTA, TEXTO_ETAPA, TEXTO_SERVICIO, TEXTO_TIPO,
   type Etapa, type NegociacionDetalle,
 } from '../../api/negociaciones';
+import { textoDias } from '../../api/renovaciones';
 import { TEXTO_DECISION, TEXTO_EVENTO, validacionApi } from '../../api/validacion';
 import { ExpedienteVenta } from '../../componentes/ExpedienteVenta';
 import './negociaciones.css';
 const fecha = (iso: string) => new Date(iso).toLocaleString('es-PE', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' });
 const ORDEN: Etapa[] = ['PROSPECCION', 'CONTACTO', 'NEGOCIACION', 'CIERRE'];
+/** Días que faltan hasta una fecha AAAA-MM-DD (negativo si ya pasó) */
+const diasHasta = (d: string) => {
+  const hoy = new Date(); hoy.setHours(12, 0, 0, 0);
+  return Math.round((new Date(`${d}T12:00:00`).getTime() - hoy.getTime()) / 86400000);
+};
 
 export function FichaNegociacion() {
   const { id = '' } = useParams();
@@ -47,7 +53,11 @@ export function FichaNegociacion() {
         <div className="encabezado" style={{ padding: 0 }}>
           <button type="button" className="boton-texto" style={{ alignSelf: 'flex-start', minHeight: 0 }} onClick={() => navegar(-1)}>← Volver</button>
           <h1>{n.razonSocial}</h1>
-          <p className="numeros">{n.codigo} · {TEXTO_TIPO[n.tipo]}{n.servicio ? ` · ${TEXTO_SERVICIO[n.servicio]}` : ''} · RUC {n.ruc}</p>
+          <p className="numeros">
+            {n.codigo} · {TEXTO_TIPO[n.tipo]}
+            {n.renuevaId && <> de <Link to={`/negociaciones/${n.renuevaId}`}>{n.renuevaCodigo}</Link></>}
+            {n.servicio ? ` · ${TEXTO_SERVICIO[n.servicio]}` : ''} · RUC {n.ruc}
+          </p>
         </div>
         <div style={{ display: 'flex', gap: 10, alignItems: 'center', flexWrap: 'wrap' }}>
           {n.resultado === 'EN_CURSO' && <span className="chip chip--gris">En curso · {TEXTO_ETAPA[n.etapa]}</span>}
@@ -146,7 +156,7 @@ export function FichaNegociacion() {
               {n.items.map((it) => (
                 <div key={it.id} className="planes__fila">
                   <span><b>{it.plan}</b> <span style={{ color: 'var(--texto-tenue)', fontSize: 12 }}>{it.tipoPlan === 'MOVIL' ? 'Móvil' : 'Fija'}</span></span>
-                  <span>{it.modalidad === 'PORTABILIDAD' ? 'Portabilidad' : 'Línea nueva'}</span>
+                  <span>{n.tipo === 'RENOVACION' ? 'Renovación' : it.modalidad === 'PORTABILIDAD' ? 'Portabilidad' : 'Línea nueva'}</span>
                   <span>{it.operadorOrigen ?? '—'}</span>
                   <span className="numeros">{it.cantidad}</span>
                   <span className="numeros">{soles(it.cargoFijoUnit)}</span>
@@ -167,6 +177,8 @@ export function FichaNegociacion() {
             <div className="rejilla-2">
               <div className="dato"><span>Asesor</span><b>{n.asesor}</b></div>
               <div className="dato"><span>Equipo</span><b>{n.equipo ?? '—'}</b></div>
+              <div className="dato"><span>Plazo</span><b>{textoPlazo(n.plazoMeses)}</b></div>
+              <div className="dato"><span>Fin de contrato</span><b>{n.finContrato ? fechaLarga(n.finContrato) : '—'}</b></div>
               <div className="dato"><span>Abierta</span><b>{fecha(n.creadoAt)}</b></div>
               <div className="dato"><span>Cierre</span><b>{n.fechaCierre ? fecha(n.fechaCierre) : '—'}</b></div>
             </div>
@@ -191,6 +203,7 @@ export function FichaNegociacion() {
 
 /** Estado de la venta en la cadena de validación, correcciones y posventa */
 function SeccionValidacion({ n, onCambio }: { n: NegociacionDetalle; onCambio: (d: NegociacionDetalle, mensaje: string) => void }) {
+  const navegar = useNavigate();
   const [ocupado, setOcupado] = useState(false);
   const [error, setError] = useState('');
   const observacion = n.validaciones.find((v) => v.decision === 'OBSERVADA');
@@ -206,6 +219,14 @@ function SeccionValidacion({ n, onCambio }: { n: NegociacionDetalle; onCambio: (
       onCambio(await negociacionesApi.detalle(n.id), 'Venta corregida y reenviada a la aprobación de tu supervisor.');
     } catch (e) { setError(e instanceof ErrorApi ? e.message : 'No se pudo reenviar'); }
     finally { setOcupado(false); }
+  }
+
+  async function renovar() {
+    setOcupado(true); setError('');
+    try {
+      const r = await negociacionesApi.renovar(n.id);
+      navegar(`/negociaciones/${r.id}`, { state: { aviso: `Se abrió la renovación ${r.codigo} con los mismos planes. Ajusta lo que cambie y ciérrala cuando el cliente acepte.` } });
+    } catch (e) { setError(e instanceof ErrorApi ? e.message : 'No se pudo iniciar la renovación'); setOcupado(false); }
   }
 
   return (
@@ -235,6 +256,20 @@ function SeccionValidacion({ n, onCambio }: { n: NegociacionDetalle; onCambio: (
       {n.ordenOperador && <p style={{ margin: 0, fontSize: 14 }}><b>N° de orden del operador:</b> <span className="numeros">{n.ordenOperador}</span></p>}
       {n.estadoVenta === 'ANULADA' && <div className="alerta" role="alert">Esta venta fue anulada y no cuenta para la meta.</div>}
       {n.estadoVenta === 'ACTIVA' && n.fechaActivacion && <div className="aviso" role="status">Servicio activo desde el {fecha(n.fechaActivacion)}. Ya suma a la meta.</div>}
+      {n.finContrato && (
+        <div className="contrato-venta">
+          <div className="contrato-venta__texto">
+            <b>Contrato hasta el {fechaLarga(n.finContrato)}</b>
+            <span>{textoPlazo(n.plazoMeses)} desde la activación · {textoDias(diasHasta(n.finContrato))}</span>
+          </div>
+          {n.renovacion && n.renovacion.resultado !== 'PERDIDA' && (
+            <Link to={`/negociaciones/${n.renovacion.id}`} className="boton-secundario">
+              {n.renovacion.resultado === 'GANADA' ? 'Renovado' : 'Renovación en curso'} · {n.renovacion.codigo}
+            </Link>
+          )}
+          {n.puedeRenovar && <button type="button" className="boton" disabled={ocupado} onClick={renovar}>{ocupado ? 'Abriendo…' : 'Iniciar renovación'}</button>}
+        </div>
+      )}
       {error && <div className="alerta" role="alert">{error}</div>}
 
       {eventos.length === 0 && <p style={{ margin: 0, color: 'var(--texto-suave)' }}>Esperando la aprobación del supervisor.</p>}

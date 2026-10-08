@@ -24,6 +24,8 @@ export interface EmpresaDetalle extends EmpresaResumen {
   libre: boolean;
   contactos: Contacto[] | null; // null = no tiene permiso para verlos
   historial: { motivo: string; fecha: string; asesorAnterior: string | null; asesorNuevo: string | null; hechoPor: string }[] | null;
+  /** Contrato con su operador actual (null = no tiene permiso para verlo) */
+  contratoActual?: { operadorId: number | null; operador: string | null; fin: string | null; dias: number | null } | null;
   puedeEditar: boolean;
   /** Back office / admin: puede corregir razón social, ubicación y contactos */
   puedeCorregirDatos?: boolean;
@@ -53,6 +55,8 @@ export const empresasApi = {
     api<EmpresaDetalle>(`/empresas/${id}`, { metodo: 'PUT', cuerpo: datos }),
   guardarContactos: (id: string, contactos: Contacto[]) =>
     api<EmpresaDetalle>(`/empresas/${id}/contactos`, { metodo: 'PUT', cuerpo: { contactos } }),
+  guardarContratoActual: (id: string, operadorId: number | null, finContrato: string | null) =>
+    api<EmpresaDetalle>(`/empresas/${id}/contrato-actual`, { metodo: 'PUT', cuerpo: { operadorId, finContrato } }),
 };
 
 export interface Lugar { id: string; nombre: string }

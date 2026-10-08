@@ -1,0 +1,37 @@
+/* ===== Renovaciones ===== */
+.reno-vistas { align-self: flex-start; }
+.reno-kpis { grid-template-columns: repeat(5, minmax(0, 1fr)); }
+.reno-urgente { color: #f8efd2; }
+.reno-vencido { color: var(--salir); }
+.reno-filtros { display: flex; flex-wrap: wrap; gap: 12px; align-items: center; justify-content: space-between; }
+.reno-buscar { flex: 0 1 320px; min-width: 200px; }
+.reno-nota { margin: 0; font-size: 14px; line-height: 1.5; color: var(--texto-suave); }
+.reno-tabla td { vertical-align: middle; }
+.reno-tabla a { text-decoration: none; }
+.reno-enlace { display: block; margin-top: 4px; font-size: 13px; }
+.reno-accion { text-align: right; white-space: nowrap; }
+.reno-accion .boton, .reno-accion .boton-secundario { min-height: 38px; padding: 0 16px; font-size: 14px; }
+
+.reno-dias { display: inline-flex; align-items: center; padding: 3px 10px; border-radius: 999px; font-size: 13px; font-weight: 700; white-space: nowrap; }
+.reno-dias--vencido { background: rgba(244, 185, 171, 0.18); color: #f4b9ab; }
+.reno-dias--urgente { background: rgba(248, 239, 210, 0.18); color: #f8efd2; }
+.reno-dias--pronto { background: rgba(255, 255, 255, 0.1); color: rgba(255, 255, 255, 0.9); }
+.reno-dias--tranquilo, .reno-dias--ok { background: rgba(199, 225, 150, 0.18); color: #c7e196; }
+
+.app[data-tema='claro'] .reno-urgente { color: #8a6a12; }
+.app[data-tema='claro'] .reno-dias--vencido { background: rgba(163, 58, 36, 0.12); color: #a33a24; }
+.app[data-tema='claro'] .reno-dias--urgente { background: #f8efd2; color: #6b5414; }
+.app[data-tema='claro'] .reno-dias--pronto { background: rgba(1, 57, 54, 0.08); color: #4f625e; }
+.app[data-tema='claro'] .reno-dias--tranquilo, .app[data-tema='claro'] .reno-dias--ok { background: rgba(199, 225, 150, 0.6); color: #2f5214; }
+
+/* Contrato con el operador actual, en la ficha de la empresa */
+.contrato-actual { display: flex; flex-wrap: wrap; gap: 12px; align-items: center; justify-content: space-between; }
+.contrato-actual__dato { display: flex; flex-direction: column; gap: 4px; }
+.contrato-actual__form { display: flex; flex-wrap: wrap; gap: 12px; align-items: flex-end; }
+.contrato-actual__form .campo { flex: 1 1 180px; }
+
+@media (max-width: 1100px) { .reno-kpis { grid-template-columns: repeat(3, minmax(0, 1fr)); } }
+@media (max-width: 700px) {
+  .reno-kpis { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .reno-buscar { flex-basis: 100%; }
+}

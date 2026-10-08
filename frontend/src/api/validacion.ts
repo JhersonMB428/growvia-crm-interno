@@ -1,13 +1,13 @@
 import { api } from './cliente';
-import type { EstadoVenta } from './negociaciones';
-
+import type { EstadoVenta, TipoNegociacion } from './negociaciones';
 export type Bandeja = 'aprobar' | 'revisar' | 'validar' | 'posventa';
 export type EventoPosventa = 'CHIPS_ENTREGADOS' | 'PORTABILIDAD_EJECUTADA' | 'SERVICIO_ACTIVO';
 
 export interface VentaEnBandeja {
   id: string;
   codigo: string;
-  tipo: 'NUEVA' | 'AMPLIACION';
+  tipo: TipoNegociacion;
+  plazoMeses: number;
   estadoVenta: EstadoVenta;
   correcciones: number;
   fechaCierre: string;

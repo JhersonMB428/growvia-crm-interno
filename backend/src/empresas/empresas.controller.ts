@@ -1,6 +1,7 @@
 import { Body, Controller, Get, Param, ParseUUIDPipe, Post, Put, Query } from '@nestjs/common';
 import { RequierePermisos } from '../auth/decorators/requiere-permisos.decorator';
 import { SesionUsuario, UsuarioActual } from '../auth/decorators/usuario-actual.decorator';
+import { ContratoActualDto } from './dto/contrato-actual.dto';
 import { CorregirEmpresaDto, CrearEmpresaDto, GuardarContactosDto } from './dto/crear-empresa.dto';
 import { ListarEmpresasDto } from './dto/listar.dto';
 import { ReasignarDto } from './dto/reasignar.dto';
@@ -54,6 +55,13 @@ export class EmpresasController {
   @RequierePermisos('INFO_COMERCIAL_VER')
   contactos(@Param('id', ParseUUIDPipe) id: string, @Body() dto: GuardarContactosDto, @UsuarioActual() s: SesionUsuario) {
     return this.empresas.guardarContactos(id, dto.contactos, s);
+  }
+
+  /** Operador y fin de contrato actuales del prospecto (el servicio revisa quién puede) */
+  @Put(':id/contrato-actual')
+  @RequierePermisos('INFO_COMERCIAL_VER')
+  contratoActual(@Param('id', ParseUUIDPipe) id: string, @Body() dto: ContratoActualDto, @UsuarioActual() s: SesionUsuario) {
+    return this.empresas.guardarContratoActual(id, dto.operadorId ?? null, dto.finContrato ?? null, s);
   }
 
   @Put(':id')

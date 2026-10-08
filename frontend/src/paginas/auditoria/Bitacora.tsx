@@ -28,6 +28,7 @@ function detalle(r: RegistroBitacora): string {
     case 'EMPRESA_REASIGNAR': return r.otroUsuario ? `a ${r.otroUsuario}` : '';
     case 'EMPRESA_CORREGIR': return String(d.razonSocial ?? '');
     case 'EMPRESA_CREAR': return `RUC ${d.ruc ?? ''}`;
+    case 'EMPRESA_CONTRATO': return d.finContrato ? `Vence el ${diaLargo(String(d.finContrato))}` : 'Sin fecha';
     case 'NEGOCIACION_CERRAR': return d.resultado === 'GANADA' ? 'Ganada' : `Perdida${d.motivoPerdida ? `: ${d.motivoPerdida}` : ''}`;
     case 'NEGOCIACION_ETAPA': return TEXTO_ETAPA[d.etapa as Etapa] ?? '';
     case 'VENTA_OBSERVAR': case 'VENTA_DETENER': case 'BASE_RECHAZAR': return String(d.comentario ?? d.motivo ?? '');

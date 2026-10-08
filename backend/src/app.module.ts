@@ -8,6 +8,7 @@ import { AdministracionModule } from './administracion/administracion.module';
 import { AlmacenamientoModule } from './almacenamiento/almacenamiento.module';
 import { AuthModule } from './auth/auth.module';
 import { CorreoModule } from './correo/correo.module';
+import { EmbudoModule } from './embudo/embudo.module';
 import { EmpresasModule } from './empresas/empresas.module';
 import { ExpedienteModule } from './expediente/expediente.module';
 import { ExportacionModule } from './exportacion/exportacion.module';
@@ -15,6 +16,7 @@ import { GestionesModule } from './gestiones/gestiones.module';
 import { NegociacionesModule } from './negociaciones/negociaciones.module';
 import { NotificacionesModule } from './notificaciones/notificaciones.module';
 import { PerfilModule } from './perfil/perfil.module';
+import { RenovacionesModule } from './renovaciones/renovaciones.module';
 import { SaludController } from './salud.controller';
 import { SistemaModule } from './sistema/sistema.module';
 import { TablerosModule } from './tableros/tableros.module';
@@ -60,6 +62,8 @@ import { ValidacionModule } from './validacion/validacion.module';
     ExportacionModule,
     AccesosMovilModule,
     AdministracionModule,
+    RenovacionesModule,
+    EmbudoModule,
     PerfilModule,
   ],
   controllers: [SaludController],

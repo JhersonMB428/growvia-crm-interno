@@ -31,6 +31,8 @@ export const ICONOS = {
   luna: 'M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8z',
   exportar: 'M12 3v12M7 10l5 5 5-5M4 17v2a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-2',
   bitacora: 'M9 3h6v3H9zM7 4.5H5V21h14V4.5h-2M8.5 11h7M8.5 15h7M8.5 19h4',
+  renovar: 'M20 11a8 8 0 0 0-14.9-4M4 3v4h4M4 13a8 8 0 0 0 14.9 4M20 21v-4h-4',
+  embudo: 'M3 4h18M6 9h12M9 14h6M11 19h2',
 } as const;
 
 const I = (ruta: string, etiqueta: string, icono: ItemMenu['icono']): ItemMenu => ({ ruta, etiqueta, icono });
@@ -41,23 +43,28 @@ export const MENU_POR_ROL: Record<Rol, ItemMenu[]> = {
     I('/inicio', 'Inicio', 'inicio'),
     I('/empresas', 'Mis empresas', 'empresas'),
     I('/negociaciones', 'Negociaciones', 'negociaciones'),
+    I('/renovaciones', 'Renovaciones', 'renovar'),
     I('/agenda', 'Agenda', 'agenda'),
     I('/bases', 'Cargar base', 'base'),
   ],
   SUPERVISOR: [
     I('/equipo', 'Mi equipo', 'equipo'),
     I('/aprobaciones', 'Aprobaciones', 'validar'),
+    I('/embudo', 'Embudo y pérdidas', 'embudo'),
     I('/metas', 'Metas', 'metas'),
     I('/repositorio', 'Empresas', 'empresas'),
     I('/negociaciones', 'Negociaciones', 'negociaciones'),
+    I('/renovaciones', 'Renovaciones', 'renovar'),
     I('/bases', 'Cargar base', 'base'),
   ],
   GERENTE: [
     I('/reportes', 'Reportes', 'reportes'),
+    I('/embudo', 'Embudo y pérdidas', 'embudo'),
     I('/revision', 'Revisión de ventas', 'validar'),
     I('/metas', 'Metas', 'metas'),
     I('/repositorio', 'Empresas', 'empresas'),
     I('/negociaciones', 'Negociaciones', 'negociaciones'),
+    I('/renovaciones', 'Renovaciones', 'renovar'),
     I('/bases', 'Cargar base', 'base'),
     I('/exportar', 'Exportar', 'exportar'),
     I('/bitacora', 'Bitácora', 'bitacora'),

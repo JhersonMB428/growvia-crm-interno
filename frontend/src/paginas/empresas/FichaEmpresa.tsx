@@ -4,6 +4,9 @@ import { ErrorApi } from '../../api/cliente';
 import { empresasApi, ubicacion, type Contacto, type EmpresaDetalle } from '../../api/empresas';
 import { contactosCompletos, EditorContactos, limpiarContactos } from '../../componentes/EditorContactos';
 import { GestionesEmpresa } from '../../componentes/GestionesEmpresa';
+import { fechaLarga, negociacionesApi, type Operador } from '../../api/negociaciones';
+import { textoDias, urgencia } from '../../api/renovaciones';
+import '../renovaciones/renovaciones.css';
 import { NegociacionesEmpresa } from '../../componentes/NegociacionesEmpresa';
 import { SelectorUbigeo } from '../../componentes/SelectorUbigeo';
 import { useSesion } from '../../sesion/SesionContext';
@@ -146,6 +149,11 @@ export function FichaEmpresa() {
               </div>
             </>
           )}
+
+          {e.contratoActual && e.estado === 'PROSPECTO' && (
+            <ContratoActual e={e} editable={e.puedeEditar || !!e.puedeCorregirDatos}
+              onGuardado={(d) => { setE(d); setAviso('Contrato actual guardado.'); }} />
+          )}
         </section>
 
         <aside className="panel vidrio" style={{ flex: '1 1 300px', minWidth: 0, display: 'flex', flexDirection: 'column', gap: 14 }}>
@@ -170,6 +178,77 @@ export function FichaEmpresa() {
       {/* Solo quien ve la información comercial ve sus negociaciones */}
       {e.contactos !== null && <NegociacionesEmpresa empresaId={e.id} puedeAbrir={e.puedeEditar && puede('NEGOCIACION_GESTIONAR')} />}
       {e.contactos !== null && <GestionesEmpresa empresaId={e.id} />}
+    </>
+  );
+}
+
+
+/** Con qué operador está el prospecto y cuándo termina su contrato: el mejor momento para ofrecer la portabilidad */
+function ContratoActual({ e, editable, onGuardado }: { e: EmpresaDetalle; editable: boolean; onGuardado: (d: EmpresaDetalle) => void }) {
+  const c = e.contratoActual!;
+  const [editando, setEditando] = useState(false);
+  const [operadores, setOperadores] = useState<Operador[]>([]);
+  const [operadorId, setOperadorId] = useState<number | ''>(c.operadorId ?? '');
+  const [fin, setFin] = useState(c.fin ?? '');
+  const [ocupado, setOcupado] = useState(false);
+  const [error, setError] = useState('');
+
+  function abrir() {
+    setOperadorId(c.operadorId ?? ''); setFin(c.fin ?? ''); setError(''); setEditando(true);
+    if (!operadores.length) negociacionesApi.catalogos().then((k) => setOperadores(k.operadores)).catch(() => undefined);
+  }
+
+  async function guardar() {
+    setOcupado(true); setError('');
+    try { onGuardado(await empresasApi.guardarContratoActual(e.id, operadorId === '' ? null : operadorId, fin || null)); setEditando(false); }
+    catch (err) { setError(err instanceof ErrorApi ? err.message : 'No se pudo guardar'); }
+    finally { setOcupado(false); }
+  }
+
+  return (
+    <>
+      <div style={{ height: 1, background: 'var(--linea)' }} />
+      <div className="fila-acciones">
+        <h2 className="h2">Contrato con su operador actual</h2>
+        {editable && !editando && <button type="button" className="boton-secundario" onClick={abrir}>{c.fin || c.operadorId ? 'Editar' : 'Registrar'}</button>}
+      </div>
+      {!editando && (
+        c.fin || c.operador ? (
+          <div className="contrato-actual">
+            <div className="contrato-actual__dato">
+              <b>{c.operador ?? 'Operador no registrado'}</b>
+              <span style={{ fontSize: 14, color: 'var(--texto-suave)' }}>{c.fin ? `Su contrato termina el ${fechaLarga(c.fin)}` : 'Sin fecha de fin registrada'}</span>
+            </div>
+            {c.fin && c.dias !== null && <span className={`reno-dias reno-dias--${urgencia(c.dias)}`}>{textoDias(c.dias)}</span>}
+          </div>
+        ) : (
+          <p style={{ margin: 0, color: 'var(--texto-suave)', lineHeight: 1.5 }}>
+            ¿Sabes cuándo termina su contrato con su operador? Regístralo y te avisaremos con tiempo para ofrecerle la portabilidad.
+          </p>
+        )
+      )}
+      {editando && (
+        <div className="bloque">
+          <div className="contrato-actual__form">
+            <div className="campo">
+              <label htmlFor="op-actual" className="etiqueta">Operador actual</label>
+              <select id="op-actual" className="entrada" value={operadorId} onChange={(ev) => setOperadorId(ev.target.value === '' ? '' : Number(ev.target.value))}>
+                <option value="">No sé</option>
+                {operadores.map((o) => <option key={o.id} value={o.id}>{o.nombre}</option>)}
+              </select>
+            </div>
+            <div className="campo">
+              <label htmlFor="fin-actual" className="etiqueta">Fin de su contrato</label>
+              <input id="fin-actual" type="date" className="entrada" value={fin} onChange={(ev) => setFin(ev.target.value)} />
+            </div>
+          </div>
+          {error && <div className="alerta" role="alert">{error}</div>}
+          <div className="fila-acciones" style={{ justifyContent: 'flex-end' }}>
+            <button type="button" className="boton-secundario" onClick={() => setEditando(false)}>Cancelar</button>
+            <button type="button" className="boton" disabled={ocupado} onClick={guardar}>{ocupado ? 'Guardando…' : 'Guardar'}</button>
+          </div>
+        </div>
+      )}
     </>
   );
 }

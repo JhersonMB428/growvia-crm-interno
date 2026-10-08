@@ -2,7 +2,7 @@ import { useCallback, useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { ErrorApi } from '../../api/cliente';
 import { avisarCampana } from '../../api/gestiones';
-import { resumenLineas, soles, TEXTO_TIPO } from '../../api/negociaciones';
+import { resumenLineas, soles, textoPlazo, TEXTO_TIPO } from '../../api/negociaciones';
 import { ExpedienteVenta } from '../../componentes/ExpedienteVenta';
 import { TEXTO_EVENTO, validacionApi, type Bandeja, type EventoPosventa, type PuntoChecklist, type VentaEnBandeja } from '../../api/validacion';
 import './validacion.css';
@@ -113,7 +113,7 @@ function TarjetaVenta({ v, bandeja, checklist, onHecho }: { v: VentaEnBandeja; b
       <div className="venta__cabecera">
         <div className="venta__titulo">
           <Link to={`/negociaciones/${v.id}`}>{v.razonSocial}</Link>
-          <span className="tenue numeros">{v.codigo} · {TEXTO_TIPO[v.tipo]} · RUC {v.ruc}</span>
+          <span className="tenue numeros">{v.codigo} · {TEXTO_TIPO[v.tipo]} · {textoPlazo(v.plazoMeses)} · RUC {v.ruc}</span>
           <span className="tenue">{v.asesor}{v.equipo ? ` · ${v.equipo}` : ''} · ganada el {fecha(v.fechaCierre)}</span>
         </div>
         <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>

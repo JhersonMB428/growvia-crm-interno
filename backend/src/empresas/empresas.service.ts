@@ -94,6 +94,12 @@ export class EmpresasService {
     const contactos = await this.db.query(
       `SELECT id, nombre, celular, correo, posicion FROM contactos WHERE cliente_id = $1 ORDER BY posicion`, [id],
     );
+    // Contrato con su operador actual (para saber cuándo ofrecer la portabilidad)
+    const [contratoActual] = await this.db.query(
+      `SELECT c.operador_actual_id AS "operadorId", op.nombre AS operador, to_char(c.fin_contrato_actual, 'YYYY-MM-DD') AS fin,
+              (c.fin_contrato_actual - (now() AT TIME ZONE 'America/Lima')::date)::int AS dias
+       FROM clientes c LEFT JOIN operadores op ON op.id = c.operador_actual_id WHERE c.id = $1`, [id],
+    );
     const historial = await this.db.query(
       `SELECT a.motivo, a.created_at AS fecha,
               ua.nombres || ' ' || ua.apellidos AS "asesorAnterior",
@@ -106,7 +112,7 @@ export class EmpresasService {
        WHERE a.cliente_id = $1 ORDER BY a.created_at DESC LIMIT 20`, [id],
     );
     return {
-      ...general, libre: !e.asesorId, contactos, historial, puedeEditar: e.asesorId === sesion.sub,
+      ...general, libre: !e.asesorId, contactos, historial, contratoActual, puedeEditar: e.asesorId === sesion.sub,
       // Back office y admin mantienen la base de clientes actualizada
       puedeCorregirDatos: sesion.permisos.includes('EMPRESA_EDITAR'),
     };
@@ -153,6 +159,30 @@ export class EmpresasService {
       throw new ForbiddenException('Solo el asesor a cargo o back office pueden editar los contactos');
     }
     await this.db.transaction((tx) => this.reemplazarContactos(tx, id, contactos));
+    return this.detalle(id, sesion);
+  }
+
+  // ───────────── Contrato con su operador actual (asesor a cargo o back office) ─────────────
+  async guardarContratoActual(id: string, operadorId: number | null, fin: string | null, sesion: SesionUsuario) {
+    const [e] = await this.db.query(`SELECT asesor_id AS "asesorId" FROM clientes WHERE id = $1`, [id]);
+    if (!e) throw new NotFoundException('La empresa no existe');
+    const esDueno = e.asesorId === sesion.sub && sesion.permisos.includes('PROSPECTO_CREAR');
+    if (!esDueno && !sesion.permisos.includes('EMPRESA_EDITAR')) {
+      throw new ForbiddenException('Solo el asesor a cargo o back office pueden editar este dato');
+    }
+    if (operadorId !== null) {
+      const [op] = await this.db.query(`SELECT 1 FROM operadores WHERE id = $1`, [operadorId]);
+      if (!op) throw new BadRequestException('El operador elegido no existe');
+    }
+    if (fin !== null) {
+      const [{ ok }] = await this.db.query(
+        `SELECT $1::date BETWEEN (now() AT TIME ZONE 'America/Lima')::date - 365 AND (now() AT TIME ZONE 'America/Lima')::date + 365 * 5 AS ok`, [fin],
+      );
+      if (!ok) throw new BadRequestException('La fecha de fin de contrato debe estar entre hace un año y dentro de cinco años');
+    }
+    await this.db.query(
+      `UPDATE clientes SET operador_actual_id = $1, fin_contrato_actual = $2, updated_at = now() WHERE id = $3`, [operadorId, fin, id],
+    );
     return this.detalle(id, sesion);
   }
 

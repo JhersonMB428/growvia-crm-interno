@@ -15,7 +15,7 @@ export const MOTIVOS_PERDIDA = ['Precio', 'Competencia', 'No está interesado', 
 
 /** Datos de la tarjeta/lista: totales calculados desde los ítems (nunca guardados) */
 const COLUMNAS = `
-  o.id, o.codigo, o.tipo, o.etapa, o.resultado, o.estado_venta AS "estadoVenta", o.motivo_perdida AS "motivoPerdida",
+  o.id, o.codigo, o.tipo, o.plazo_meses AS "plazoMeses", o.etapa, o.resultado, o.estado_venta AS "estadoVenta", o.motivo_perdida AS "motivoPerdida",
   o.fecha_cierre AS "fechaCierre", o.created_at AS "creadoAt", o.updated_at AS "actualizadoAt",
   o.cliente_id AS "clienteId", c.razon_social AS "razonSocial", c.ruc,
   o.asesor_id AS "asesorId", ua.nombres || ' ' || ua.apellidos AS asesor,
@@ -39,13 +39,22 @@ const UNIONES = `
     WHERE i.oportunidad_id = o.id
   ) t ON true`;
 
+/** OP-2026-000123 */
+const NUEVO_CODIGO = `'OP-' || to_char(now() AT TIME ZONE 'America/Lima', 'YYYY') || '-' || lpad(nextval('oportunidad_codigo_seq')::text, 6, '0')`;
+
+/** Último día del contrato: fecha de activación (en Lima) + plazo en meses */
+export const FIN_CONTRATO_SQL = `(((o.fecha_activacion AT TIME ZONE 'America/Lima')::date + make_interval(months => o.plazo_meses::int))::date - 1)`;
+const FIN_CONTRATO = `to_char(${FIN_CONTRATO_SQL}, 'YYYY-MM-DD')`;
+
 @Injectable()
 export class NegociacionesService {
   constructor(
     private readonly db: DataSource,
     private readonly notificaciones: NotificacionesService,
     private readonly parametros: ParametrosService,
-  ) {}  // ───────────── Catálogos para el formulario ─────────────
+  ) {}
+
+  // ───────────── Catálogos para el formulario ─────────────
   async catalogos() {
     const planes = await this.db.query(
       `SELECT id, tipo, nombre, cargo_ref::float8 AS "cargoRef" FROM planes_servicio WHERE activo ORDER BY tipo DESC, id`,
@@ -69,7 +78,7 @@ export class NegociacionesService {
 
   // ───────────── Lista paginada (también la usa la ficha de empresa) ─────────────
   async listar(f: ListarNegociacionesDto, s: SesionUsuario) {
-    const { cond, params } = this.alcance(s);
+    const { cond, params } = this.alcance(s, !!f.clienteId);
     const p = [...params];
     const where = [cond];
     if (f.clienteId) { p.push(f.clienteId); where.push(`o.cliente_id = $${p.length}`); }
@@ -98,11 +107,16 @@ export class NegociacionesService {
       `SELECT ${COLUMNAS}, ua.equipo_id AS "equipoAsesorId", o.equipo_id AS "equipoVentaId",
               c.asesor_id AS "duenoEmpresaId", o.correcciones, o.fecha_validacion AS "fechaValidacion",
               o.fecha_activacion AS "fechaActivacion", o.orden_operador AS "ordenOperador",
-              (SELECT pv.nombre FROM pasos_validacion pv WHERE pv.id = o.paso_actual_id) AS "pasoActual"
+              (SELECT pv.nombre FROM pasos_validacion pv WHERE pv.id = o.paso_actual_id) AS "pasoActual",
+              o.renueva_id AS "renuevaId", (SELECT r.codigo FROM oportunidades r WHERE r.id = o.renueva_id) AS "renuevaCodigo",
+              CASE WHEN o.estado_venta = 'ACTIVA' AND o.plazo_meses > 0 THEN ${FIN_CONTRATO} END AS "finContrato",
+              (SELECT json_build_object('id', r.id, 'codigo', r.codigo, 'resultado', r.resultado)
+               FROM oportunidades r WHERE r.renueva_id = o.id
+               ORDER BY (r.resultado <> 'PERDIDA') DESC, r.created_at DESC LIMIT 1) AS renovacion
        ${UNIONES} WHERE o.id = $1`, [id],
     );
     if (!o) throw new NotFoundException('La negociación no existe');
-    if (!this.puedeVer(s, o)) throw new ForbiddenException('No tienes acceso a esta negociación');
+    if (!this.puedeVer(s, o, o.duenoEmpresaId)) throw new ForbiddenException('No tienes acceso a esta negociación');
 
     const items = await this.db.query(
       `SELECT i.id, i.plan_id AS "planId", p.nombre AS plan, p.tipo AS "tipoPlan", i.modalidad,
@@ -133,8 +147,12 @@ export class NegociacionesService {
 
     const { equipoAsesorId: _a, equipoVentaId: _v, duenoEmpresaId, ...datos } = o;
     const esDueno = o.asesorId === s.sub && duenoEmpresaId === s.sub && s.permisos.includes('NEGOCIACION_GESTIONAR');
+    const renovacionViva = o.renovacion && o.renovacion.resultado !== 'PERDIDA';
     return {
       ...datos, items, historial, validaciones, posventa,
+      // El asesor que hoy tiene la empresa puede renovar el contrato (aunque lo haya vendido otro)
+      puedeRenovar: duenoEmpresaId === s.sub && s.permisos.includes('NEGOCIACION_GESTIONAR')
+        && o.estadoVenta === 'ACTIVA' && o.plazoMeses > 0 && !renovacionViva,
       maxCorrecciones: await this.parametros.numero('max_correcciones_venta', 3),
       puedeEditar: esDueno && o.resultado === 'EN_CURSO',
       // Venta observada: el asesor corrige los planes y la reenvía
@@ -147,6 +165,7 @@ export class NegociacionesService {
     const [cliente] = await this.db.query(`SELECT asesor_id AS "asesorId" FROM clientes WHERE id = $1`, [dto.clienteId]);
     if (!cliente) throw new NotFoundException('La empresa no existe');
     if (cliente.asesorId !== s.sub) throw new ForbiddenException('Solo el asesor a cargo de la empresa puede abrir una negociación');
+    if (dto.tipo === 'RENOVACION') throw new BadRequestException('Las renovaciones se inician desde la pantalla Renovaciones o desde la venta activa');
     await this.verificarAbierta(dto.clienteId);
     const items = await this.normalizarItems(dto.items);
 
@@ -154,11 +173,10 @@ export class NegociacionesService {
     try {
       id = await this.db.transaction(async (tx) => {
         const [o] = await tx.query(
-          `INSERT INTO oportunidades (codigo, cliente_id, asesor_id, tipo)
-           VALUES ('OP-' || to_char(now() AT TIME ZONE 'America/Lima', 'YYYY') || '-' || lpad(nextval('oportunidad_codigo_seq')::text, 6, '0'),
-                   $1, $2, $3)
+          `INSERT INTO oportunidades (codigo, cliente_id, asesor_id, tipo, plazo_meses)
+           VALUES (${NUEVO_CODIGO}, $1, $2, $3, $4)
            RETURNING id`,
-          [dto.clienteId, s.sub, dto.tipo],
+          [dto.clienteId, s.sub, dto.tipo, dto.plazoMeses ?? 18],
         );
         await this.reemplazarItems(tx, o.id, items);
         await this.registrarEtapa(tx, o.id, null, 'PROSPECCION', 'Negociación creada', s.sub);
@@ -172,12 +190,18 @@ export class NegociacionesService {
     return this.detalle(id, s);
   }
 
-  // ───────────── Editar tipo e ítems (solo en curso) ─────────────
+  // ───────────── Editar tipo e ítems (en curso, o ganada y observada para corregirla) ─────────────
   async actualizar(id: string, dto: GuardarNegociacionDto, s: SesionUsuario) {
     const items = await this.normalizarItems(dto.items);
     await this.db.transaction(async (tx) => {
       const o = await this.bloquearEditable(tx, id, s, true);
-      await tx.query(`UPDATE oportunidades SET tipo = $1, updated_at = now() WHERE id = $2`, [dto.tipo, id]);
+      // Una renovación sigue siendo renovación; las demás no pueden volverse renovación
+      if (!o.renuevaId && dto.tipo === 'RENOVACION') throw new BadRequestException('Las renovaciones se inician desde la venta activa');
+      const tipo = o.renuevaId ? 'RENOVACION' : dto.tipo;
+      await tx.query(
+        `UPDATE oportunidades SET tipo = $1, plazo_meses = COALESCE($2, plazo_meses), updated_at = now() WHERE id = $3`,
+        [tipo, dto.plazoMeses ?? null, id],
+      );
       await this.reemplazarItems(tx, id, items);
       await this.marcarGestion(tx, o.clienteId);
     });
@@ -244,23 +268,70 @@ export class NegociacionesService {
     return this.detalle(id, s);
   }
 
+  // ───────────── Renovar un contrato activo (copia sus planes en una negociación nueva) ─────────────
+  async iniciarRenovacion(ventaId: string, s: SesionUsuario) {
+    let id: string;
+    try {
+      id = await this.db.transaction(async (tx) => {
+        const [v] = await tx.query(
+          `SELECT o.id, o.codigo, o.cliente_id AS "clienteId", o.estado_venta AS "estadoVenta", o.plazo_meses AS "plazoMeses",
+                  c.asesor_id AS "duenoEmpresaId"
+           FROM oportunidades o JOIN clientes c ON c.id = o.cliente_id WHERE o.id = $1 FOR UPDATE OF o`, [ventaId],
+        );
+        if (!v) throw new NotFoundException('La venta no existe');
+        if (v.duenoEmpresaId !== s.sub || !s.permisos.includes('NEGOCIACION_GESTIONAR')) {
+          throw new ForbiddenException('Solo el asesor a cargo de la empresa puede iniciar la renovación');
+        }
+        if (v.estadoVenta !== 'ACTIVA') throw new BadRequestException('Solo se renuevan contratos con el servicio activo');
+        if (!v.plazoMeses) throw new BadRequestException('Este contrato no tiene plazo forzoso');
+        const [viva] = await tx.query(
+          `SELECT id, codigo FROM oportunidades WHERE renueva_id = $1 AND resultado <> 'PERDIDA'`, [ventaId],
+        );
+        if (viva) throw new ConflictException({ message: `Este contrato ya tiene su renovación (${viva.codigo})`, negociacionId: viva.id });
+        await this.verificarAbierta(v.clienteId);
+
+        const [o] = await tx.query(
+          `INSERT INTO oportunidades (codigo, cliente_id, asesor_id, tipo, plazo_meses, renueva_id, etapa)
+           VALUES (${NUEVO_CODIGO}, $1, $2, 'RENOVACION', $3, $4, 'CONTACTO') RETURNING id`,
+          [v.clienteId, s.sub, v.plazoMeses, ventaId],
+        );
+        // Mismos planes y cantidades; las líneas ya son nuestras, así que dejan de ser portabilidad
+        await tx.query(
+          `INSERT INTO oportunidad_items (oportunidad_id, plan_id, modalidad, operador_origen_id, cantidad, cargo_fijo_unit)
+           SELECT $1, i.plan_id, 'NUEVA', NULL, i.cantidad, i.cargo_fijo_unit
+           FROM oportunidad_items i JOIN planes_servicio p ON p.id = i.plan_id
+           WHERE i.oportunidad_id = $2 AND p.activo`,
+          [o.id, ventaId],
+        );
+        await this.registrarEtapa(tx, o.id, null, 'CONTACTO', `Renovación de ${v.codigo}`, s.sub);
+        await this.marcarGestion(tx, v.clienteId);
+        return o.id as string;
+      });
+    } catch (e) {
+      if ((e as { code?: string }).code === '23505') throw new ConflictException('Esta empresa o contrato ya tiene una negociación abierta');
+      throw e;
+    }
+    return this.detalle(id, s);
+  }
+
   // ───────────── Ayudantes ─────────────
 
   /** Asesor: las suyas · Supervisor: las de su equipo · Gerencia, back office y admin: todas */
-  private alcance(s: SesionUsuario): { cond: string; params: unknown[] } {
+  private alcance(s: SesionUsuario, deUnaEmpresa = false): { cond: string; params: unknown[] } {
     if (['GERENTE', 'BACKOFFICE', 'ADMIN'].includes(s.rol)) return { cond: 'true', params: [] };
     if (s.rol === 'SUPERVISOR') {
       if (!s.equipoId) return { cond: 'false', params: [] };
       // Las ganadas cuentan para el equipo donde se cerraron; las abiertas, para el equipo actual del asesor
       return { cond: '(o.equipo_id = $1 OR (o.equipo_id IS NULL AND ua.equipo_id = $1))', params: [s.equipoId] };
     }
-    return { cond: 'o.asesor_id = $1', params: [s.sub] };
+    // En la ficha de una empresa, el asesor que hoy la tiene ve también las ventas anteriores (para renovarlas)
+    return { cond: deUnaEmpresa ? '(o.asesor_id = $1 OR c.asesor_id = $1)' : 'o.asesor_id = $1', params: [s.sub] };
   }
 
-  private puedeVer(s: SesionUsuario, o: { asesorId: string; equipoVentaId: string | null; equipoAsesorId: string | null }) {
+  private puedeVer(s: SesionUsuario, o: { asesorId: string; equipoVentaId: string | null; equipoAsesorId: string | null }, duenoEmpresaId?: string | null) {
     if (['GERENTE', 'BACKOFFICE', 'ADMIN'].includes(s.rol)) return true;
     if (s.rol === 'SUPERVISOR') return !!s.equipoId && (o.equipoVentaId ?? o.equipoAsesorId) === s.equipoId;
-    return o.asesorId === s.sub;
+    return o.asesorId === s.sub || duenoEmpresaId === s.sub;
   }
 
   private async verificarAbierta(clienteId: string) {
@@ -279,14 +350,14 @@ export class NegociacionesService {
   private async bloquearEditable(tx: EntityManager, id: string, s: SesionUsuario, permitirObservada = false) {
     const [o] = await tx.query(
       `SELECT o.etapa, o.resultado, o.estado_venta AS "estadoVenta", o.asesor_id AS "asesorId", o.cliente_id AS "clienteId",
-              c.asesor_id AS "duenoEmpresaId"
+              c.asesor_id AS "duenoEmpresaId", o.renueva_id AS "renuevaId"
        FROM oportunidades o JOIN clientes c ON c.id = o.cliente_id WHERE o.id = $1 FOR UPDATE OF o`, [id],
     );
     if (!o) throw new NotFoundException('La negociación no existe');
     if (o.asesorId !== s.sub || o.duenoEmpresaId !== s.sub) throw new ForbiddenException('Solo el asesor a cargo puede modificar esta negociación');
     const observada = o.resultado === 'GANADA' && o.estadoVenta === 'OBSERVADA';
     if (o.resultado !== 'EN_CURSO' && !(permitirObservada && observada)) throw new BadRequestException('La negociación ya está cerrada');
-    return o as { etapa: string; clienteId: string };
+    return o as { etapa: string; clienteId: string; renuevaId: string | null };
   }
 
   /** Revisa planes y operadores; en línea nueva el operador de origen se borra */
