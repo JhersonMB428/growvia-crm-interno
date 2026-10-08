@@ -15,6 +15,8 @@ export function RutaPrivada({ children, roles }: Props) {
   const ubicacion = useLocation();
   if (cargando) return null;
   if (!usuario) return <Navigate to="/login" replace state={{ desde: ubicacion.pathname }} />;
+  // Con contraseña temporal, primero debe elegir una propia en su perfil
+  if (usuario.debeCambiarClave && ubicacion.pathname !== '/perfil') return <Navigate to="/perfil" replace />;
   if (roles && !roles.includes(usuario.rol.codigo)) return <Navigate to="/" replace />;
   return <>{children}</>;
 }

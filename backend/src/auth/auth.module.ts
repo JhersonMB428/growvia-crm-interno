@@ -35,5 +35,6 @@ import { PermisosGuard } from './guards/permisos.guard';
     { provide: APP_GUARD, useClass: JwtAuthGuard },
     { provide: APP_GUARD, useClass: PermisosGuard },
   ],
+  exports: [AuthService],
 })
 export class AuthModule {}

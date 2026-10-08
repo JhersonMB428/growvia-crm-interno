@@ -7,7 +7,10 @@
 .app .casilla input { accent-color: var(--acento); }
 .app select.entrada { appearance: auto; }
 .app select.entrada option { background: #0f3a36; color: #ffffff; }
+/* Títulos de grupo (ej. "Línea móvil" / "Línea fija" en los planes) */
+.app select.entrada optgroup { background: #0a2e2b; color: #c7e196; font-style: normal; font-weight: 700; }
 .app[data-tema='claro'] select.entrada option { background: #ffffff; color: #0f2422; }
+.app[data-tema='claro'] select.entrada optgroup { background: #eef4e4; color: #013936; }
 .app .entrada:disabled { opacity: 0.55; }
 .app .alerta { color: var(--texto); }
 .app[data-tema='claro'] .alerta { background: rgba(240, 150, 130, 0.22); border-color: rgba(163, 58, 36, 0.35); color: #6e2414; }

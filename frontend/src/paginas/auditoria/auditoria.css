@@ -1,0 +1,13 @@
+/* ===== Exportar ===== */
+.exportar-rejilla { display: grid; grid-template-columns: repeat(auto-fill, minmax(320px, 1fr)); gap: 20px; align-items: start; }
+.exportar-tarjeta { display: flex; flex-direction: column; gap: 14px; }
+.exportar-tarjeta__texto { margin: 0; font-size: 14px; line-height: 1.5; color: var(--texto-suave); }
+.exportar-tarjeta__boton { align-self: flex-start; }
+
+/* ===== Bitácora ===== */
+.bitacora-filtros { display: flex; flex-wrap: wrap; gap: 12px; align-items: flex-end; }
+.bitacora-filtros .campo { flex: 1 1 180px; max-width: 280px; }
+.bitacora-tabla td { vertical-align: top; }
+.bitacora-tabla__sobre { min-width: 180px; max-width: 280px; }
+.bitacora-tabla__sobre a { font-weight: 700; text-decoration: none; }
+.bitacora-tabla__detalle { min-width: 180px; max-width: 360px; font-size: 13.5px; color: var(--texto-suave); }

@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom';
 import { ErrorApi } from '../../api/cliente';
 import { avisarCampana } from '../../api/gestiones';
 import { resumenLineas, soles, TEXTO_TIPO } from '../../api/negociaciones';
+import { ExpedienteVenta } from '../../componentes/ExpedienteVenta';
 import { TEXTO_EVENTO, validacionApi, type Bandeja, type EventoPosventa, type PuntoChecklist, type VentaEnBandeja } from '../../api/validacion';
 import './validacion.css';
 
@@ -85,7 +86,8 @@ function TarjetaVenta({ v, bandeja, checklist, onHecho }: { v: VentaEnBandeja; b
   const [motivo, setMotivo] = useState('');
   const [marcados, setMarcados] = useState<number[]>([]);
   const [orden, setOrden] = useState(v.ordenOperador ?? '');
-  // Puntos que aplican a esta venta (la carta de portabilidad solo si hay portabilidades)
+  const [docs, setDocs] = useState(v.documentos);
+  const [verExpediente, setVerExpediente] = useState(false);  // Puntos que aplican a esta venta (la carta de portabilidad solo si hay portabilidades)
   const puntos = checklist.filter((p) => !p.soloPortabilidad || v.portabilidades > 0);
   const faltan = puntos.filter((p) => !marcados.includes(p.id));
   const [ocupado, setOcupado] = useState(false);
@@ -118,7 +120,7 @@ function TarjetaVenta({ v, bandeja, checklist, onHecho }: { v: VentaEnBandeja; b
           {bandeja === 'revisar' && v.pasoActual && <span className="chip chip--gris">En: {v.pasoActual}</span>}
           {bandeja === 'revisar' && v.revisada && <span className="chip chip--lima">✓ Revisada</span>}
           {v.correcciones > 0 && <span className="chip chip--crema">Corrección {v.correcciones}</span>}
-        </div>
+          <span className={`chip ${docs ? 'chip--gris' : 'chip--crema'}`}>{docs ? `${docs} ${docs === 1 ? 'documento' : 'documentos'}` : 'Sin documentos'}</span>        </div>
       </div>
 
       <div className="venta__datos">
@@ -149,6 +151,8 @@ function TarjetaVenta({ v, bandeja, checklist, onHecho }: { v: VentaEnBandeja; b
 
       {panel === 'validar' && (
         <div className="bloque" role="group" aria-label="Checklist de validación">
+          {/* Back office revisa los documentos antes de marcar el checklist */}
+          <ExpedienteVenta negociacionId={v.id} compacto onCambio={setDocs} />
           <b>Checklist de back office</b>
           {puntos.map((p) => (
             <label key={p.id} className="casilla">
@@ -212,6 +216,13 @@ function TarjetaVenta({ v, bandeja, checklist, onHecho }: { v: VentaEnBandeja; b
           ))}
         </div>
       )}
+      {bandeja === 'posventa' && (
+        <button type="button" className="boton-texto" style={{ alignSelf: 'flex-start', minHeight: 0, padding: 0 }}
+          aria-expanded={verExpediente} onClick={() => setVerExpediente(!verExpediente)}>
+          {verExpediente ? 'Ocultar expediente' : 'Ver expediente'}
+        </button>
+      )}
+      {bandeja === 'posventa' && verExpediente && <ExpedienteVenta negociacionId={v.id} compacto onCambio={setDocs} />}
     </article>
   );
 }

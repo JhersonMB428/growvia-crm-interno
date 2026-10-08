@@ -1,0 +1,16 @@
+# Nunca entran a la imagen
+.env
+.env.*
+**/.env
+**/.env.*
+.git
+.github
+.vscode
+**/node_modules
+**/dist
+**/almacen
+**/*.log
+**/*.tsbuildinfo
+Dockerfile
+.dockerignore
+scripts

@@ -22,8 +22,8 @@ export class AuthController {
   @Publico()
   @Post('verificar')
   @HttpCode(200)
-  verificar(@Body() dto: VerificarDto) {
-    return this.auth.verificar(dto);
+  verificar(@Body() dto: VerificarDto, @Headers('user-agent') ua = '') {
+    return this.auth.verificar(dto, ua);
   }
 
   /** Pedir otro código (máximo uno por minuto) */

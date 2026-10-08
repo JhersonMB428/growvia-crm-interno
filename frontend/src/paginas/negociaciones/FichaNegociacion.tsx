@@ -6,6 +6,7 @@ import {
   type Etapa, type NegociacionDetalle,
 } from '../../api/negociaciones';
 import { TEXTO_DECISION, TEXTO_EVENTO, validacionApi } from '../../api/validacion';
+import { ExpedienteVenta } from '../../componentes/ExpedienteVenta';
 import './negociaciones.css';
 const fecha = (iso: string) => new Date(iso).toLocaleString('es-PE', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' });
 const ORDEN: Etapa[] = ['PROSPECCION', 'CONTACTO', 'NEGOCIACION', 'CIERRE'];
@@ -132,6 +133,9 @@ export function FichaNegociacion() {
           </section>
 
           {n.resultado === 'GANADA' && <SeccionValidacion n={n} onCambio={(d, m) => { setN(d); setAviso(m); }} />}
+
+          {/* Contrato, DNI, carta de portabilidad… Se recarga al cambiar el estado (cambian los permisos) */}
+          <ExpedienteVenta key={`${n.id}-${n.estadoVenta ?? n.resultado}`} negociacionId={n.id} />
 
           {/* Planes */}          <section className="panel vidrio" style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
             <h2 className="h2">Planes negociados</h2>

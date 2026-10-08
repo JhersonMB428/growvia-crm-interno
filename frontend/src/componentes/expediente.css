@@ -1,0 +1,36 @@
+/* ===== Expediente digital de la venta ===== */
+.expediente__lista { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 8px; }
+.expediente__doc {
+  display: flex; align-items: center; gap: 12px; padding: 10px 12px; border-radius: 16px;
+  background: var(--campo-fondo); border: 1px solid var(--campo-borde);
+}
+.expediente__icono {
+  flex: none; width: 42px; height: 42px; border-radius: 12px; display: grid; place-items: center;
+  font-size: 11px; font-weight: 800; letter-spacing: .04em; background: var(--activo-fondo); color: var(--activo-texto);
+}
+.expediente__info { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
+.expediente__info b { font-size: 14px; }
+.expediente__info span { font-size: 12.5px; color: var(--texto-suave); }
+.expediente__accion { min-height: 36px; padding: 0 14px; font-size: 13px; }
+
+.expediente__subir { display: flex; flex-wrap: wrap; gap: 10px; align-items: flex-end; }
+.expediente__archivo {
+  position: relative; flex: 2 1 220px; min-width: 0; min-height: 48px; display: flex; flex-direction: column; justify-content: center;
+  padding: 6px 16px; border-radius: 16px; border: 2px dashed var(--campo-borde); background: var(--campo-fondo); cursor: pointer;
+}
+.expediente__archivo:hover, .expediente__archivo--listo { border-color: var(--acento); }
+.expediente__archivo--listo { border-style: solid; }
+.expediente__archivo input { position: absolute; inset: 0; opacity: 0; cursor: pointer; }
+.expediente__archivo b { font-size: 14px; }
+.expediente__archivo span { font-size: 12px; color: var(--texto-tenue); }
+
+/* Visor: el documento se ve dentro del CRM */
+.visor { position: fixed; inset: 0; z-index: 100; display: grid; place-items: center; padding: 24px; background: rgba(0, 0, 0, 0.6); }
+.visor__caja {
+  width: min(960px, 100%); height: min(88vh, 1100px); display: flex; flex-direction: column; gap: 12px; padding: 14px;
+  border-radius: 24px; background: var(--vidrio-abierto); border: 1px solid var(--vidrio-borde); box-shadow: var(--vidrio-sombra);
+}
+.visor__barra { display: flex; align-items: center; justify-content: space-between; gap: 12px; color: var(--texto); }
+.visor__contenido { flex: 1; min-height: 0; width: 100%; border: 0; border-radius: 14px; background: #fff; }
+.visor__imagen { display: grid; place-items: center; overflow: auto; background: rgba(0, 0, 0, 0.25); }
+.visor__imagen img { max-width: 100%; max-height: 100%; object-fit: contain; }

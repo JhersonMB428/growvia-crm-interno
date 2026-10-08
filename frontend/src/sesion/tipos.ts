@@ -6,6 +6,8 @@ export interface Usuario {
   rol: { codigo: 'ASESOR' | 'SUPERVISOR' | 'GERENTE' | 'BACKOFFICE' | 'ADMIN'; nombre: string };
   equipo: { id: string; nombre: string } | null;
   permisos: string[];
+  /** Entró con una contraseña temporal: debe elegir una propia antes de usar el CRM */
+  debeCambiarClave?: boolean;
 }
 
 export type RespuestaLogin =
