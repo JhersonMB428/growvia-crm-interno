@@ -1,0 +1,41 @@
+/* ===== Embudo y pérdidas ===== */
+.embudo-filtros { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; justify-content: flex-end; }
+.embudo-filtros .entrada { width: auto; min-width: 180px; }
+.embudo-dos { display: grid; grid-template-columns: minmax(0, 1.3fr) minmax(0, 1fr); gap: 20px; align-items: start; }
+.embudo-dos--interno { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); align-items: center; }
+.embudo-vacio { margin: 0; font-size: 14px; line-height: 1.5; color: var(--texto-suave); }
+.embudo-perdido, .embudo-caida { color: var(--salir); }
+.embudo-alerta { color: #f8efd2; }
+.app[data-tema='claro'] .embudo-alerta { color: #8a6a12; }
+
+.embudo-pasos { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 14px; }
+.embudo-paso { display: flex; flex-direction: column; gap: 6px; }
+.embudo-paso__cabecera { display: flex; justify-content: space-between; gap: 10px; font-size: 14px; }
+.embudo-paso__cabecera span { color: var(--texto-suave); }
+.embudo-paso__cabecera span b { color: var(--texto); }
+.embudo-paso__pista { height: 14px; border-radius: 999px; background: var(--linea); overflow: hidden; }
+.embudo-paso__barra { display: block; height: 100%; border-radius: 999px; background: var(--acento); }
+.embudo-paso:nth-child(2) .embudo-paso__barra { opacity: .88; }
+.embudo-paso:nth-child(3) .embudo-paso__barra { opacity: .76; }
+.embudo-paso:nth-child(4) .embudo-paso__barra { opacity: .64; }
+.embudo-paso:nth-child(5) .embudo-paso__barra { opacity: .52; }
+.embudo-paso__nota { font-size: 12.5px; color: var(--texto-tenue); }
+.embudo-paso__nota .embudo-caida { font-weight: 700; }
+
+.embudo-tiempos { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; }
+.embudo-tiempo { display: flex; flex-direction: column; gap: 4px; padding: 14px; border-radius: 18px; background: var(--campo-fondo); border: 1px solid var(--campo-borde); }
+.embudo-tiempo span { font-size: 12px; font-weight: 700; letter-spacing: .05em; text-transform: uppercase; color: var(--texto-tenue); }
+.embudo-tiempo b { font-family: var(--fuente-titulos); font-size: 22px; font-weight: 600; }
+.embudo-tiempo small { font-size: 12px; color: var(--texto-suave); }
+
+.embudo-otros { display: flex; flex-direction: column; gap: 8px; font-size: 14px; }
+.embudo-otros ul { margin: 0; padding-left: 18px; display: flex; flex-direction: column; gap: 6px; }
+.embudo-otros .tenue { color: var(--texto-suave); font-size: 13px; }
+.embudo-otros a { text-decoration: none; }
+
+@media (max-width: 1000px) { .embudo-dos, .embudo-dos--interno { grid-template-columns: 1fr; } }
+@media (max-width: 600px) {
+  .embudo-tiempos { grid-template-columns: 1fr; }
+  .embudo-filtros { justify-content: flex-start; }
+  .embudo-filtros .entrada { width: 100%; }
+}

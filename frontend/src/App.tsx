@@ -20,6 +20,7 @@ import { AccesosCelular } from './paginas/accesos/AccesosCelular';
 import { Administracion } from './paginas/administracion/Administracion';
 import { Bitacora } from './paginas/auditoria/Bitacora';
 import { Exportar } from './paginas/auditoria/Exportar';
+import { Embudo } from './paginas/embudo/Embudo';
 import { Perfil } from './paginas/perfil/Perfil';
 import { Renovaciones } from './paginas/renovaciones/Renovaciones';
 import { ResumenBackoffice } from './paginas/tableros/ResumenBackoffice';
@@ -62,6 +63,7 @@ export default function App() {
               <Route path="/aprobaciones" element={<RutaPrivada roles={['SUPERVISOR']}><BandejaVentas modo="aprobar" /></RutaPrivada>} />
               {/* Gerencia */}
               <Route path="/reportes" element={<RutaPrivada roles={['GERENTE']}><ResumenGerencia /></RutaPrivada>} />
+              <Route path="/embudo" element={<RutaPrivada roles={['SUPERVISOR', 'GERENTE']}><Embudo /></RutaPrivada>} />
               <Route path="/revision" element={<RutaPrivada roles={['GERENTE']}><BandejaVentas modo="revisar" /></RutaPrivada>} />
               <Route path="/exportar" element={<RutaPrivada roles={['GERENTE']}><Exportar /></RutaPrivada>} />
               <Route path="/bitacora" element={<RutaPrivada roles={['GERENTE', 'ADMIN']}><Bitacora /></RutaPrivada>} />
