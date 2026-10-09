@@ -54,6 +54,7 @@ export const GUIA_COMUN: Tema[] = [
       'El buscador de arriba encuentra cualquier empresa por RUC o razón social. Escribe al menos 3 letras o números.',
       'La campanita muestra tus avisos: gestiones del día, ventas aprobadas u observadas, contratos por vencer y más.',
       'El sol y la luna cambian entre modo claro y oscuro.',
+      'Si tu computadora va lenta, activa el “Modo ligero” en Perfil y ajustes → Apariencia.',
     ],
   },
   {

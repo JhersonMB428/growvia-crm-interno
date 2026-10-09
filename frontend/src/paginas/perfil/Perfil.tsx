@@ -3,6 +3,7 @@ import { accesosMovilApi, DURACIONES, ultimoDia, type AccesoMovil } from '../../
 import { ErrorApi } from '../../api/cliente';
 import { perfilApi, reglasClave, type MiPerfil } from '../../api/perfil';
 import { useSesion } from '../../sesion/SesionContext';
+import { useTema } from '../../tema/TemaContext';
 import './perfil.css';
 
 const fecha = (iso: string) => new Date(iso).toLocaleDateString('es-PE', { day: 'numeric', month: 'short', year: 'numeric' });
@@ -49,6 +50,7 @@ export function Perfil() {
             </div>
             <p className="perfil-nota">Si algún dato está mal, pídele a back office que lo corrija.</p>
           </section>
+          <Apariencia />
           <CambiarClave email={p.email} cambiada={p.claveCambiada} onCambio={cargar} />
         </div>
         <div className="perfil-columna">
@@ -242,6 +244,34 @@ function AccesoCelular() {
           </div>
         </div>
       )}
+    </section>
+  );
+}
+
+
+/** Modo claro u oscuro y modo ligero (se guardan en esta computadora) */
+function Apariencia() {
+  const { tema, cambiarTema, ligero, cambiarLigero } = useTema();
+  return (
+    <section className="panel vidrio perfil-panel">
+      <h2 className="h2">Apariencia</h2>
+      <div className="perfil-apariencia">
+        <span className="etiqueta">Modo</span>
+        <div className="pestanas" role="radiogroup" aria-label="Modo de color">
+          {(['oscuro', 'claro'] as const).map((t) => (
+            <button key={t} type="button" role="radio" aria-checked={tema === t} className={`pestana${tema === t ? ' pestana--activa' : ''}`}
+              onClick={() => cambiarTema(t)}>{t === 'oscuro' ? 'Oscuro' : 'Claro'}</button>
+          ))}
+        </div>
+      </div>
+      <label className="casilla perfil-ligero">
+        <input type="checkbox" checked={ligero} onChange={(e) => cambiarLigero(e.target.checked)} />
+        <span>
+          <b>Modo ligero</b>
+          <span>Para computadoras lentas: quita el efecto de vidrio y las animaciones, y revisa los avisos cada 3 minutos en vez de cada minuto. El CRM funciona igual.</span>
+        </span>
+      </label>
+      <p className="perfil-nota">Se guarda en esta computadora.</p>
     </section>
   );
 }
