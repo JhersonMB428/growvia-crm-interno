@@ -20,6 +20,7 @@ import { AccesosCelular } from './paginas/accesos/AccesosCelular';
 import { Administracion } from './paginas/administracion/Administracion';
 import { Bitacora } from './paginas/auditoria/Bitacora';
 import { Exportar } from './paginas/auditoria/Exportar';
+import { Ayuda } from './paginas/ayuda/Ayuda';
 import { Embudo } from './paginas/embudo/Embudo';
 import { Perfil } from './paginas/perfil/Perfil';
 import { Renovaciones } from './paginas/renovaciones/Renovaciones';
@@ -74,6 +75,7 @@ export default function App() {
               <Route path="/usuarios" element={<RutaPrivada roles={['BACKOFFICE', 'ADMIN']}><Administracion /></RutaPrivada>} />
               {/* Todos */}
               <Route path="/perfil" element={<Perfil />} />
+              <Route path="/ayuda" element={<Ayuda />} />
               <Route path="/notificaciones" element={<Notificaciones />} />
               <Route path="*" element={<InicioPorRol />} />
             </Route>

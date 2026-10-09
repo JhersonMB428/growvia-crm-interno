@@ -8,6 +8,10 @@ export interface Usuario {
   permisos: string[];
   /** Entró con una contraseña temporal: debe elegir una propia antes de usar el CRM */
   debeCambiarClave?: boolean;
+  /** Ya vio el recorrido de bienvenida */
+  guiaVista?: boolean;
+  /** Cambia cada vez que cambia su foto (null = sin foto, se muestran las iniciales) */
+  fotoVersion?: number | null;
 }
 
 export type RespuestaLogin =

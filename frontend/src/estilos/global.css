@@ -133,3 +133,26 @@ p { margin: 0; }
   --logo-filtro: brightness(0) saturate(100%) invert(15%) sepia(38%) saturate(2400%) hue-rotate(146deg) brightness(92%);
   color-scheme: light;
 }
+
+/* ===== Modo ligero: para computadoras lentas =====
+   Sin desenfoque de vidrio (lo más pesado para la tarjeta de video), fondo liso,
+   sombras simples y sin animaciones. Los colores y el orden de la pantalla no cambian. */
+.app[data-ligero='si'] { --panel-solido: #06302c; --app-fondo: #01241f; background-attachment: scroll; }
+.app[data-ligero='si'][data-tema='claro'] { --panel-solido: #ffffff; --app-fondo: #eef2e8; }
+.app[data-ligero='si'] .vidrio {
+  backdrop-filter: none; -webkit-backdrop-filter: none;
+  background: var(--panel-solido); box-shadow: 0 1px 2px rgba(0, 0, 0, 0.18);
+}
+.app[data-ligero='si'][data-tema='claro'] .vidrio { border-color: rgba(1, 57, 54, 0.1); box-shadow: 0 1px 2px rgba(1, 57, 54, 0.08); }
+.app[data-ligero='si'] *, .app[data-ligero='si'] *::before, .app[data-ligero='si'] *::after {
+  transition: none !important; animation: none !important; scroll-behavior: auto !important;
+}
+.app[data-ligero='si'] .recorrido { background: rgba(0, 0, 0, 0.7); }
+
+/* Quien pidió menos movimiento en su sistema tampoco ve animaciones */
+@media (prefers-reduced-motion: reduce) {
+  .app *, .app *::before, .app *::after { transition-duration: 0s !important; animation-duration: 0s !important; }
+}
+
+.sugerencia-ligero { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 12px; }
+.sugerencia-ligero__botones { display: flex; gap: 8px; flex-wrap: wrap; }

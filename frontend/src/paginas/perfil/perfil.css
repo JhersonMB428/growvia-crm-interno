@@ -19,3 +19,15 @@
 .perfil-equipos__quitar { min-height: 36px; padding: 0 14px; font-size: 13px; }
 
 @media (max-width: 1000px) { .perfil-rejilla { grid-template-columns: 1fr; } }
+
+.perfil-apariencia { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; }
+.perfil-ligero { align-items: flex-start; gap: 12px; }
+.perfil-ligero input { margin-top: 3px; }
+.perfil-ligero > span { display: flex; flex-direction: column; gap: 4px; }
+.perfil-ligero > span span { font-size: 13px; line-height: 1.5; color: var(--texto-suave); font-weight: 400; }
+
+
+.perfil-foto { display: flex; align-items: center; gap: 16px; flex-wrap: wrap; }
+.perfil-foto__acciones { display: flex; flex-direction: column; gap: 6px; min-width: 0; }
+.perfil-foto label { cursor: pointer; }
+.perfil-foto--ocupado { opacity: .6; pointer-events: none; }

@@ -1,6 +1,8 @@
 import { useEffect, useState } from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import { notificacionesApi } from '../api/gestiones';
+import { Avatar } from '../componentes/Avatar';
+import { BuscadorEmpresas } from '../componentes/BuscadorEmpresas';
 import '../componentes/gestiones.css';
 import { useSesion } from '../sesion/SesionContext';
 import { useTema } from '../tema/TemaContext';
@@ -9,23 +11,28 @@ import { INICIO_POR_ROL } from './menu';
 
 export function Topbar() {
   const { usuario } = useSesion();
-  const { tema, alternar } = useTema();
+  const { tema, alternar, ligero } = useTema();
   const { pathname } = useLocation();
   const [sinLeer, setSinLeer] = useState(0);
 
-  // Número de avisos sin leer: al cambiar de pantalla, cada minuto y cuando otra pantalla avisa
+  // Número de avisos sin leer: al cambiar de pantalla, cada minuto (cada 3 en modo ligero) y cuando otra pantalla avisa.
+  // Si la pestaña está oculta no consulta; al volver a ella, actualiza.
   useEffect(() => {
     if (!usuario) return;
-    const actualizar = () => notificacionesApi.contador().then((r) => setSinLeer(r.sinLeer)).catch(() => undefined);
+    const actualizar = () => { if (!document.hidden) notificacionesApi.contador().then((r) => setSinLeer(r.sinLeer)).catch(() => undefined); };
     actualizar();
-    const reloj = window.setInterval(actualizar, 60_000);
+    const reloj = window.setInterval(actualizar, ligero ? 180_000 : 60_000);
     window.addEventListener('gv-notificaciones', actualizar);
-    return () => { window.clearInterval(reloj); window.removeEventListener('gv-notificaciones', actualizar); };
-  }, [usuario, pathname]);
+    document.addEventListener('visibilitychange', actualizar);
+    return () => {
+      window.clearInterval(reloj);
+      window.removeEventListener('gv-notificaciones', actualizar);
+      document.removeEventListener('visibilitychange', actualizar);
+    };
+  }, [usuario, pathname, ligero]);
 
   if (!usuario) return null;
 
-  const iniciales = (usuario.nombres[0] + usuario.apellidos[0]).toUpperCase();
   const detalle = usuario.rol.nombre + (usuario.equipo ? ` · ${usuario.equipo.nombre}` : '');
 
   return (
@@ -34,11 +41,7 @@ export function Topbar() {
         <img src="/img/logo-growvia.webp" alt="Growvia" />
       </Link>
 
-      <div className="topbar__buscar">
-        <label htmlFor="buscar" className="oculto-visual">Buscar empresa</label>
-        <span className="topbar__lupa"><Icono nombre="buscar" tam={18} /></span>
-        <input id="buscar" type="search" placeholder="Buscar por RUC o razón social" />
-      </div>
+      <BuscadorEmpresas />
 
       <div className="topbar__acciones">
         <button type="button" className="topbar__circulo" onClick={alternar}
@@ -51,7 +54,7 @@ export function Topbar() {
           {sinLeer > 0 && <span className="campana__contador" aria-hidden="true">{sinLeer > 99 ? '99+' : sinLeer}</span>}
         </Link>
         <div className="topbar__usuario">
-          <span className="topbar__avatar">{iniciales}</span>
+          <Avatar id={usuario.id} version={usuario.fotoVersion} nombres={usuario.nombres} apellidos={usuario.apellidos} className="topbar__avatar" />
           <span className="topbar__nombre">
             <b>{usuario.nombres} {usuario.apellidos}</b>
             <span>{detalle}</span>

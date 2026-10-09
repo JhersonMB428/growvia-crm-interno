@@ -12,6 +12,7 @@ import { EmbudoModule } from './embudo/embudo.module';
 import { EmpresasModule } from './empresas/empresas.module';
 import { ExpedienteModule } from './expediente/expediente.module';
 import { ExportacionModule } from './exportacion/exportacion.module';
+import { FotosModule } from './fotos/fotos.module';
 import { GestionesModule } from './gestiones/gestiones.module';
 import { NegociacionesModule } from './negociaciones/negociaciones.module';
 import { NotificacionesModule } from './notificaciones/notificaciones.module';
@@ -65,6 +66,7 @@ import { ValidacionModule } from './validacion/validacion.module';
     RenovacionesModule,
     EmbudoModule,
     PerfilModule,
+    FotosModule,    
   ],
   controllers: [SaludController],
 })

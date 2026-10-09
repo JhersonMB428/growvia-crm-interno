@@ -145,6 +145,9 @@ export class AuthService {
       equipo: u.equipo ? { id: u.equipo.id, nombre: u.equipo.nombre } : null,
       permisos: u.rol.permisos.map((p) => p.codigo).sort(),
       debeCambiarClave: u.claveTemporal,
+      guiaVista: !!u.guiaVistaAt,
+      /** Cambia cada vez que se cambia la foto (null = sin foto) */
+      fotoVersion: u.fotoAt ? u.fotoAt.getTime() : null,
     };
   }
 

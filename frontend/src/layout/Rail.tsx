@@ -48,6 +48,11 @@ export function Rail() {
         ))}
 
         <div className="rail__linea" />
+        <NavLink to="/ayuda" title="Ayuda"
+          className={({ isActive }) => `rail__item${isActive ? ' rail__item--activo' : ''}`}>
+          <Icono nombre="ayuda" />
+          <span className="rail__texto">Ayuda</span>
+        </NavLink>
         <NavLink to="/perfil" title="Perfil y ajustes"
           className={({ isActive }) => `rail__item${isActive ? ' rail__item--activo' : ''}`}>
           <Icono nombre="perfil" />

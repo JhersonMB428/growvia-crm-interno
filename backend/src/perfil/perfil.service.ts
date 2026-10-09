@@ -81,6 +81,12 @@ export class PerfilService {
     return { avisoCorreo, minutosRecordatorio };
   }
 
+  /** Ya vio el recorrido de bienvenida: no se le vuelve a abrir solo */
+  async marcarGuiaVista(s: SesionUsuario) {
+    await this.db.query(`UPDATE usuarios SET guia_vista_at = COALESCE(guia_vista_at, now()) WHERE id = $1`, [s.sub]);
+    return { guiaVista: true };
+  }
+
   async quitarDispositivo(s: SesionUsuario, id: string) {
     const r = await this.db.query(
       `UPDATE dispositivos_confiables SET revocado_at = now() WHERE id = $1 AND usuario_id = $2 AND revocado_at IS NULL RETURNING id`, [id, s.sub],

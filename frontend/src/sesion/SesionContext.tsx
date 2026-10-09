@@ -8,6 +8,8 @@ interface Sesion {
   iniciar: (t: string, u: Usuario) => void;
   cerrar: () => void;
   puede: (permiso: string) => boolean;
+  /** Cambia datos del usuario en pantalla sin volver a pedirlos (ej. ya vio el recorrido) */
+  actualizar: (cambios: Partial<Usuario>) => void;
 }
 
 const Contexto = createContext<Sesion | null>(null);
@@ -34,8 +36,9 @@ export function SesionProvider({ children }: { children: ReactNode }) {
   const iniciar = useCallback((t: string, u: Usuario) => { token.guardar(t); setUsuario(u); }, []);
   const cerrar = useCallback(() => { token.borrar(); setUsuario(null); }, []);
   const puede = useCallback((p: string) => !!usuario?.permisos.includes(p), [usuario]);
+  const actualizar = useCallback((cambios: Partial<Usuario>) => setUsuario((u) => (u ? { ...u, ...cambios } : u)), []);
 
-  return <Contexto.Provider value={{ usuario, cargando, iniciar, cerrar, puede }}>{children}</Contexto.Provider>;
+  return <Contexto.Provider value={{ usuario, cargando, iniciar, cerrar, puede, actualizar }}>{children}</Contexto.Provider>;
 }
 
 export function useSesion() {

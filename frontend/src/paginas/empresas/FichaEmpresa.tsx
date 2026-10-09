@@ -27,6 +27,7 @@ export function FichaEmpresa() {
   const [editando, setEditando] = useState<Contacto[] | null>(null);
   const [ocupado, setOcupado] = useState(false);
   const [corrigiendo, setCorrigiendo] = useState<{ razonSocial: string; distritoId: string } | null>(null);
+  const [reasignando, setReasignando] = useState(false);
   // Estable para que el selector de ubigeo no se re-ejecute en cada render
   const alCambiarDistrito = useCallback((d: string) => setCorrigiendo((c) => (c && c.distritoId !== d ? { ...c, distritoId: d } : c)), []);
 
@@ -72,6 +73,9 @@ export function FichaEmpresa() {
           <span className={`chip ${e.estado === 'VENTA' ? 'chip--lima' : 'chip--gris'}`}>{e.estado === 'VENTA' ? 'Venta' : 'Prospecto'}</span>
           {e.libre && <span className="chip chip--crema">Libre</span>}
           {e.libre && puede('EMPRESA_TOMAR') && <button type="button" className="boton" onClick={tomar} disabled={ocupado}>{ocupado ? 'Tomando…' : 'Tomar empresa'}</button>}
+          {puede('EMPRESA_REASIGNAR') && !reasignando && (
+            <button type="button" className="boton-secundario" onClick={() => setReasignando(true)}>{e.libre ? 'Asignar' : 'Reasignar'}</button>
+          )}
           {e.puedeEditar && puede('NEGOCIACION_GESTIONAR') && (
             <button type="button" className="boton"
               onClick={() => document.getElementById('gestiones')?.scrollIntoView({ behavior: 'smooth' })}>Registrar gestión</button>
@@ -81,6 +85,10 @@ export function FichaEmpresa() {
 
       {aviso && <div className="aviso" role="status">{aviso}</div>}
       {error && <div className="alerta" role="alert">{error}</div>}
+      {reasignando && (
+        <Reasignar e={e} onCancelar={() => setReasignando(false)}
+          onHecho={(d) => { setE(d); setReasignando(false); setAviso(`La empresa ahora está a cargo de ${d.asesor}.`); }} />
+      )}
 
       <div style={{ display: 'flex', flexWrap: 'wrap', gap: 20, alignItems: 'flex-start' }}>
         <section className="panel vidrio" style={{ flex: '2 1 520px', minWidth: 0, display: 'flex', flexDirection: 'column', gap: 18 }}>
@@ -250,5 +258,45 @@ function ContratoActual({ e, editable, onGuardado }: { e: EmpresaDetalle; editab
         </div>
       )}
     </>
+  );
+}
+
+/** Gerencia y admin: pasar la empresa (y su negociación abierta) a otro asesor */
+function Reasignar({ e, onCancelar, onHecho }: { e: EmpresaDetalle; onCancelar: () => void; onHecho: (d: EmpresaDetalle) => void }) {
+  const [asesores, setAsesores] = useState<{ id: string; nombre: string; equipo: string | null }[] | null>(null);
+  const [destino, setDestino] = useState('');
+  const [ocupado, setOcupado] = useState(false);
+  const [error, setError] = useState('');
+
+  useEffect(() => {
+    empresasApi.asesores().then((l) => setAsesores(l.filter((a) => a.id !== e.asesorId)))
+      .catch((err) => setError(err instanceof ErrorApi ? err.message : 'No se pudo cargar la lista de asesores'));
+  }, [e.asesorId]);
+
+  async function confirmar() {
+    setOcupado(true); setError('');
+    try { onHecho(await empresasApi.reasignar(e.id, destino)); }
+    catch (err) { setError(err instanceof ErrorApi ? err.message : 'No se pudo reasignar'); setOcupado(false); }
+  }
+
+  return (
+    <section className="panel vidrio" style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+      <h2 className="h2">{e.libre ? 'Asignar la empresa' : 'Reasignar la empresa'}</h2>
+      <p style={{ margin: 0, color: 'var(--texto-suave)', lineHeight: 1.5 }}>
+        {e.libre ? 'La empresa está libre en el repositorio.' : `Hoy la tiene ${e.asesor}.`} Si tiene una negociación abierta, pasa con la empresa al nuevo asesor.
+      </p>
+      <div className="campo" style={{ maxWidth: 420 }}>
+        <label htmlFor="reasignar-a" className="etiqueta">Nuevo asesor</label>
+        <select id="reasignar-a" className="entrada" value={destino} onChange={(ev) => setDestino(ev.target.value)} disabled={!asesores}>
+          <option value="">{asesores ? 'Elige el asesor' : 'Cargando…'}</option>
+          {asesores?.map((a) => <option key={a.id} value={a.id}>{a.nombre}{a.equipo ? ` · ${a.equipo}` : ''}</option>)}
+        </select>
+      </div>
+      {error && <div className="alerta" role="alert">{error}</div>}
+      <div className="fila-acciones" style={{ justifyContent: 'flex-end' }}>
+        <button type="button" className="boton-secundario" onClick={onCancelar}>Cancelar</button>
+        <button type="button" className="boton" disabled={!destino || ocupado} onClick={confirmar}>{ocupado ? 'Guardando…' : 'Confirmar'}</button>
+      </div>
+    </section>
   );
 }

@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { ErrorApi } from '../../api/cliente';
 import { empresasApi, type EmpresaResumen, type Pagina } from '../../api/empresas';
 import { ListaEmpresas } from '../../componentes/ListaEmpresas';
@@ -11,13 +11,19 @@ type Filtro = 'todas' | 'libres' | 'asignadas';
 export function Repositorio() {
   const { usuario, puede } = useSesion();
   const navegar = useNavigate();
-  const [q, setQ] = useState('');
-  const [filtro, setFiltro] = useState<Filtro>('libres');
+  // Desde el buscador de arriba llega ?q=… y se busca en todas las empresas
+  const [params] = useSearchParams();
+  const [q, setQ] = useState(params.get('q') ?? '');
+  const [filtro, setFiltro] = useState<Filtro>(params.get('q') ? 'todas' : 'libres');
   const [pagina, setPagina] = useState(1);
   const [datos, setDatos] = useState<Pagina<EmpresaResumen> | null>(null);
   const [cargando, setCargando] = useState(true);
   const [tomando, setTomando] = useState<string | null>(null);
   const [error, setError] = useState('');
+  useEffect(() => {
+    const nueva = params.get('q');
+    if (nueva) { setQ(nueva); setFiltro('todas'); setPagina(1); }
+  }, [params]);
   const busqueda = useDebounce(q);
   const puedeTomar = puede('EMPRESA_TOMAR');
 

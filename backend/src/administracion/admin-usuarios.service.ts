@@ -67,6 +67,7 @@ export class AdminUsuariosService {
     const filas = await this.db.query(
       `SELECT u.id, u.nombres, u.apellidos, u.email, r.codigo AS rol, r.nombre AS "rolNombre", u.equipo_id AS "equipoId", eq.nombre AS equipo,
               u.activo, u.clave_temporal AS "claveTemporal", u.created_at AS creado,
+              floor(extract(epoch FROM u.foto_at) * 1000)::float8 AS "fotoVersion",
               (eq.supervisor_id = u.id) AS "esSupervisorDelEquipo",
               (SELECT max(b.created_at) FROM bitacora b WHERE b.usuario_id = u.id AND b.accion = 'LOGIN') AS "ultimoIngreso",
               (SELECT count(*)::int FROM clientes c WHERE c.asesor_id = u.id) AS empresas

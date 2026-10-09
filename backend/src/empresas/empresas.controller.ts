@@ -32,6 +32,13 @@ export class EmpresasController {
     return this.empresas.repositorio(f);
   }
 
+  /** Asesores activos a los que se puede reasignar una empresa (gerencia y admin) */
+  @Get('asesores')
+  @RequierePermisos('EMPRESA_REASIGNAR')
+  asesores() {
+    return this.empresas.asesoresActivos();
+  }
+
   @Post()
   @RequierePermisos('PROSPECTO_CREAR')
   crear(@Body() dto: CrearEmpresaDto, @UsuarioActual() s: SesionUsuario) {

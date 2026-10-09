@@ -1,0 +1,19 @@
+/* ===== Buscador de empresas (barra superior) ===== */
+.buscador__panel {
+  position: absolute; top: calc(100% + 8px); left: 0; right: 0; z-index: 80; display: flex; flex-direction: column; gap: 2px;
+  padding: 8px; border-radius: 22px; background: var(--vidrio-abierto); border: 1px solid var(--vidrio-borde); box-shadow: var(--vidrio-sombra);
+  max-height: 70vh; overflow-y: auto;
+}
+.buscador__nota { margin: 0; padding: 12px 14px; font-size: 14px; color: var(--texto-suave); }
+.buscador__fila {
+  display: flex; align-items: center; justify-content: space-between; gap: 10px; width: 100%; padding: 10px 12px;
+  border: 0; border-radius: 14px; background: transparent; color: var(--texto); font: inherit; text-align: left; cursor: pointer;
+}
+.buscador__fila--marcada { background: var(--campo-fondo); }
+.buscador__texto { min-width: 0; display: flex; flex-direction: column; gap: 2px; }
+.buscador__texto b { font-size: 14px; }
+.buscador__texto span { font-size: 12.5px; color: var(--texto-suave); }
+.buscador__fila .chip { flex-shrink: 0; max-width: 45%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.buscador__todas { margin-top: 4px; padding: 10px 12px; border: 0; border-top: 1px solid var(--linea); background: none; color: var(--acento); font: inherit; font-size: 14px; font-weight: 600; cursor: pointer; text-align: left; }
+/* La barra superior queda por encima del contenido para que la lista de resultados no quede tapada */
+.topbar { position: relative; z-index: 70; }

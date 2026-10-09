@@ -49,6 +49,17 @@ export class Usuario {
   @Column({ name: 'clave_temporal', default: false })
   claveTemporal: boolean;
 
+  /** Cuándo vio el recorrido de bienvenida (null = todavía no) */
+  @Column({ name: 'guia_vista_at', type: 'timestamptz', nullable: true })
+  guiaVistaAt: Date | null;
+
+  /** Foto de perfil (null = se muestran las iniciales) */
+  @Column({ name: 'foto_clave', type: 'varchar', length: 200, nullable: true })
+  fotoClave: string | null;
+
+  @Column({ name: 'foto_at', type: 'timestamptz', nullable: true })
+  fotoAt: Date | null;
+
   @Column({ name: 'creado_por', type: 'uuid', nullable: true })
   creadoPor: string | null;
 
