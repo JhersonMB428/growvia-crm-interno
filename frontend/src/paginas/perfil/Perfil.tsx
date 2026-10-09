@@ -4,6 +4,7 @@ import { ErrorApi } from '../../api/cliente';
 import { perfilApi, reglasClave, type MiPerfil } from '../../api/perfil';
 import { useSesion } from '../../sesion/SesionContext';
 import { useTema } from '../../tema/TemaContext';
+import { Avatar } from '../../componentes/Avatar';
 import './perfil.css';
 
 const fecha = (iso: string) => new Date(iso).toLocaleDateString('es-PE', { day: 'numeric', month: 'short', year: 'numeric' });
@@ -40,6 +41,7 @@ export function Perfil() {
         <div className="perfil-columna">
           <section className="panel vidrio perfil-panel">
             <h2 className="h2">Mis datos</h2>
+            <FotoPerfil />
             <div className="rejilla-2">
               <div className="dato"><span>Nombre</span><b>{p.nombres} {p.apellidos}</b></div>
               <div className="dato"><span>Correo</span><b>{p.email}</b></div>
@@ -273,5 +275,64 @@ function Apariencia() {
       </label>
       <p className="perfil-nota">Se guarda en esta computadora.</p>
     </section>
+  );
+}
+
+
+/** Recorta la foto al centro en un cuadrado de 256 px (así pesa unos pocos KB) */
+async function recortarFoto(archivo: File): Promise<Blob> {
+  if (!/^image\/(jpeg|png|webp)$/.test(archivo.type)) throw new Error('La foto debe ser JPG, PNG o WEBP');
+  if (archivo.size > 15 * 1024 * 1024) throw new Error('La foto pesa más de 15 MB');
+  const img = await createImageBitmap(archivo).catch(() => { throw new Error('No se pudo leer la foto'); });
+  const lado = Math.min(img.width, img.height);
+  const lienzo = document.createElement('canvas');
+  lienzo.width = 256; lienzo.height = 256;
+  lienzo.getContext('2d')!.drawImage(img, (img.width - lado) / 2, (img.height - lado) / 2, lado, lado, 0, 0, 256, 256);
+  const aBlob = (tipo: string) => new Promise<Blob | null>((ok) => lienzo.toBlob(ok, tipo, 0.85));
+  const webp = await aBlob('image/webp');
+  const foto = webp?.type === 'image/webp' ? webp : await aBlob('image/jpeg'); // algunos navegadores no generan WEBP
+  if (!foto) throw new Error('No se pudo preparar la foto');
+  return foto;
+}
+
+/** Foto de perfil: se ve en la barra de arriba y en la lista de usuarios */
+function FotoPerfil() {
+  const { usuario, actualizar } = useSesion();
+  const [ocupado, setOcupado] = useState(false);
+  const [estado, setEstado] = useState('');
+  if (!usuario) return null;
+
+  async function elegir(archivo: File | undefined) {
+    if (!archivo) return;
+    setOcupado(true); setEstado('');
+    try {
+      const r = await perfilApi.subirFoto(await recortarFoto(archivo));
+      actualizar({ fotoVersion: r.fotoVersion }); setEstado('Foto actualizada.');
+    } catch (e) { setEstado(e instanceof Error ? e.message : 'No se pudo subir la foto'); }
+    finally { setOcupado(false); }
+  }
+
+  async function quitar() {
+    setOcupado(true); setEstado('');
+    try { await perfilApi.quitarFoto(); actualizar({ fotoVersion: null }); setEstado('Foto quitada.'); }
+    catch (e) { setEstado(e instanceof ErrorApi ? e.message : 'No se pudo quitar la foto'); }
+    finally { setOcupado(false); }
+  }
+
+  return (
+    <div className="perfil-foto">
+      <Avatar id={usuario.id} version={usuario.fotoVersion} nombres={usuario.nombres} apellidos={usuario.apellidos} tam={84} />
+      <div className="perfil-foto__acciones">
+        <div className="fila-acciones" style={{ justifyContent: 'flex-start' }}>
+          <label className={`boton-secundario${ocupado ? ' perfil-foto--ocupado' : ''}`}>
+            {ocupado ? 'Subiendo…' : usuario.fotoVersion ? 'Cambiar foto' : 'Subir foto'}
+            <input type="file" accept="image/jpeg,image/png,image/webp" className="oculto-visual" disabled={ocupado}
+              onChange={(e) => { elegir(e.target.files?.[0]); e.target.value = ''; }} />
+          </label>
+          {usuario.fotoVersion && <button type="button" className="boton-texto" disabled={ocupado} onClick={quitar}>Quitar foto</button>}
+        </div>
+        <span className="perfil-nota" role="status">{estado || 'JPG, PNG o WEBP. Se recorta en cuadrado automáticamente.'}</span>
+      </div>
+    </div>
   );
 }

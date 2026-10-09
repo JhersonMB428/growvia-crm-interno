@@ -38,3 +38,5 @@
 
 @media (max-width: 1000px) { .admin-dos { grid-template-columns: 1fr; } }
 @media (max-width: 600px) { .admin-parametro { flex-wrap: wrap; } .admin-parametro .admin-item__info { flex-basis: 100%; } }
+
+.admin-usuario { display: flex; align-items: center; gap: 10px; }

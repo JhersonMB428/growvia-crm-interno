@@ -6,6 +6,7 @@ export interface UsuarioAdmin {
   id: string; nombres: string; apellidos: string; email: string; rol: CodigoRol; rolNombre: string;
   equipoId: string | null; equipo: string | null; activo: boolean; claveTemporal: boolean; creado: string;
   esSupervisorDelEquipo: boolean; ultimoIngreso: string | null; empresas: number; editable: boolean; soyYo: boolean;
+  fotoVersion: number | null;
 }
 export interface DatosUsuario { nombres: string; apellidos: string; email: string; rol: CodigoRol; equipoId: string | null }
 export interface CatalogosAdmin {
@@ -35,6 +36,8 @@ export const adminApi = {
   desactivar: (id: string, destino?: string) =>
     api<{ ok: boolean; empresas: number; negociaciones: number }>(`/admin/usuarios/${id}/desactivar`, { metodo: 'POST', cuerpo: { destino } }),
   reactivar: (id: string) => api(`/admin/usuarios/${id}/reactivar`, { metodo: 'POST' }),
+  /** Quitar una foto inapropiada */
+  quitarFoto: (id: string) => api(`/admin/usuarios/${id}/foto`, { metodo: 'DELETE' }),
   equipos: () => api<{ equipos: EquipoAdmin[]; supervisores: { id: string; nombre: string }[] }>('/admin/equipos'),
   guardarEquipo: (id: string | null, d: { nombre: string; supervisorId: string | null; activo?: boolean }) =>
     api<{ equipos: EquipoAdmin[]; supervisores: { id: string; nombre: string }[] }>(id ? `/admin/equipos/${id}` : '/admin/equipos', { metodo: id ? 'PUT' : 'POST', cuerpo: d }),

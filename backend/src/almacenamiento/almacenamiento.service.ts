@@ -1,7 +1,7 @@
 import { Injectable, Logger, OnModuleInit } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { BlobServiceClient, ContainerClient } from '@azure/storage-blob';
-import { mkdir, readFile, writeFile } from 'node:fs/promises';
+import { mkdir, readFile, rm, writeFile } from 'node:fs/promises';
 import { dirname, resolve, sep } from 'node:path';
 
 /**
@@ -45,6 +45,12 @@ export class AlmacenamientoService implements OnModuleInit {
   async leer(clave: string): Promise<Buffer> {
     if (this.contenedor) return this.contenedor.getBlockBlobClient(clave).downloadToBuffer();
     return readFile(this.ruta(clave));
+  }
+
+  /** Borra un archivo (si ya no existe, no pasa nada) */
+  async borrar(clave: string) {
+    if (this.contenedor) { await this.contenedor.getBlockBlobClient(clave).deleteIfExists(); return; }
+    await rm(this.ruta(clave), { force: true });
   }
 
   /** Evita que una clave como "../../.env" salga de la carpeta */

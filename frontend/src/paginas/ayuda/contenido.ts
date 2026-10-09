@@ -38,11 +38,12 @@ export const GUIA_COMUN: Tema[] = [
     ],
   },
   {
-    id: 'perfil', titulo: 'Tu perfil', resumen: 'Cambia tu contraseña, elige tus avisos y revisa en qué equipos entraste.',
+    id: 'perfil', titulo: 'Tu perfil', resumen: 'Tu foto, tu contraseña, tus avisos y los equipos en los que entraste.',
     pasos: [
       'Abre “Perfil y ajustes” al final del menú.',
       'Contraseña: escribe la actual y la nueva (mínimo 10 caracteres, con letras y números). Al cambiarla, los demás equipos se cierran.',
       'Avisos: elige cuántos minutos antes de cada gestión agendada quieres el recordatorio y si quieres el resumen del día por correo.',
+      'Foto: en “Mis datos” pulsa “Subir foto”. Se recorta en cuadrado sola y se ve en la barra de arriba.',
       'Equipos de confianza: si no reconoces alguno, quítalo.',
     ],
     enlace: { ruta: '/perfil', texto: 'Ir a mi perfil' },

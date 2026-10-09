@@ -1,0 +1,7 @@
+/* ===== Avatar (foto o iniciales) ===== */
+.avatar {
+  flex-shrink: 0; border-radius: 50%; display: inline-flex; align-items: center; justify-content: center;
+  background: var(--crema); color: var(--verde); font-family: var(--fuente-titulos); font-weight: 600; line-height: 1;
+}
+.app[data-tema='claro'] .avatar { background: var(--verde); color: var(--lima); }
+.avatar--foto { object-fit: cover; background: var(--campo-fondo); }

@@ -53,6 +53,9 @@ const REGLAS: Record<string, Regla> = {
   'POST /accesos-moviles/:id/revocar': { accion: 'ACCESO_MOVIL_REVOCAR', entidad: 'ACCESO', campos: ['respuesta'] },
   'POST /accesos-moviles/otorgar': { accion: 'ACCESO_MOVIL_OTORGAR', campos: ['usuarioId', 'hasta'] },
   'PUT /perfil/clave': { accion: 'CLAVE_CAMBIAR' },
+  'PUT /perfil/foto': { accion: 'FOTO_CAMBIAR' },
+  'DELETE /perfil/foto': { accion: 'FOTO_QUITAR' },
+  'DELETE /admin/usuarios/:id/foto': { accion: 'FOTO_QUITAR_OTRO', entidad: 'USUARIO' },
   'PUT /perfil/avisos': { accion: 'PERFIL_AVISOS', campos: ['avisoCorreo', 'minutosRecordatorio'] },
   'DELETE /perfil/dispositivos/:id': { accion: 'DISPOSITIVO_QUITAR' },
   'DELETE /perfil/dispositivos': { accion: 'DISPOSITIVOS_QUITAR_TODOS' },
@@ -76,14 +79,14 @@ const IGNORAR = new Set(['POST /notificaciones/leer-todas', 'POST /notificacione
 export const CATEGORIAS: Record<string, string[]> = {
   accesos: ['LOGIN', 'LOGIN_FALLIDO', 'CODIGO_FALLIDO', 'LOGIN_BLOQUEADO', 'ACCESO_DENEGADO', 'SESION_MOVIL_CORTADA',
         'ACCESO_MOVIL_SOLICITAR', 'ACCESO_MOVIL_APROBAR', 'ACCESO_MOVIL_RECHAZAR', 'ACCESO_MOVIL_REVOCAR', 'ACCESO_MOVIL_OTORGAR',
-    'CLAVE_CAMBIAR', 'CLAVE_FALLIDA', 'DISPOSITIVO_QUITAR', 'DISPOSITIVOS_QUITAR_TODOS'],
+    'CLAVE_CAMBIAR', 'CLAVE_FALLIDA', 'DISPOSITIVO_QUITAR', 'DISPOSITIVOS_QUITAR_TODOS', 'FOTO_CAMBIAR', 'FOTO_QUITAR'],
   empresas: ['EMPRESA_CREAR', 'EMPRESA_TOMAR', 'EMPRESA_REASIGNAR', 'EMPRESA_CORREGIR', 'CONTACTOS_EDITAR', 'EMPRESA_CONTRATO', 'GESTION_REGISTRAR', 'GESTION_REPROGRAMAR'],
   ventas: ['NEGOCIACION_CREAR', 'NEGOCIACION_EDITAR', 'NEGOCIACION_ETAPA', 'NEGOCIACION_CERRAR', 'RENOVACION_INICIAR', 'VENTA_REENVIAR', 'VENTA_APROBAR',
     'VENTA_REVISAR', 'VENTA_OBSERVAR', 'VENTA_DETENER', 'VENTA_VALIDAR', 'VENTA_POSVENTA'],
   documentos: ['DOCUMENTO_SUBIR', 'DOCUMENTO_VER', 'DOCUMENTO_ELIMINAR'],
   datos: ['BASE_SUBIR', 'BASE_APROBAR', 'BASE_RECHAZAR', 'EXPORTAR', 'META_DEFINIR'],
   admin: ['USUARIO_CREAR', 'USUARIO_EDITAR', 'USUARIO_CLAVE', 'USUARIO_DESACTIVAR', 'USUARIO_REACTIVAR', 'EQUIPO_CREAR', 'EQUIPO_EDITAR',
-    'PLAN_GUARDAR', 'OPERADOR_GUARDAR', 'PARAMETRO_EDITAR'],
+    'PLAN_GUARDAR', 'OPERADOR_GUARDAR', 'PARAMETRO_EDITAR', 'FOTO_QUITAR_OTRO'],
 };
 
 const recortar = (v: unknown) => (typeof v === 'string' && v.length > 300 ? `${v.slice(0, 300)}…` : v);

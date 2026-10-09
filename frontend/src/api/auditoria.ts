@@ -64,6 +64,7 @@ export const TEXTO_ACCION: Record<string, string> = {
   ACCESO_MOVIL_RECHAZAR: 'Rechazó acceso desde celular', ACCESO_MOVIL_REVOCAR: 'Retiró acceso desde celular',
   ACCESO_MOVIL_OTORGAR: 'Dio acceso desde celular', SESION_MOVIL_CORTADA: 'Celular sacado del CRM',
   CLAVE_CAMBIAR: 'Cambió su contraseña', CLAVE_FALLIDA: 'Contraseña actual incorrecta (perfil)', PERFIL_AVISOS: 'Cambió sus avisos',
+  FOTO_CAMBIAR: 'Cambió su foto', FOTO_QUITAR: 'Quitó su foto', FOTO_QUITAR_OTRO: 'Quitó la foto de un usuario',
   DISPOSITIVO_QUITAR: 'Quitó un equipo de confianza', DISPOSITIVOS_QUITAR_TODOS: 'Quitó todos sus equipos de confianza',
   USUARIO_CREAR: 'Creó un usuario', USUARIO_EDITAR: 'Editó un usuario', USUARIO_CLAVE: 'Restableció una contraseña',
   USUARIO_DESACTIVAR: 'Desactivó un usuario', USUARIO_REACTIVAR: 'Reactivó un usuario', EQUIPO_CREAR: 'Creó un equipo',

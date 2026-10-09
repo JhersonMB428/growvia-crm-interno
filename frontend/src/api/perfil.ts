@@ -1,4 +1,4 @@
-import { api } from './cliente';
+import { api, ErrorApi, token } from './cliente';
 import { huellaDelEquipo } from '../sesion/huella';
 import type { RespuestaLogin } from '../sesion/tipos';
 
@@ -20,6 +20,21 @@ export const perfilApi = {
     api<{ avisoCorreo: boolean; minutosRecordatorio: number }>('/perfil/avisos', { metodo: 'PUT', cuerpo: { avisoCorreo, minutosRecordatorio } }),
   quitarDispositivo: (id: string) => api(`/perfil/dispositivos/${id}`, { metodo: 'DELETE' }),
   quitarTodos: () => api('/perfil/dispositivos', { metodo: 'DELETE' }),
+  /** Sube la foto ya recortada (cuadrada, 256 px) */
+  async subirFoto(foto: Blob): Promise<{ fotoVersion: number }> {
+    const datos = new FormData();
+    datos.append('foto', foto, 'foto.webp');
+    let res: Response;
+    try {
+      res = await fetch('/api/perfil/foto', { method: 'PUT', headers: { Authorization: `Bearer ${token.leer() ?? ''}` }, body: datos });
+    } catch {
+      throw new ErrorApi(0, 'No pudimos conectar con el servidor. Revisa tu conexión.');
+    }
+    const cuerpo = await res.json().catch(() => ({}));
+    if (!res.ok) throw new ErrorApi(res.status, res.status === 413 ? 'La foto pesa demasiado' : (Array.isArray(cuerpo.message) ? cuerpo.message[0] : cuerpo.message) ?? 'No se pudo subir la foto');
+    return cuerpo;
+  },
+  quitarFoto: () => api<{ fotoVersion: null }>('/perfil/foto', { metodo: 'DELETE' }),
   /** Ya vio el recorrido de bienvenida */
   guiaVista: () => api<{ guiaVista: boolean }>('/perfil/guia', { metodo: 'PUT' }),
 };

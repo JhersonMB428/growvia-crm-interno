@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import { notificacionesApi } from '../api/gestiones';
+import { Avatar } from '../componentes/Avatar';
 import { BuscadorEmpresas } from '../componentes/BuscadorEmpresas';
 import '../componentes/gestiones.css';
 import { useSesion } from '../sesion/SesionContext';
@@ -32,7 +33,6 @@ export function Topbar() {
 
   if (!usuario) return null;
 
-  const iniciales = (usuario.nombres[0] + usuario.apellidos[0]).toUpperCase();
   const detalle = usuario.rol.nombre + (usuario.equipo ? ` · ${usuario.equipo.nombre}` : '');
 
   return (
@@ -54,7 +54,7 @@ export function Topbar() {
           {sinLeer > 0 && <span className="campana__contador" aria-hidden="true">{sinLeer > 99 ? '99+' : sinLeer}</span>}
         </Link>
         <div className="topbar__usuario">
-          <span className="topbar__avatar">{iniciales}</span>
+          <Avatar id={usuario.id} version={usuario.fotoVersion} nombres={usuario.nombres} apellidos={usuario.apellidos} className="topbar__avatar" />
           <span className="topbar__nombre">
             <b>{usuario.nombres} {usuario.apellidos}</b>
             <span>{detalle}</span>

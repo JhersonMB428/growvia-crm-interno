@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import { adminApi, type CatalogosAdmin, type CodigoRol, type DatosUsuario, type UsuarioAdmin } from '../../api/administracion';
 import { ErrorApi } from '../../api/cliente';
+import { Avatar } from '../../componentes/Avatar';
 import { useSesion } from '../../sesion/SesionContext';
 import { Equipos } from './Equipos';
 import { Parametros, PlanesOperadores } from './Sistema';
@@ -84,6 +85,11 @@ function Usuarios() {
     try { const r = await adminApi.restablecer(u.id); setAviso(''); setClave({ nombre: `${u.nombres} ${u.apellidos}`, clave: r.claveTemporal }); cargar(); }
     catch (e) { setError(e instanceof ErrorApi ? e.message : 'No se pudo restablecer'); }
   }
+  async function quitarFoto(u: UsuarioAdmin) {
+    if (!window.confirm(`¿Quitar la foto de ${u.nombres}? Volverán a mostrarse sus iniciales.`)) return;
+    try { await adminApi.quitarFoto(u.id); hecho(`Se quitó la foto de ${u.nombres} ${u.apellidos}.`); }
+    catch (e) { setError(e instanceof ErrorApi ? e.message : 'No se pudo quitar la foto'); }
+  }
   async function reactivar(u: UsuarioAdmin) {
     try { await adminApi.reactivar(u.id); hecho(`${u.nombres} ${u.apellidos} está activo otra vez. Restablécele la contraseña si no la recuerda.`); }
     catch (e) { setError(e instanceof ErrorApi ? e.message : 'No se pudo reactivar'); }
@@ -138,7 +144,12 @@ function Usuarios() {
               <tbody>
                 {filas.map((u) => (
                   <tr key={u.id} className={u.activo ? '' : 'admin-tabla__inactivo'}>
-                    <td><b>{u.nombres} {u.apellidos}</b>{u.soyYo && <span className="tenue"> (tú)</span>}<span className="tenue admin-tabla__correo">{u.email}</span></td>
+                    <td>
+                      <span className="admin-usuario">
+                        <Avatar id={u.id} version={u.fotoVersion} nombres={u.nombres} apellidos={u.apellidos} tam={34} />
+                        <span><b>{u.nombres} {u.apellidos}</b>{u.soyYo && <span className="tenue"> (tú)</span>}<span className="tenue admin-tabla__correo">{u.email}</span></span>
+                      </span>
+                    </td>
                     <td>{u.rolNombre}</td>
                     <td>{u.equipo ?? <span className="tenue">—</span>}{u.esSupervisorDelEquipo && <span className="tenue admin-tabla__correo">Supervisa</span>}</td>
                     <td className="num">{u.empresas || <span className="tenue">—</span>}</td>
@@ -152,6 +163,7 @@ function Usuarios() {
                         <>
                           <button type="button" className="boton-texto" onClick={() => { setForm(u); setAviso(''); }}>Editar</button>
                           <button type="button" className="boton-texto" onClick={() => restablecer(u)}>Restablecer clave</button>
+                          {!u.soyYo && u.fotoVersion && <button type="button" className="boton-texto" onClick={() => quitarFoto(u)}>Quitar foto</button>}
                           {!u.soyYo && <button type="button" className="boton-texto admin-peligro" onClick={() => { setBaja(u); setAviso(''); }}>Desactivar</button>}
                         </>
                       )}
