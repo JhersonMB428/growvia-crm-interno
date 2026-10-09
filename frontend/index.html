@@ -5,43 +5,82 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <meta name="theme-color" content="#013936" />
     <link rel="icon" type="image/webp" href="/img/logo-growvia.webp" />
-    <link rel="preload" as="image" href="/img/logo-growvia.webp" />
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@500;600;700&family=Manrope:wght@400;500;600;700&display=swap" rel="stylesheet" />
     <title>Growvia CRM</title>
-    <!-- Pantalla de carga: se ve apenas abre la página, antes de que cargue la app.
+    <!-- Pantalla de carga (la W de Growvia que se dibuja): se ve apenas abre la página, antes de que cargue la app.
          Va aquí (y no en un .css aparte) para que aparezca al instante. -->
     <style>
       html, body { margin: 0; background: #01201d; }
       .gv-carga {
-        position: fixed; inset: 0; z-index: 9999;
-        display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 26px;
+        position: fixed; inset: 0; z-index: 9999; overflow: hidden;
+        display: flex; align-items: center; justify-content: center;
         background:
           radial-gradient(1100px 700px at 85% 10%, rgba(64, 140, 90, 0.55), transparent 60%),
           radial-gradient(900px 600px at 10% 90%, rgba(0, 110, 95, 0.45), transparent 60%),
           linear-gradient(160deg, #013936 0%, #01201d 55%, #021a17 100%);
-        color: rgba(255, 255, 255, 0.72);
-        font-family: 'Manrope', system-ui, sans-serif;
+        color: #ffffff; font-family: 'Manrope', system-ui, sans-serif;
       }
-      .gv-carga__logo { width: 190px; max-width: 60vw; height: auto; animation: gv-latido 2.4s ease-in-out infinite; }
-      .gv-carga__barra { width: 180px; max-width: 50vw; height: 4px; border-radius: 999px; background: rgba(255, 255, 255, 0.12); overflow: hidden; }
-      .gv-carga__barra span { display: block; width: 40%; height: 100%; border-radius: inherit; background: #c7e196; animation: gv-avance 1.3s ease-in-out infinite; }
-      .gv-carga__texto { margin: 0; font-size: 14px; letter-spacing: 0.02em; }
-      @keyframes gv-latido { 0%, 100% { opacity: 1; transform: scale(1); } 50% { opacity: 0.82; transform: scale(0.97); } }
-      @keyframes gv-avance { 0% { transform: translateX(-100%); } 100% { transform: translateX(250%); } }
+      .gv-carga__tarjeta {
+        box-sizing: border-box; width: min(420px, 92vw); padding: 48px 32px 40px; border-radius: 40px;
+        background: rgba(255, 255, 255, 0.07); border: 1px solid rgba(255, 255, 255, 0.16);
+        backdrop-filter: blur(30px) saturate(170%); -webkit-backdrop-filter: blur(30px) saturate(170%);
+        box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.22), 0 30px 80px rgba(0, 0, 0, 0.35);
+        display: flex; flex-direction: column; align-items: center; gap: 28px;
+      }
+      .gv-carga__w { width: 220px; max-width: 60vw; height: auto; }
+      .gv-carga__textos { display: flex; flex-direction: column; align-items: center; gap: 10px; width: 100%; text-align: center; }
+      .gv-carga__titulo { font-family: 'Outfit', sans-serif; font-weight: 600; font-size: 22px; }
+      .gv-carga__sub { font-size: 14px; color: rgba(255, 255, 255, 0.65); }
+      .gv-carga__pista { width: 100%; height: 6px; margin-top: 10px; border-radius: 999px; background: rgba(255, 255, 255, 0.1); overflow: hidden; }
+      .gw-bar { width: 0; height: 100%; border-radius: 999px; background: #c7e196; animation: gwb 3.2s ease-in-out infinite; }
+      .gw-seg { fill: none; stroke-width: 20; stroke-linecap: round; stroke-dasharray: 1; stroke-dashoffset: 1; }
+      .gw-lima { stroke: #c7e196; }
+      .gw-crema { stroke: #f8efd2; }
+      .gw-s1 { animation: gw1 3.2s cubic-bezier(.6, 0, .3, 1) infinite; }
+      .gw-s2 { animation: gw2 3.2s cubic-bezier(.6, 0, .3, 1) infinite; }
+      .gw-s3 { animation: gw3 3.2s cubic-bezier(.6, 0, .3, 1) infinite; }
+      .gw-s4 { animation: gw4 3.2s cubic-bezier(.6, 0, .3, 1) infinite; }
+      .gw-head { fill: #f8efd2; stroke: #f8efd2; stroke-width: 4; stroke-linejoin: round; opacity: 0; transform-box: fill-box; transform-origin: 50% 50%; animation: gwh 3.2s ease-out infinite; }
+      .gw-dot { animation: gwd 1.2s ease-in-out infinite; }
+      /* Desfase: la versión de React continúa la animación donde iba (sin salto) */
+      .gw-s1, .gw-s2, .gw-s3, .gw-s4, .gw-head, .gw-bar { animation-delay: var(--gv-desfase, 0s); }
+      .gw-dot:nth-child(1) { animation-delay: var(--gv-desfase, 0s); }
+      .gw-dot:nth-child(2) { animation-delay: calc(var(--gv-desfase, 0s) + .2s); }
+      .gw-dot:nth-child(3) { animation-delay: calc(var(--gv-desfase, 0s) + .4s); }
+      @keyframes gw1 { 0% { stroke-dashoffset: 1; opacity: 1 } 18% { stroke-dashoffset: 0 } 82% { stroke-dashoffset: 0; opacity: 1 } 92% { opacity: 0 } 100% { stroke-dashoffset: 0; opacity: 0 } }
+      @keyframes gw2 { 0%, 18% { stroke-dashoffset: 1; opacity: 1 } 34% { stroke-dashoffset: 0 } 82% { stroke-dashoffset: 0; opacity: 1 } 92% { opacity: 0 } 100% { stroke-dashoffset: 0; opacity: 0 } }
+      @keyframes gw3 { 0%, 34% { stroke-dashoffset: 1; opacity: 1 } 50% { stroke-dashoffset: 0 } 82% { stroke-dashoffset: 0; opacity: 1 } 92% { opacity: 0 } 100% { stroke-dashoffset: 0; opacity: 0 } }
+      @keyframes gw4 { 0%, 50% { stroke-dashoffset: 1; opacity: 1 } 66% { stroke-dashoffset: 0 } 82% { stroke-dashoffset: 0; opacity: 1 } 92% { opacity: 0 } 100% { stroke-dashoffset: 0; opacity: 0 } }
+      @keyframes gwh { 0%, 64% { opacity: 0; transform: translate(-6px, 10px) scale(.6) } 72% { opacity: 1; transform: translate(0, 0) scale(1.08) } 76% { transform: scale(1) } 82% { opacity: 1 } 92%, 100% { opacity: 0 } }
+      @keyframes gwb { 0% { width: 0 } 66% { width: 100% } 82% { width: 100%; opacity: 1 } 92%, 100% { width: 100%; opacity: 0 } }
+      @keyframes gwd { 0%, 100% { opacity: .25 } 50% { opacity: 1 } }
       @media (prefers-reduced-motion: reduce) {
-        .gv-carga__logo { animation: none; }
-        .gv-carga__barra span { width: 100%; animation: none; opacity: 0.6; }
+        .gw-seg { animation: none; stroke-dashoffset: 0; }
+        .gw-head { animation: none; opacity: 1; }
+        .gw-bar { animation: none; width: 100%; }
+        .gw-dot { animation: none; opacity: 1; }
       }
     </style>
   </head>
   <body>
     <div id="root">
-      <div class="gv-carga" role="status" aria-live="polite">
-        <img class="gv-carga__logo" src="/img/logo-growvia.webp" alt="Growvia" />
-        <div class="gv-carga__barra"><span></span></div>
-        <p class="gv-carga__texto">Preparando tu CRM…</p>
+      <div class="gv-carga">
+        <div class="gv-carga__tarjeta" role="status" aria-live="polite">
+          <svg class="gv-carga__w" viewBox="0 0 220 160" width="220" height="160" aria-hidden="true">
+            <path class="gw-seg gw-lima gw-s1" pathLength="1" d="M20 22 L62 132" />
+            <path class="gw-seg gw-crema gw-s2" pathLength="1" d="M62 132 L104 58" />
+            <path class="gw-seg gw-lima gw-s3" pathLength="1" d="M104 58 L146 132" />
+            <path class="gw-seg gw-crema gw-s4" pathLength="1" d="M146 132 L190 35" />
+            <polygon class="gw-head" points="204,4 206,43 173,27" />
+          </svg>
+          <div class="gv-carga__textos">
+            <span class="gv-carga__titulo">Preparando tu día<span class="gw-dot">.</span><span class="gw-dot">.</span><span class="gw-dot">.</span></span>
+            <span class="gv-carga__sub">Cargando prospectos, gestiones y metas</span>
+            <div class="gv-carga__pista"><div class="gw-bar"></div></div>
+          </div>
+        </div>
       </div>
     </div>
     <script type="module" src="/src/main.tsx"></script>
