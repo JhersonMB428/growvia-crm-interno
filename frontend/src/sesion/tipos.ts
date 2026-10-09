@@ -8,6 +8,8 @@ export interface Usuario {
   permisos: string[];
   /** Entró con una contraseña temporal: debe elegir una propia antes de usar el CRM */
   debeCambiarClave?: boolean;
+  /** Ya vio el recorrido de bienvenida */
+  guiaVista?: boolean;
 }
 
 export type RespuestaLogin =

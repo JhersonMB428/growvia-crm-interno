@@ -55,6 +55,9 @@ export const empresasApi = {
     api<EmpresaDetalle>(`/empresas/${id}`, { metodo: 'PUT', cuerpo: datos }),
   guardarContactos: (id: string, contactos: Contacto[]) =>
     api<EmpresaDetalle>(`/empresas/${id}/contactos`, { metodo: 'PUT', cuerpo: { contactos } }),
+  /** Gerencia y admin: asesores activos para reasignar */
+  asesores: () => api<{ id: string; nombre: string; equipo: string | null }[]>('/empresas/asesores'),
+  reasignar: (id: string, asesorId: string) => api<EmpresaDetalle>(`/empresas/${id}/reasignar`, { metodo: 'POST', cuerpo: { asesorId } }),
   guardarContratoActual: (id: string, operadorId: number | null, finContrato: string | null) =>
     api<EmpresaDetalle>(`/empresas/${id}/contrato-actual`, { metodo: 'PUT', cuerpo: { operadorId, finContrato } }),
 };

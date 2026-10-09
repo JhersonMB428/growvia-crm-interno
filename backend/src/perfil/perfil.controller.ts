@@ -35,6 +35,11 @@ export class PerfilController {
     return this.perfil.guardarAvisos(s, dto.avisoCorreo, dto.minutosRecordatorio);
   }
 
+  @Put('guia')
+  guia(@UsuarioActual() s: SesionUsuario) {
+    return this.perfil.marcarGuiaVista(s);
+  }
+
   @Delete('dispositivos/:id')
   quitar(@Param('id', ParseUUIDPipe) id: string, @UsuarioActual() s: SesionUsuario) {
     return this.perfil.quitarDispositivo(s, id);

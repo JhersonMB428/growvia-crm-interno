@@ -20,6 +20,8 @@ export const perfilApi = {
     api<{ avisoCorreo: boolean; minutosRecordatorio: number }>('/perfil/avisos', { metodo: 'PUT', cuerpo: { avisoCorreo, minutosRecordatorio } }),
   quitarDispositivo: (id: string) => api(`/perfil/dispositivos/${id}`, { metodo: 'DELETE' }),
   quitarTodos: () => api('/perfil/dispositivos', { metodo: 'DELETE' }),
+  /** Ya vio el recorrido de bienvenida */
+  guiaVista: () => api<{ guiaVista: boolean }>('/perfil/guia', { metodo: 'PUT' }),
 };
 
 /** Reglas de contraseña (las mismas que revisa el backend) */

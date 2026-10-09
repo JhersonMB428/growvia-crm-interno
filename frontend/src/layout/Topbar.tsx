@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import { notificacionesApi } from '../api/gestiones';
+import { BuscadorEmpresas } from '../componentes/BuscadorEmpresas';
 import '../componentes/gestiones.css';
 import { useSesion } from '../sesion/SesionContext';
 import { useTema } from '../tema/TemaContext';
@@ -34,11 +35,7 @@ export function Topbar() {
         <img src="/img/logo-growvia.webp" alt="Growvia" />
       </Link>
 
-      <div className="topbar__buscar">
-        <label htmlFor="buscar" className="oculto-visual">Buscar empresa</label>
-        <span className="topbar__lupa"><Icono nombre="buscar" tam={18} /></span>
-        <input id="buscar" type="search" placeholder="Buscar por RUC o razón social" />
-      </div>
+      <BuscadorEmpresas />
 
       <div className="topbar__acciones">
         <button type="button" className="topbar__circulo" onClick={alternar}

@@ -71,8 +71,7 @@ const REGLAS: Record<string, Regla> = {
 };
 
 /** Acciones sin valor de auditoría */
-const IGNORAR = new Set(['POST /notificaciones/leer-todas', 'POST /notificaciones/:id/leida', 'POST /auth/reenviar']);
-
+const IGNORAR = new Set(['POST /notificaciones/leer-todas', 'POST /notificaciones/:id/leida', 'POST /auth/reenviar', 'PUT /perfil/guia']);
 /** Grupos para el filtro de la pantalla */
 export const CATEGORIAS: Record<string, string[]> = {
   accesos: ['LOGIN', 'LOGIN_FALLIDO', 'CODIGO_FALLIDO', 'LOGIN_BLOQUEADO', 'ACCESO_DENEGADO', 'SESION_MOVIL_CORTADA',

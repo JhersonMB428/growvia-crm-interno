@@ -25,6 +25,10 @@ const UNIONES = `
   LEFT JOIN usuarios u ON u.id = c.asesor_id
   LEFT JOIN equipos eq ON eq.id = u.equipo_id`;
 
+/** Compara sin tildes ni mayúsculas (sin depender de extensiones de PostgreSQL) */
+const SIN_TILDES = (col: string) => `translate(lower(${col}), 'áéíóúüñàèìòù', 'aeiouunaeiou')`;
+const sinTildes = (t: string) => t.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase();
+
 @Injectable()
 export class EmpresasService {
   constructor(private readonly db: DataSource, private readonly parametros: ParametrosService) {}
@@ -198,6 +202,15 @@ export class EmpresasService {
     return this.detalle(id, sesion);
   }
 
+  // ───────────── Asesores activos (para reasignar) ─────────────
+  asesoresActivos() {
+    return this.db.query(
+      `SELECT u.id, u.nombres || ' ' || u.apellidos AS nombre, eq.nombre AS equipo
+       FROM usuarios u JOIN roles r ON r.id = u.rol_id LEFT JOIN equipos eq ON eq.id = u.equipo_id
+       WHERE r.codigo = 'ASESOR' AND u.activo ORDER BY eq.nombre NULLS LAST, u.nombres, u.apellidos`,
+    );
+  }
+
   // ───────────── Reasignar (gerencia) ─────────────
   async reasignar(id: string, asesorId: string, sesion: SesionUsuario) {
     const [destino] = await this.db.query(
@@ -250,8 +263,9 @@ export class EmpresasService {
     const p = [...params];
     const where = [...cond];
     if (f.q?.trim()) {
-      p.push(`%${f.q.trim().toLowerCase()}%`);
-      where.push(`(c.ruc LIKE $${p.length} OR lower(c.razon_social) LIKE $${p.length})`);
+      // Sin tildes ni mayúsculas: "clinica" encuentra "Clínica"
+      p.push(`%${sinTildes(f.q.trim())}%`);
+      where.push(`(c.ruc LIKE $${p.length} OR ${SIN_TILDES('c.razon_social')} LIKE $${p.length})`);
     }
     if (f.estado) { p.push(f.estado); where.push(`c.estado = $${p.length}`); }
     if (f.distritoId) { p.push(f.distritoId); where.push(`c.distrito_id = $${p.length}`); }

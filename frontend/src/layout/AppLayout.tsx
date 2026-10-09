@@ -1,5 +1,6 @@
 import { Outlet } from 'react-router-dom';
 import { useTema } from '../tema/TemaContext';
+import { Recorrido } from '../componentes/Recorrido';
 import { Rail } from './Rail';
 import { Topbar } from './Topbar';
 import './layout.css';
@@ -18,6 +19,7 @@ export function AppLayout() {
           </main>
         </div>
       </div>
+      <Recorrido />
     </div>
   );
 }

@@ -33,6 +33,7 @@ export const ICONOS = {
   bitacora: 'M9 3h6v3H9zM7 4.5H5V21h14V4.5h-2M8.5 11h7M8.5 15h7M8.5 19h4',
   renovar: 'M20 11a8 8 0 0 0-14.9-4M4 3v4h4M4 13a8 8 0 0 0 14.9 4M20 21v-4h-4',
   embudo: 'M3 4h18M6 9h12M9 14h6M11 19h2',
+  ayuda: 'M12 3a9 9 0 1 1 0 18a9 9 0 1 1 0-18M9.5 9.5a2.5 2.5 0 1 1 3.5 2.3c-.7.3-1 .9-1 1.7M12 17h.01',
 } as const;
 
 const I = (ruta: string, etiqueta: string, icono: ItemMenu['icono']): ItemMenu => ({ ruta, etiqueta, icono });
