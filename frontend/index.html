@@ -5,13 +5,45 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <meta name="theme-color" content="#013936" />
     <link rel="icon" type="image/webp" href="/img/logo-growvia.webp" />
+    <link rel="preload" as="image" href="/img/logo-growvia.webp" />
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@500;600;700&family=Manrope:wght@400;500;600;700&display=swap" rel="stylesheet" />
     <title>Growvia CRM</title>
+    <!-- Pantalla de carga: se ve apenas abre la página, antes de que cargue la app.
+         Va aquí (y no en un .css aparte) para que aparezca al instante. -->
+    <style>
+      html, body { margin: 0; background: #01201d; }
+      .gv-carga {
+        position: fixed; inset: 0; z-index: 9999;
+        display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 26px;
+        background:
+          radial-gradient(1100px 700px at 85% 10%, rgba(64, 140, 90, 0.55), transparent 60%),
+          radial-gradient(900px 600px at 10% 90%, rgba(0, 110, 95, 0.45), transparent 60%),
+          linear-gradient(160deg, #013936 0%, #01201d 55%, #021a17 100%);
+        color: rgba(255, 255, 255, 0.72);
+        font-family: 'Manrope', system-ui, sans-serif;
+      }
+      .gv-carga__logo { width: 190px; max-width: 60vw; height: auto; animation: gv-latido 2.4s ease-in-out infinite; }
+      .gv-carga__barra { width: 180px; max-width: 50vw; height: 4px; border-radius: 999px; background: rgba(255, 255, 255, 0.12); overflow: hidden; }
+      .gv-carga__barra span { display: block; width: 40%; height: 100%; border-radius: inherit; background: #c7e196; animation: gv-avance 1.3s ease-in-out infinite; }
+      .gv-carga__texto { margin: 0; font-size: 14px; letter-spacing: 0.02em; }
+      @keyframes gv-latido { 0%, 100% { opacity: 1; transform: scale(1); } 50% { opacity: 0.82; transform: scale(0.97); } }
+      @keyframes gv-avance { 0% { transform: translateX(-100%); } 100% { transform: translateX(250%); } }
+      @media (prefers-reduced-motion: reduce) {
+        .gv-carga__logo { animation: none; }
+        .gv-carga__barra span { width: 100%; animation: none; opacity: 0.6; }
+      }
+    </style>
   </head>
   <body>
-    <div id="root"></div>
+    <div id="root">
+      <div class="gv-carga" role="status" aria-live="polite">
+        <img class="gv-carga__logo" src="/img/logo-growvia.webp" alt="Growvia" />
+        <div class="gv-carga__barra"><span></span></div>
+        <p class="gv-carga__texto">Preparando tu CRM…</p>
+      </div>
+    </div>
     <script type="module" src="/src/main.tsx"></script>
   </body>
 </html>
