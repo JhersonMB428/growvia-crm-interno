@@ -4,8 +4,7 @@ import {
 import { DataSource, EntityManager } from 'typeorm';
 import { SesionUsuario } from '../auth/decorators/usuario-actual.decorator';
 import { NotificacionesService } from '../notificaciones/notificaciones.service';
-import { ParametrosService } from '../sistema/parametros.service';
-import { CambiarEtapaDto, CerrarNegociacionDto } from './dto/etapa.dto';
+import { CambiarEtapaDto, PerderNegociacionDto } from './dto/etapa.dto';
 import { CrearNegociacionDto, GuardarNegociacionDto } from './dto/guardar-negociacion.dto';
 import { ItemDto } from './dto/item.dto';
 import { ListarNegociacionesDto } from './dto/listar.dto';
@@ -44,14 +43,12 @@ const NUEVO_CODIGO = `'OP-' || to_char(now() AT TIME ZONE 'America/Lima', 'YYYY'
 
 /** Último día del contrato: fecha de activación (en Lima) + plazo en meses */
 export const FIN_CONTRATO_SQL = `(((o.fecha_activacion AT TIME ZONE 'America/Lima')::date + make_interval(months => o.plazo_meses::int))::date - 1)`;
-const FIN_CONTRATO = `to_char(${FIN_CONTRATO_SQL}, 'YYYY-MM-DD')`;
 
 @Injectable()
 export class NegociacionesService {
   constructor(
     private readonly db: DataSource,
     private readonly notificaciones: NotificacionesService,
-    private readonly parametros: ParametrosService,
   ) {}
 
   // ───────────── Catálogos para el formulario ─────────────
@@ -105,14 +102,7 @@ export class NegociacionesService {
   async detalle(id: string, s: SesionUsuario) {
     const [o] = await this.db.query(
       `SELECT ${COLUMNAS}, ua.equipo_id AS "equipoAsesorId", o.equipo_id AS "equipoVentaId",
-              c.asesor_id AS "duenoEmpresaId", o.correcciones, o.fecha_validacion AS "fechaValidacion",
-              o.fecha_activacion AS "fechaActivacion", o.orden_operador AS "ordenOperador",
-              (SELECT pv.nombre FROM pasos_validacion pv WHERE pv.id = o.paso_actual_id) AS "pasoActual",
-              o.renueva_id AS "renuevaId", (SELECT r.codigo FROM oportunidades r WHERE r.id = o.renueva_id) AS "renuevaCodigo",
-              CASE WHEN o.estado_venta = 'ACTIVA' AND o.plazo_meses > 0 THEN ${FIN_CONTRATO} END AS "finContrato",
-              (SELECT json_build_object('id', r.id, 'codigo', r.codigo, 'resultado', r.resultado)
-               FROM oportunidades r WHERE r.renueva_id = o.id
-               ORDER BY (r.resultado <> 'PERDIDA') DESC, r.created_at DESC LIMIT 1) AS renovacion
+              c.asesor_id AS "duenoEmpresaId"
        ${UNIONES} WHERE o.id = $1`, [id],
     );
     if (!o) throw new NotFoundException('La negociación no existe');
@@ -121,7 +111,8 @@ export class NegociacionesService {
     const items = await this.db.query(
       `SELECT i.id, i.plan_id AS "planId", p.nombre AS plan, p.tipo AS "tipoPlan", i.modalidad,
               i.operador_origen_id AS "operadorOrigenId", op.nombre AS "operadorOrigen",
-              i.cantidad, i.cargo_fijo_unit::float8 AS "cargoFijoUnit", (i.cantidad * i.cargo_fijo_unit)::float8 AS subtotal
+              i.cantidad, i.cargo_fijo_unit::float8 AS "cargoFijoUnit", (i.cantidad * i.cargo_fijo_unit)::float8 AS subtotal,
+              i.con_equipo AS "conEquipo"
        FROM oportunidad_items i
        JOIN planes_servicio p ON p.id = i.plan_id
        LEFT JOIN operadores op ON op.id = i.operador_origen_id
@@ -133,30 +124,22 @@ export class NegociacionesService {
        FROM historial_etapas h LEFT JOIN usuarios u ON u.id = h.usuario_id
        WHERE h.oportunidad_id = $1 ORDER BY h.created_at DESC`, [id],
     );
-    // Cadena de validación y posventa (solo si se ganó)
-    const validaciones = o.resultado !== 'GANADA' ? [] : await this.db.query(
-      `SELECT v.decision, v.comentario, v.intento, v.created_at AS fecha, p.nombre AS paso,
-              u.nombres || ' ' || u.apellidos AS usuario
-       FROM validaciones v LEFT JOIN pasos_validacion p ON p.id = v.paso_id JOIN usuarios u ON u.id = v.usuario_id
-       WHERE v.oportunidad_id = $1 ORDER BY v.created_at DESC`, [id],
-    );
-    const posventa = o.resultado !== 'GANADA' ? [] : await this.db.query(
-      `SELECT e.evento, e.fecha, e.comentario, u.nombres || ' ' || u.apellidos AS usuario
-       FROM posventa_eventos e JOIN usuarios u ON u.id = e.usuario_id WHERE e.oportunidad_id = $1 ORDER BY e.fecha`, [id],
+    // Comentarios de la negociación: las gestiones registradas mientras estaba abierta
+    const gestiones = await this.db.query(
+      `SELECT g.id, g.canal, g.resultado, g.comentario, g.created_at AS fecha, u.nombres || ' ' || u.apellidos AS usuario
+       FROM gestiones g JOIN usuarios u ON u.id = g.usuario_id
+       WHERE g.oportunidad_id = $1 ORDER BY g.created_at DESC LIMIT 100`, [id],
     );
 
-    const { equipoAsesorId: _a, equipoVentaId: _v, duenoEmpresaId, ...datos } = o;
+    const { equipoAsesorId: _a, equipoVentaId, duenoEmpresaId, ...datos } = o;
     const esDueno = o.asesorId === s.sub && duenoEmpresaId === s.sub && s.permisos.includes('NEGOCIACION_GESTIONAR');
-    const renovacionViva = o.renovacion && o.renovacion.resultado !== 'PERDIDA';
+    const enCurso = o.resultado === 'EN_CURSO';
     return {
-      ...datos, items, historial, validaciones, posventa,
-      // El asesor que hoy tiene la empresa puede renovar el contrato (aunque lo haya vendido otro)
-      puedeRenovar: duenoEmpresaId === s.sub && s.permisos.includes('NEGOCIACION_GESTIONAR')
-        && o.estadoVenta === 'ACTIVA' && o.plazoMeses > 0 && !renovacionViva,
-      maxCorrecciones: await this.parametros.numero('max_correcciones_venta', 3),
-      puedeEditar: esDueno && o.resultado === 'EN_CURSO',
-      // Venta observada: el asesor corrige los planes y la reenvía
-      puedeCorregir: esDueno && o.resultado === 'GANADA' && o.estadoVenta === 'OBSERVADA',
+      ...datos, items, historial, gestiones,
+      puedeEditar: esDueno && enCurso,
+      puedeComentar: esDueno && enCurso,
+      // Ganada: desde Cierre, la marca el asesor o su supervisor (cuando el expediente ya se envió por correo)
+      puedeGanar: enCurso && o.etapa === 'CIERRE' && (esDueno || this.esSupervisorDe(s, equipoVentaId ?? o.equipoAsesorId)),
     };
   }
 
@@ -165,7 +148,6 @@ export class NegociacionesService {
     const [cliente] = await this.db.query(`SELECT asesor_id AS "asesorId" FROM clientes WHERE id = $1`, [dto.clienteId]);
     if (!cliente) throw new NotFoundException('La empresa no existe');
     if (cliente.asesorId !== s.sub) throw new ForbiddenException('Solo el asesor a cargo de la empresa puede abrir una negociación');
-    if (dto.tipo === 'RENOVACION') throw new BadRequestException('Las renovaciones se inician desde la pantalla Renovaciones o desde la venta activa');
     await this.verificarAbierta(dto.clienteId);
     const items = await this.normalizarItems(dto.items);
 
@@ -173,13 +155,13 @@ export class NegociacionesService {
     try {
       id = await this.db.transaction(async (tx) => {
         const [o] = await tx.query(
-          `INSERT INTO oportunidades (codigo, cliente_id, asesor_id, tipo, plazo_meses)
-           VALUES (${NUEVO_CODIGO}, $1, $2, $3, $4)
+          `INSERT INTO oportunidades (codigo, cliente_id, asesor_id, tipo, plazo_meses, etapa)
+           VALUES (${NUEVO_CODIGO}, $1, $2, 'NUEVA', 0, 'NEGOCIACION')
            RETURNING id`,
-          [dto.clienteId, s.sub, dto.tipo, dto.plazoMeses ?? 18],
+          [dto.clienteId, s.sub],
         );
         await this.reemplazarItems(tx, o.id, items);
-        await this.registrarEtapa(tx, o.id, null, 'PROSPECCION', 'Negociación creada', s.sub);
+        await this.registrarEtapa(tx, o.id, null, 'NEGOCIACION', 'Negociación creada', s.sub);
         await this.marcarGestion(tx, dto.clienteId);
         return o.id as string;
       });
@@ -190,127 +172,101 @@ export class NegociacionesService {
     return this.detalle(id, s);
   }
 
-  // ───────────── Editar tipo e ítems (en curso, o ganada y observada para corregirla) ─────────────
+  // ───────────── Editar los servicios (solo en curso) ─────────────
   async actualizar(id: string, dto: GuardarNegociacionDto, s: SesionUsuario) {
     const items = await this.normalizarItems(dto.items);
     await this.db.transaction(async (tx) => {
-      const o = await this.bloquearEditable(tx, id, s, true);
-      // Una renovación sigue siendo renovación; las demás no pueden volverse renovación
-      if (!o.renuevaId && dto.tipo === 'RENOVACION') throw new BadRequestException('Las renovaciones se inician desde la venta activa');
-      const tipo = o.renuevaId ? 'RENOVACION' : dto.tipo;
-      await tx.query(
-        `UPDATE oportunidades SET tipo = $1, plazo_meses = COALESCE($2, plazo_meses), updated_at = now() WHERE id = $3`,
-        [tipo, dto.plazoMeses ?? null, id],
-      );
+      const o = await this.bloquearEditable(tx, id, s);
+      await tx.query(`UPDATE oportunidades SET updated_at = now() WHERE id = $1`, [id]);
       await this.reemplazarItems(tx, id, items);
       await this.marcarGestion(tx, o.clienteId);
     });
     return this.detalle(id, s);
   }
 
-  // ───────────── Mover de etapa (prospección ↔ contacto ↔ negociación) ─────────────
+  // ───────────── Mover de etapa: Negociación ↔ Cierre ─────────────
   async cambiarEtapa(id: string, dto: CambiarEtapaDto, s: SesionUsuario) {
     await this.db.transaction(async (tx) => {
       const o = await this.bloquearEditable(tx, id, s);
       if (o.etapa === dto.etapa) throw new BadRequestException('La negociación ya está en esa etapa');
+      if (dto.etapa === 'CIERRE') {
+        const [{ n }] = await tx.query(`SELECT count(*)::int AS n FROM oportunidad_items WHERE oportunidad_id = $1`, [id]);
+        if (!n) throw new BadRequestException('Agrega al menos un servicio antes de pasar a cierre');
+      }
       await tx.query(`UPDATE oportunidades SET etapa = $1, updated_at = now() WHERE id = $2`, [dto.etapa, id]);
       await this.registrarEtapa(tx, id, o.etapa, dto.etapa, null, s.sub);
       await this.marcarGestion(tx, o.clienteId);
+
+      // Al pasar a cierre se avisa al supervisor: él también puede confirmar la venta
+      if (dto.etapa === 'CIERRE') {
+        const v = await this.datosAviso(tx, id);
+        if (v?.supervisorId && v.supervisorId !== s.sub) {
+          await this.notificaciones.crear(v.supervisorId, {
+            tipo: 'VENTA_POR_APROBAR', titulo: 'Negociación en cierre',
+            mensaje: `${v.asesor} pasó ${v.codigo} (${v.razonSocial}) a cierre. Cuando envíe el expediente a back office, se marca como ganada.`,
+            entidad: 'NEGOCIACION', entidadId: id,
+          }, tx);
+        }
+      }
     });
     return this.detalle(id, s);
   }
 
-  // ───────────── Cerrar: ganada (va a validación) o perdida (con motivo) ─────────────
-  async cerrar(id: string, dto: CerrarNegociacionDto, s: SesionUsuario) {
+  // ───────────── Perdida (con motivo), desde cualquier etapa ─────────────
+  async perder(id: string, dto: PerderNegociacionDto, s: SesionUsuario) {
     await this.db.transaction(async (tx) => {
       const o = await this.bloquearEditable(tx, id, s);
-
-      if (dto.resultado === 'PERDIDA') {
-        const motivo = dto.motivoPerdida!.trim();
-        await tx.query(
-          `UPDATE oportunidades SET etapa = 'CIERRE', resultado = 'PERDIDA', motivo_perdida = $1,
-                  fecha_cierre = now(), updated_at = now() WHERE id = $2`, [motivo, id],
-        );
-        await this.registrarEtapa(tx, id, o.etapa, 'CIERRE', `Perdida: ${motivo}`, s.sub);
-      } else {
-        const [{ n }] = await tx.query(`SELECT count(*)::int AS n FROM oportunidad_items WHERE oportunidad_id = $1`, [id]);
-        if (!n) throw new BadRequestException('Agrega al menos un plan antes de marcarla como ganada');
-        const [u] = await tx.query(`SELECT equipo_id AS "equipoId" FROM usuarios WHERE id = $1`, [s.sub]);
-        if (!u?.equipoId) throw new BadRequestException('No tienes un equipo asignado; pide a tu supervisor que te agregue antes de cerrar la venta');
-        const [paso] = await tx.query(`SELECT id FROM pasos_validacion WHERE activo ORDER BY orden LIMIT 1`);
-        if (!paso) throw new BadRequestException('No hay pasos de validación configurados; avisa al administrador');
-        await tx.query(
-          `UPDATE oportunidades SET etapa = 'CIERRE', resultado = 'GANADA', equipo_id = $1,
-                  estado_venta = 'EN_VALIDACION', paso_actual_id = $2, fecha_cierre = now(), updated_at = now()
-           WHERE id = $3`, [u.equipoId, paso.id, id],
-        );
-        await this.registrarEtapa(tx, id, o.etapa, 'CIERRE', 'Ganada · enviada a aprobación del supervisor', s.sub);
-
-        // Aviso al supervisor del equipo: tiene una venta por aprobar
-        const [v] = await tx.query(
-          `SELECT e.supervisor_id AS "supervisorId", op.codigo, c.razon_social AS "razonSocial",
-                  ua.nombres || ' ' || ua.apellidos AS asesor
-           FROM oportunidades op JOIN equipos e ON e.id = op.equipo_id JOIN clientes c ON c.id = op.cliente_id
-           JOIN usuarios ua ON ua.id = op.asesor_id WHERE op.id = $1`, [id],
-        );
-        if (v?.supervisorId && v.supervisorId !== s.sub) {
-          await this.notificaciones.crear(v.supervisorId, {
-            tipo: 'VENTA_POR_APROBAR',
-            titulo: 'Venta por aprobar',
-            mensaje: `${v.asesor} ganó ${v.codigo} (${v.razonSocial}). Revísala en Aprobaciones.`,
-            entidad: 'NEGOCIACION',
-            entidadId: id,
-          }, tx);
-        }
-      }
+      const motivo = dto.motivoPerdida.trim();
+      await tx.query(
+        `UPDATE oportunidades SET resultado = 'PERDIDA', motivo_perdida = $1, fecha_cierre = now(), updated_at = now() WHERE id = $2`,
+        [motivo, id],
+      );
+      await this.registrarEtapa(tx, id, o.etapa, 'PERDIDA', `Perdida: ${motivo}`, s.sub);
       await this.marcarGestion(tx, o.clienteId);
     });
     return this.detalle(id, s);
   }
 
-  // ───────────── Renovar un contrato activo (copia sus planes en una negociación nueva) ─────────────
-  async iniciarRenovacion(ventaId: string, s: SesionUsuario) {
-    let id: string;
-    try {
-      id = await this.db.transaction(async (tx) => {
-        const [v] = await tx.query(
-          `SELECT o.id, o.codigo, o.cliente_id AS "clienteId", o.estado_venta AS "estadoVenta", o.plazo_meses AS "plazoMeses",
-                  c.asesor_id AS "duenoEmpresaId"
-           FROM oportunidades o JOIN clientes c ON c.id = o.cliente_id WHERE o.id = $1 FOR UPDATE OF o`, [ventaId],
-        );
-        if (!v) throw new NotFoundException('La venta no existe');
-        if (v.duenoEmpresaId !== s.sub || !s.permisos.includes('NEGOCIACION_GESTIONAR')) {
-          throw new ForbiddenException('Solo el asesor a cargo de la empresa puede iniciar la renovación');
-        }
-        if (v.estadoVenta !== 'ACTIVA') throw new BadRequestException('Solo se renuevan contratos con el servicio activo');
-        if (!v.plazoMeses) throw new BadRequestException('Este contrato no tiene plazo forzoso');
-        const [viva] = await tx.query(
-          `SELECT id, codigo FROM oportunidades WHERE renueva_id = $1 AND resultado <> 'PERDIDA'`, [ventaId],
-        );
-        if (viva) throw new ConflictException({ message: `Este contrato ya tiene su renovación (${viva.codigo})`, negociacionId: viva.id });
-        await this.verificarAbierta(v.clienteId);
+  // ───────────── Ganada: desde Cierre, por el asesor o su supervisor, con el expediente ya enviado ─────────────
+  async ganar(id: string, s: SesionUsuario) {
+    await this.db.transaction(async (tx) => {
+      const [o] = await tx.query(
+        `SELECT o.etapa, o.resultado, o.asesor_id AS "asesorId", o.cliente_id AS "clienteId", c.asesor_id AS "duenoEmpresaId",
+                ua.equipo_id AS "equipoId"
+         FROM oportunidades o JOIN clientes c ON c.id = o.cliente_id JOIN usuarios ua ON ua.id = o.asesor_id
+         WHERE o.id = $1 FOR UPDATE OF o`, [id],
+      );
+      if (!o) throw new NotFoundException('La negociación no existe');
+      const esDueno = o.asesorId === s.sub && o.duenoEmpresaId === s.sub && s.permisos.includes('NEGOCIACION_GESTIONAR');
+      if (!esDueno && !this.esSupervisorDe(s, o.equipoId)) {
+        throw new ForbiddenException('Solo el asesor a cargo o su supervisor pueden marcar la venta como ganada');
+      }
+      if (o.resultado !== 'EN_CURSO') throw new BadRequestException('La negociación ya está cerrada');
+      if (o.etapa !== 'CIERRE') throw new BadRequestException('Primero pasa la negociación a cierre');
+      const [{ n }] = await tx.query(`SELECT count(*)::int AS n FROM oportunidad_items WHERE oportunidad_id = $1`, [id]);
+      if (!n) throw new BadRequestException('Agrega al menos un servicio antes de marcarla como ganada');
+      if (!o.equipoId) throw new BadRequestException('El asesor no tiene un equipo asignado; agrégalo a un equipo antes de cerrar la venta');
 
-        const [o] = await tx.query(
-          `INSERT INTO oportunidades (codigo, cliente_id, asesor_id, tipo, plazo_meses, renueva_id, etapa)
-           VALUES (${NUEVO_CODIGO}, $1, $2, 'RENOVACION', $3, $4, 'CONTACTO') RETURNING id`,
-          [v.clienteId, s.sub, v.plazoMeses, ventaId],
-        );
-        // Mismos planes y cantidades; las líneas ya son nuestras, así que dejan de ser portabilidad
-        await tx.query(
-          `INSERT INTO oportunidad_items (oportunidad_id, plan_id, modalidad, operador_origen_id, cantidad, cargo_fijo_unit)
-           SELECT $1, i.plan_id, 'NUEVA', NULL, i.cantidad, i.cargo_fijo_unit
-           FROM oportunidad_items i JOIN planes_servicio p ON p.id = i.plan_id
-           WHERE i.oportunidad_id = $2 AND p.activo`,
-          [o.id, ventaId],
-        );
-        await this.registrarEtapa(tx, o.id, null, 'CONTACTO', `Renovación de ${v.codigo}`, s.sub);
-        await this.marcarGestion(tx, v.clienteId);
-        return o.id as string;
-      });
-    } catch (e) {
-      if ((e as { code?: string }).code === '23505') throw new ConflictException('Esta empresa o contrato ya tiene una negociación abierta');
-      throw e;
-    }
+      // Sin validación: la venta queda activa y suma a la meta desde hoy
+      await tx.query(
+        `UPDATE oportunidades SET resultado = 'GANADA', equipo_id = $1, estado_venta = 'ACTIVA', paso_actual_id = NULL,
+                fecha_cierre = now(), fecha_validacion = now(), fecha_activacion = now(), updated_at = now()
+         WHERE id = $2`, [o.equipoId, id],
+      );
+      await this.registrarEtapa(tx, id, 'CIERRE', 'GANADA', 'Ganada · expediente enviado a back office por correo', s.sub);
+      await this.marcarGestion(tx, o.clienteId);
+
+      // Aviso a la otra parte (al supervisor si la marcó el asesor, y al revés)
+      const v = await this.datosAviso(tx, id);
+      const avisar = esDueno ? v?.supervisorId : o.asesorId;
+      if (v && avisar && avisar !== s.sub) {
+        await this.notificaciones.crear(avisar, {
+          tipo: 'VENTA_ACTIVA', titulo: 'Venta ganada',
+          mensaje: `${v.codigo} (${v.razonSocial}) de ${v.asesor} se marcó como ganada.`,
+          entidad: 'NEGOCIACION', entidadId: id,
+        }, tx);
+      }
+    });
     return this.detalle(id, s);
   }
 
@@ -324,7 +280,7 @@ export class NegociacionesService {
       // Las ganadas cuentan para el equipo donde se cerraron; las abiertas, para el equipo actual del asesor
       return { cond: '(o.equipo_id = $1 OR (o.equipo_id IS NULL AND ua.equipo_id = $1))', params: [s.equipoId] };
     }
-    // En la ficha de una empresa, el asesor que hoy la tiene ve también las ventas anteriores (para renovarlas)
+    // En la ficha de una empresa, el asesor que hoy la tiene ve también las ventas anteriores
     return { cond: deUnaEmpresa ? '(o.asesor_id = $1 OR c.asesor_id = $1)' : 'o.asesor_id = $1', params: [s.sub] };
   }
 
@@ -332,6 +288,20 @@ export class NegociacionesService {
     if (['GERENTE', 'BACKOFFICE', 'ADMIN'].includes(s.rol)) return true;
     if (s.rol === 'SUPERVISOR') return !!s.equipoId && (o.equipoVentaId ?? o.equipoAsesorId) === s.equipoId;
     return o.asesorId === s.sub || duenoEmpresaId === s.sub;
+  }
+
+  private esSupervisorDe(s: SesionUsuario, equipoId: string | null) {
+    return s.rol === 'SUPERVISOR' && !!s.equipoId && equipoId === s.equipoId && s.permisos.includes('VENTA_APROBAR');
+  }
+
+  /** Datos para los avisos: supervisor del equipo, código, empresa y asesor */
+  private async datosAviso(tx: EntityManager, id: string) {
+    const [v] = await tx.query(
+      `SELECT e.supervisor_id AS "supervisorId", op.codigo, c.razon_social AS "razonSocial", ua.nombres || ' ' || ua.apellidos AS asesor
+       FROM oportunidades op JOIN usuarios ua ON ua.id = op.asesor_id JOIN clientes c ON c.id = op.cliente_id
+       LEFT JOIN equipos e ON e.id = COALESCE(op.equipo_id, ua.equipo_id) WHERE op.id = $1`, [id],
+    );
+    return v as { supervisorId: string | null; codigo: string; razonSocial: string; asesor: string } | undefined;
   }
 
   private async verificarAbierta(clienteId: string) {
@@ -347,30 +317,28 @@ export class NegociacionesService {
   }
 
   /** Bloquea la fila y comprueba que se pueda editar (en curso y del asesor a cargo) */
-  private async bloquearEditable(tx: EntityManager, id: string, s: SesionUsuario, permitirObservada = false) {
+  private async bloquearEditable(tx: EntityManager, id: string, s: SesionUsuario) {
     const [o] = await tx.query(
-      `SELECT o.etapa, o.resultado, o.estado_venta AS "estadoVenta", o.asesor_id AS "asesorId", o.cliente_id AS "clienteId",
-              c.asesor_id AS "duenoEmpresaId", o.renueva_id AS "renuevaId"
+      `SELECT o.etapa, o.resultado, o.asesor_id AS "asesorId", o.cliente_id AS "clienteId", c.asesor_id AS "duenoEmpresaId"
        FROM oportunidades o JOIN clientes c ON c.id = o.cliente_id WHERE o.id = $1 FOR UPDATE OF o`, [id],
     );
     if (!o) throw new NotFoundException('La negociación no existe');
     if (o.asesorId !== s.sub || o.duenoEmpresaId !== s.sub) throw new ForbiddenException('Solo el asesor a cargo puede modificar esta negociación');
-    const observada = o.resultado === 'GANADA' && o.estadoVenta === 'OBSERVADA';
-    if (o.resultado !== 'EN_CURSO' && !(permitirObservada && observada)) throw new BadRequestException('La negociación ya está cerrada');
-    return o as { etapa: string; clienteId: string; renuevaId: string | null };
+    if (o.resultado !== 'EN_CURSO') throw new BadRequestException('La negociación ya está cerrada');
+    return o as { etapa: string; clienteId: string };
   }
 
-  /** Revisa planes y operadores; en línea nueva el operador de origen se borra */
+  /** Revisa servicios y operadores; en línea nueva el operador de origen se borra */
   private async normalizarItems(items: ItemDto[]) {
     const planes: { id: number }[] = await this.db.query(`SELECT id FROM planes_servicio WHERE activo`);
     const operadores: { id: number }[] = await this.db.query(`SELECT id FROM operadores WHERE activo`);
     const idsPlan = new Set(planes.map((p) => Number(p.id)));
     const idsOp = new Set(operadores.map((p) => Number(p.id)));
     return items.map((it, i) => {
-      if (!idsPlan.has(it.planId)) throw new BadRequestException(`Plan ${i + 1}: el plan elegido no existe o está desactivado`);
+      if (!idsPlan.has(it.planId)) throw new BadRequestException(`Servicio ${i + 1}: el servicio elegido no existe o está desactivado`);
       if (it.modalidad === 'PORTABILIDAD') {
         if (!it.operadorOrigenId || !idsOp.has(it.operadorOrigenId)) {
-          throw new BadRequestException(`Plan ${i + 1}: elige de qué operador viene la portabilidad`);
+          throw new BadRequestException(`Servicio ${i + 1}: elige de qué operador viene la portabilidad`);
         }
         return { ...it };
       }
@@ -382,9 +350,9 @@ export class NegociacionesService {
     await tx.query(`DELETE FROM oportunidad_items WHERE oportunidad_id = $1`, [id]);
     for (const it of items) {
       await tx.query(
-        `INSERT INTO oportunidad_items (oportunidad_id, plan_id, modalidad, operador_origen_id, cantidad, cargo_fijo_unit)
-         VALUES ($1, $2, $3, $4, $5, $6)`,
-        [id, it.planId, it.modalidad, it.operadorOrigenId ?? null, it.cantidad, it.cargoFijoUnit],
+        `INSERT INTO oportunidad_items (oportunidad_id, plan_id, modalidad, operador_origen_id, cantidad, cargo_fijo_unit, con_equipo)
+         VALUES ($1, $2, $3, $4, $5, $6, $7)`,
+        [id, it.planId, it.modalidad, it.operadorOrigenId ?? null, it.cantidad, it.cargoFijoUnit, it.conEquipo ?? false],
       );
     }
   }

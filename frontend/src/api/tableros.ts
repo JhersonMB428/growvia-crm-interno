@@ -31,7 +31,9 @@ export interface TableroEquipo {
   mes: string;
   equipo: { id: string; nombre: string; metaLineas: number | null; lineas: number; proyeccion: number } | null;
   asesores: AsesorEquipo[];
-  alertas: { sinGestionesHoy: number; prospectosSinContacto: number; negociacionesAntiguas: number; porAprobar: number } | null;
+  alertas: { sinGestionesHoy: number; prospectosSinContacto: number; negociacionesAntiguas: number; enCierre: number } | null;
+  /** Cambios de asesor en las empresas del equipo */
+  cambios: { clienteId: string; razonSocial: string; motivo: string; fecha: string; asesorAnterior: string | null; asesorNuevo: string | null; hechoPor: string }[];
 }
 
 export interface TableroGerencia {

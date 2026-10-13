@@ -15,8 +15,8 @@ const TOTALES = `
            COALESCE(sum(i.cantidad * i.cargo_fijo_unit), 0)::float8 AS cargo
     FROM oportunidad_items i WHERE i.oportunidad_id = o.id
   ) t ON true`;
-const POR_ACTIVAR = `('EN_VALIDACION','OBSERVADA','VALIDADA','EN_POSVENTA')`;
-
+/** "Cantidad de líneas": las que están en negociaciones abiertas (negociación o cierre) */
+const EN_CURSO = `o.resultado = 'EN_CURSO'`;
 /** "2026-10" del mes actual en Lima */
 export const mesActual = () =>
   new Date().toLocaleDateString('en-CA', { timeZone: ZONA, year: 'numeric', month: '2-digit' }).slice(0, 7);
@@ -70,7 +70,7 @@ export class TablerosService {
     const [porActivar] = await this.db.query(
       `SELECT count(*)::int AS ventas, COALESCE(sum(t.lineas), 0)::int AS lineas,
               count(*) FILTER (WHERE o.estado_venta = 'OBSERVADA')::int AS observadas
-       FROM oportunidades o ${TOTALES} WHERE o.asesor_id = $1 AND o.estado_venta IN ${POR_ACTIVAR}`, [s.sub],
+       FROM oportunidades o ${TOTALES} WHERE o.asesor_id = $1 AND ${EN_CURSO}`, [s.sub],
     );
     const embudo = await this.db.query(
       `SELECT o.etapa, count(*)::int AS cantidad, COALESCE(sum(t.cargo), 0)::float8 AS cargo
@@ -115,7 +115,7 @@ export class TablerosService {
 
   // ───────────── Supervisor: su equipo ─────────────
   async equipo(s: SesionUsuario) {
-    if (!s.equipoId) return { mes: mesActual(), equipo: null, asesores: [], alertas: null };
+    if (!s.equipoId) return { mes: mesActual(), equipo: null, asesores: [], alertas: null, cambios: [] };
     const mes = mesActual();
     const [equipo] = await this.db.query(
       `SELECT e.id, e.nombre,
@@ -133,15 +133,27 @@ export class TablerosService {
           WHERE u.equipo_id = $1 AND c.estado = 'PROSPECTO' AND COALESCE(c.ultima_gestion_at, c.asignado_at) < now() - interval '7 days') AS "prospectosSinContacto",
          (SELECT count(*)::int FROM oportunidades o JOIN usuarios u ON u.id = o.asesor_id
           WHERE u.equipo_id = $1 AND o.resultado = 'EN_CURSO' AND o.created_at < now() - interval '15 days') AS "negociacionesAntiguas",
-         (SELECT count(*)::int FROM oportunidades o JOIN pasos_validacion p ON p.id = o.paso_actual_id JOIN roles r ON r.id = p.rol_id
-          WHERE o.equipo_id = $1 AND o.estado_venta = 'EN_VALIDACION' AND r.codigo = 'SUPERVISOR') AS "porAprobar"`,
+         (SELECT count(*)::int FROM oportunidades o JOIN usuarios u ON u.id = o.asesor_id
+          WHERE u.equipo_id = $1 AND o.resultado = 'EN_CURSO' AND o.etapa = 'CIERRE') AS "enCierre"`,
       [s.equipoId],
+    );
+    // Cambios de asesor en las empresas del equipo (tomas, reasignaciones, liberaciones)
+    const cambios = await this.db.query(
+      `SELECT a.cliente_id AS "clienteId", c.razon_social AS "razonSocial", a.motivo, a.created_at AS fecha,
+              ua.nombres || ' ' || ua.apellidos AS "asesorAnterior", un.nombres || ' ' || un.apellidos AS "asesorNuevo",
+              COALESCE(up.nombres || ' ' || up.apellidos, 'Sistema') AS "hechoPor"
+       FROM asignaciones a JOIN clientes c ON c.id = a.cliente_id
+       LEFT JOIN usuarios ua ON ua.id = a.asesor_anterior
+       LEFT JOIN usuarios un ON un.id = a.asesor_nuevo
+       LEFT JOIN usuarios up ON up.id = a.asignado_por
+       WHERE ua.equipo_id = $1 OR un.equipo_id = $1
+       ORDER BY a.created_at DESC LIMIT 10`, [s.equipoId],
     );
     const lineas = asesores.reduce((a: number, r: { lineas: number }) => a + r.lineas, 0);
     const sumaMetas = asesores.reduce((a: number, r: { metaLineas: number | null }) => a + (r.metaLineas ?? 0), 0);
     return {
       mes, equipo: { ...equipo, metaLineas: equipo.metaEquipo ?? (sumaMetas || null), lineas, proyeccion: proyectar(lineas, mes) },
-      asesores, alertas,
+      asesores, alertas, cambios,
     };
   }
 
@@ -168,7 +180,7 @@ export class TablerosService {
        FROM oportunidades o WHERE o.resultado IN ('GANADA','PERDIDA') AND o.fecha_cierre >= ${DESDE(1)} AND o.fecha_cierre < ${HASTA(1)}`, [mes],
     );
     const [{ porActivar }] = await this.db.query(
-      `SELECT count(*)::int AS "porActivar" FROM oportunidades o WHERE o.estado_venta IN ${POR_ACTIVAR}`,
+      `SELECT count(*)::int AS "porActivar" FROM oportunidades o WHERE ${EN_CURSO}`,
     );
     const equipos = await this.db.query(
       `SELECT e.id, e.nombre, us.nombres || ' ' || us.apellidos AS supervisor,
@@ -314,7 +326,7 @@ export class TablerosService {
          WHERE o.asesor_id = u.id AND o.estado_venta = 'ACTIVA' AND o.fecha_activacion >= ${DESDE(2)} AND o.fecha_activacion < ${HASTA(2)}
        ) a ON true
        LEFT JOIN LATERAL (
-         SELECT sum(t.lineas) AS lineas FROM oportunidades o ${TOTALES} WHERE o.asesor_id = u.id AND o.estado_venta IN ${POR_ACTIVAR}
+         SELECT sum(t.lineas) AS lineas FROM oportunidades o ${TOTALES} WHERE o.asesor_id = u.id AND ${EN_CURSO}
        ) p ON true
        -- Conversión y calidad del mes (ventas cerradas en el mes y cuántas fueron observadas)
        LEFT JOIN LATERAL (

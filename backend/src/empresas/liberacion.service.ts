@@ -41,15 +41,15 @@ export class LiberacionService {
         );
         // Si tenía una negociación abierta, se cierra como perdida (usuario NULL = el sistema)
         const abiertas = await tx.query(
-          `UPDATE oportunidades SET etapa = 'CIERRE', resultado = 'PERDIDA', fecha_cierre = now(), updated_at = now(),
-                  motivo_perdida = 'Empresa liberada por inactividad'
+          `UPDATE oportunidades SET resultado = 'PERDIDA', fecha_cierre = now(), updated_at = now(),
+            motivo_perdida = 'Empresa liberada por inactividad'
            FROM (SELECT id, etapa FROM oportunidades WHERE cliente_id = $1 AND resultado = 'EN_CURSO' FOR UPDATE) a
            WHERE oportunidades.id = a.id RETURNING oportunidades.id, a.etapa`,
           [l.id],
         );
         for (const o of Array.isArray(abiertas[0]) ? abiertas[0] : abiertas) {
           await tx.query(
-            `INSERT INTO historial_etapas (oportunidad_id, etapa_anterior, etapa_nueva, detalle) VALUES ($1, $2, 'CIERRE', $3)`,
+            `INSERT INTO historial_etapas (oportunidad_id, etapa_anterior, etapa_nueva, detalle) VALUES ($1, $2, 'PERDIDA', $3)`,
             [o.id, o.etapa, 'Perdida: la empresa volvió al repositorio por inactividad'],
           );
         }
