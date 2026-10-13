@@ -6,7 +6,7 @@ export interface ReporteEmbudo {
   hasta: string;
   diasEstancada: number;
   /** Negociaciones abiertas en el periodo y hasta qué etapa llegaron */
-  embudo: { abiertas: number; contacto: number; negociacion: number; ganadas: number; activas: number; perdidas: number; enCurso: number };
+  embudo: { abiertas: number; cierre: number; ganadas: number; activas: number; perdidas: number; enCurso: number };
   /** Negociaciones cerradas en el periodo */
   cierres: {
     ganadas: number; perdidas: number; anuladas: number; cicloGanada: number; cicloPerdida: number;

@@ -1,7 +1,7 @@
 import { Body, Controller, Get, Param, ParseUUIDPipe, Post, Put, Query } from '@nestjs/common';
 import { RequierePermisos } from '../auth/decorators/requiere-permisos.decorator';
 import { SesionUsuario, UsuarioActual } from '../auth/decorators/usuario-actual.decorator';
-import { CambiarEtapaDto, CerrarNegociacionDto } from './dto/etapa.dto';
+import { CambiarEtapaDto, GanarNegociacionDto, PerderNegociacionDto } from './dto/etapa.dto';
 import { CrearNegociacionDto, GuardarNegociacionDto } from './dto/guardar-negociacion.dto';
 import { ListarNegociacionesDto } from './dto/listar.dto';
 import { NegociacionesService } from './negociaciones.service';
@@ -54,16 +54,16 @@ export class NegociacionesController {
     return this.negociaciones.cambiarEtapa(id, dto, s);
   }
 
-  /** Abre la renovación de un contrato activo (el :id es la venta que se renueva) */
-  @Post(':id/renovar')
+  @Post(':id/perder')
   @RequierePermisos('NEGOCIACION_GESTIONAR')
-  renovar(@Param('id', ParseUUIDPipe) id: string, @UsuarioActual() s: SesionUsuario) {
-    return this.negociaciones.iniciarRenovacion(id, s);
+  perder(@Param('id', ParseUUIDPipe) id: string, @Body() dto: PerderNegociacionDto, @UsuarioActual() s: SesionUsuario) {
+    return this.negociaciones.perder(id, dto, s);
   }
 
-  @Post(':id/cerrar')
-  @RequierePermisos('NEGOCIACION_GESTIONAR')
-  cerrar(@Param('id', ParseUUIDPipe) id: string, @Body() dto: CerrarNegociacionDto, @UsuarioActual() s: SesionUsuario) {
-    return this.negociaciones.cerrar(id, dto, s);
+  /** Ganada: la marca el asesor a cargo o su supervisor (el servicio revisa quién es) */
+  @Post(':id/ganar')
+  @RequierePermisos('INFO_COMERCIAL_VER')
+  ganar(@Param('id', ParseUUIDPipe) id: string, @Body() _dto: GanarNegociacionDto, @UsuarioActual() s: SesionUsuario) {
+    return this.negociaciones.ganar(id, s);
   }
 }

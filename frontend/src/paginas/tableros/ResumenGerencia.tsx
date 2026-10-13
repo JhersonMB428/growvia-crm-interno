@@ -73,14 +73,14 @@ export function ResumenGerencia() {
               <span className="kpi__detalle">{k.portas} de {k.lineas} líneas</span>
             </section>
             <section className="kpi vidrio">
-              <span className="kpi__titulo">Por activar</span>
+              <span className="kpi__titulo">En negociación</span>
               <span className="kpi__valor numeros">{k.porActivar}</span>
-              <span className="kpi__detalle">ventas en validación o posventa</span>
+              <span className="kpi__detalle">negociaciones abiertas hoy</span>
             </section>
             <section className="kpi vidrio">
-              <span className="kpi__titulo">Ventas observadas</span>
-              <span className="kpi__valor numeros">{pct(t.proceso.observadas, t.proceso.ganadas) ?? 0}%</span>
-              <span className="kpi__detalle">{t.proceso.observadas} de {t.proceso.ganadas} ganadas · cierre en {t.proceso.diasCierre} días promedio</span>
+               <span className="kpi__titulo">Tiempo de cierre</span>
+              <span className="kpi__valor numeros">{t.proceso.diasCierre} <small>días</small></span>
+              <span className="kpi__detalle">{t.proceso.ganadas} ganadas · {t.proceso.perdidas} perdidas en el mes</span>
             </section>
           </div>
 

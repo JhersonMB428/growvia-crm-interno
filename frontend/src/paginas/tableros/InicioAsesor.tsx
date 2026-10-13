@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { ErrorApi } from '../../api/cliente';
 import { horaCorta, TEXTO_CANAL } from '../../api/gestiones';
-import { soles, TEXTO_ESTADO_VENTA, TEXTO_ETAPA } from '../../api/negociaciones';
+import { estadoDe, soles, TEXTO_ETAPA } from '../../api/negociaciones';
 import { mesLargo, pct, tablerosApi, variacion, type TableroAsesor } from '../../api/tableros';
 import { Barras, BarraMeta } from '../../componentes/graficos';
 import { useSesion } from '../../sesion/SesionContext';
@@ -25,7 +25,7 @@ export function InicioAsesor() {
   const avance = pct(t.activas.lineas, t.metaLineas);
   const faltan = t.metaLineas ? Math.max(0, t.metaLineas - t.activas.lineas) : null;
   const vari = variacion(t.activas.lineas, t.lineasMesAnterior);
-  const etapas = (['PROSPECCION', 'CONTACTO', 'NEGOCIACION'] as const).map((e) => {
+  const etapas = (['NEGOCIACION', 'CIERRE'] as const).map((e) => {
     const f = t.embudo.find((x) => x.etapa === e);
     return { etiqueta: TEXTO_ETAPA[e], valor: f?.cantidad ?? 0, detalle: f ? soles(f.cargo) : undefined };
   });
@@ -39,7 +39,7 @@ export function InicioAsesor() {
           <p className="saludo">
             {t.metaLineas === null ? 'Tu supervisor todavía no definió tu meta de este mes.'
               : faltan === 0 ? <>¡Cumpliste tu meta de <b>{t.metaLineas} líneas</b>!</>
-              : <>Te faltan <b>{faltan} líneas activas</b> para tu meta de {t.metaLineas}. Tienes <b>{t.porActivar.lineas}</b> más en validación.</>}
+              : <>Te faltan <b>{faltan} líneas activas</b> para tu meta de {t.metaLineas}. Tienes <b>{t.porActivar.lineas}</b> más en negociación.</>}
           </p>
         </div>
         <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
@@ -62,10 +62,9 @@ export function InicioAsesor() {
           {vari && <span className="kpi__detalle"><span className={`kpi__variacion${vari.startsWith('−') ? ' kpi__variacion--baja' : ''}`}>{vari}</span> líneas vs. mes anterior</span>}
         </section>
         <section className="kpi vidrio">
-          <span className="kpi__titulo">Por activar</span>
+          <span className="kpi__titulo">Cantidad de líneas</span>
           <span className="kpi__valor numeros">{t.porActivar.lineas} <small>líneas</small></span>
-          <span className="kpi__detalle">{t.porActivar.ventas} {t.porActivar.ventas === 1 ? 'venta' : 'ventas'} en validación o posventa</span>
-          {t.porActivar.observadas > 0 && <span className="kpi__detalle" style={{ color: 'var(--salir)', fontWeight: 700 }}>{t.porActivar.observadas} observada(s): corrígelas</span>}
+          <span className="kpi__detalle">en {t.porActivar.ventas} {t.porActivar.ventas === 1 ? 'negociación abierta' : 'negociaciones abiertas'}</span>
         </section>
         <section className="kpi vidrio">
           <span className="kpi__titulo">Posición en tu equipo</span>
@@ -125,7 +124,7 @@ export function InicioAsesor() {
                     <td>{n.razonSocial}</td>
                     <td className="num">{n.lineas}</td>
                     <td className="num">{soles(n.total)}</td>
-                    <td>{n.resultado === 'EN_CURSO' ? TEXTO_ETAPA[n.etapa] : n.resultado === 'PERDIDA' ? 'Perdida' : n.estadoVenta ? TEXTO_ESTADO_VENTA[n.estadoVenta] : 'Ganada'}</td>
+                    <td>{estadoDe(n)}</td>
                   </tr>
                 ))}
               </tbody>
