@@ -7,6 +7,7 @@ import { ParametrosService } from '../sistema/parametros.service';
 import { ContactoDto } from './dto/contacto.dto';
 import { CrearEmpresaDto } from './dto/crear-empresa.dto';
 import { ListarEmpresasDto } from './dto/listar.dto';
+import { RetencionService } from './retencion';
 
 /** Columnas generales de una empresa (lo que cualquier rol puede ver en el repositorio) */
 const COLUMNAS_GENERALES = `
@@ -15,7 +16,21 @@ const COLUMNAS_GENERALES = `
   c.asesor_id AS "asesorId",
   CASE WHEN u.id IS NULL THEN NULL ELSE u.nombres || ' ' || u.apellidos END AS asesor,
   eq.nombre AS equipo,
-  c.asignado_at AS "asignadoAt", c.ultima_gestion_at AS "ultimaGestionAt", c.created_at AS "creadoAt"`;
+  c.asignado_at AS "asignadoAt", c.ultima_gestion_at AS "ultimaGestionAt", c.created_at AS "creadoAt",
+  c.retencion_hasta AS "retencionHasta",
+  CASE WHEN c.bloqueo_hasta > now() THEN c.bloqueo_tipo END AS "bloqueoTipo",
+  CASE WHEN c.bloqueo_hasta > now() THEN c.bloqueo_hasta END AS "bloqueoHasta",
+  c.ultimo_asesor_id AS "ultimoAsesorId"`;
+
+/**
+ * ¿Esta persona puede tomar la empresa libre?
+ * "No interesado" la bloquea para todos; "sin respuesta" solo para el asesor que la tenía.
+ */
+function conBloqueo<T extends { bloqueoTipo: string | null; ultimoAsesorId: string | null }>(fila: T, usuarioId: string) {
+  const { ultimoAsesorId, ...resto } = fila;
+  const bloqueadaParaMi = fila.bloqueoTipo === 'RECHAZO' || (fila.bloqueoTipo === 'SIN_RESPUESTA' && ultimoAsesorId === usuarioId);
+  return { ...resto, bloqueadaParaMi };
+}
 
 const UNIONES = `
   FROM clientes c
@@ -27,11 +42,16 @@ const UNIONES = `
 
 /** Compara sin tildes ni mayúsculas (sin depender de extensiones de PostgreSQL) */
 const SIN_TILDES = (col: string) => `translate(lower(${col}), 'áéíóúüñàèìòù', 'aeiouunaeiou')`;
+const fechaCorta = (d: Date) => new Date(d).toLocaleDateString('es-PE', { timeZone: 'America/Lima', day: '2-digit', month: 'short', year: 'numeric' });
 const sinTildes = (t: string) => t.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase();
 
 @Injectable()
 export class EmpresasService {
-  constructor(private readonly db: DataSource, private readonly parametros: ParametrosService) {}
+  constructor(
+    private readonly db: DataSource,
+    private readonly parametros: ParametrosService,
+    private readonly retencion: RetencionService,
+  ) {}
 
   // ───────────── ¿El RUC ya existe? (para la alerta roja antes de guardar) ─────────────
   async verificarRuc(ruc: string) {
@@ -55,11 +75,12 @@ export class EmpresasService {
     const [distrito] = await this.db.query(`SELECT 1 FROM distritos WHERE id = $1`, [dto.distritoId]);
     if (!distrito) throw new BadRequestException('El distrito elegido no existe');
 
+    const retencion = await this.retencion.inicial();
     const id = await this.db.transaction(async (tx) => {
       const [c] = await tx.query(
-        `INSERT INTO clientes (ruc, razon_social, distrito_id, asesor_id, origen, asignado_at, ultima_gestion_at, creado_por)
-         VALUES ($1, $2, $3, $4, 'PROSPECCION', now(), now(), $4) RETURNING id`,
-        [dto.ruc, dto.razonSocial.trim(), dto.distritoId, sesion.sub],
+        `INSERT INTO clientes (ruc, razon_social, distrito_id, asesor_id, origen, asignado_at, ultima_gestion_at, creado_por, retencion_hasta)
+         VALUES ($1, $2, $3, $4, 'PROSPECCION', now(), now(), $4, $5) RETURNING id`,
+        [dto.ruc, dto.razonSocial.trim(), dto.distritoId, sesion.sub, retencion],
       );
       await this.reemplazarContactos(tx, c.id, dto.contactos);
       await tx.query(
@@ -73,15 +94,26 @@ export class EmpresasService {
 
   // ───────────── Mis empresas (cartera del asesor) ─────────────
   async misEmpresas(f: ListarEmpresasDto, sesion: SesionUsuario) {
-    return this.listar(f, ['c.asesor_id = $1'], [sesion.sub]);
+    const cond = ['c.asesor_id = $1'];
+    // "Por vencer": las que se liberan en las próximas 24 horas
+    if (f.filtro === 'por_vencer') cond.push(`c.retencion_hasta <= now() + interval '24 hours'`);
+    const lista = await this.listar(f, cond, [sesion.sub], sesion,
+      // Primero las que están por vencer; las que no vencen (ventas) al final
+      'c.retencion_hasta ASC NULLS LAST, c.updated_at DESC');
+    const [{ porVencer }] = await this.db.query(
+      `SELECT count(*)::int AS "porVencer" FROM clientes
+       WHERE asesor_id = $1 AND retencion_hasta <= now() + make_interval(hours => $2)`,
+      [sesion.sub, (await this.retencion.reglas()).horasAvisoLiberacion],
+    );
+    return { ...lista, porVencer };
   }
 
   // ───────────── Repositorio (todas las empresas, solo datos generales) ─────────────
-  async repositorio(f: ListarEmpresasDto) {
+  async repositorio(f: ListarEmpresasDto, sesion: SesionUsuario) {
     const cond: string[] = [];
     if (f.filtro === 'libres') cond.push('c.asesor_id IS NULL');
     if (f.filtro === 'asignadas') cond.push('c.asesor_id IS NOT NULL');
-    return this.listar(f, cond, []);
+    return this.listar(f, cond, [], sesion);
   }
 
   // ───────────── Detalle (los contactos solo si le corresponde verlos) ─────────────
@@ -92,7 +124,7 @@ export class EmpresasService {
     if (!e) throw new NotFoundException('La empresa no existe');
 
     const verComercial = this.puedeVerComercial(sesion, e.asesorId, e.equipoId);
-    const { equipoId: _equipo, ...general } = e;
+    const { equipoId: _equipo, ...general } = conBloqueo(e, sesion.sub);
     if (!verComercial) return { ...general, libre: !e.asesorId, contactos: null, historial: null, puedeEditar: false };
 
     const contactos = await this.db.query(
@@ -104,6 +136,7 @@ export class EmpresasService {
               (c.fin_contrato_actual - (now() AT TIME ZONE 'America/Lima')::date)::int AS dias
        FROM clientes c LEFT JOIN operadores op ON op.id = c.operador_actual_id WHERE c.id = $1`, [id],
     );
+    const [{ prorrogada }] = await this.db.query(`SELECT prorrogada FROM clientes WHERE id = $1`, [id]);
     const historial = await this.db.query(
       `SELECT a.motivo, a.created_at AS fecha,
               ua.nombres || ' ' || ua.apellidos AS "asesorAnterior",
@@ -116,7 +149,7 @@ export class EmpresasService {
        WHERE a.cliente_id = $1 ORDER BY a.created_at DESC LIMIT 20`, [id],
     );
     return {
-      ...general, libre: !e.asesorId, contactos, historial, contratoActual, puedeEditar: e.asesorId === sesion.sub,
+      ...general, libre: !e.asesorId, contactos, historial, contratoActual, puedeEditar: e.asesorId === sesion.sub, prorrogada,
       // Back office y admin mantienen la base de clientes actualizada
       puedeCorregirDatos: sesion.permisos.includes('EMPRESA_EDITAR'),
     };
@@ -130,11 +163,25 @@ export class EmpresasService {
       if (total >= limite) throw new ConflictException(`Llegaste al máximo de ${limite} empresas en tu cartera`);
     }
 
+    const [b] = await this.db.query(
+      `SELECT bloqueo_tipo AS tipo, bloqueo_hasta AS hasta, ultimo_asesor_id AS "ultimo" FROM clientes WHERE id = $1 AND bloqueo_hasta > now()`, [id],
+    );
+    if (b?.tipo === 'RECHAZO') {
+      throw new ConflictException(`Esta empresa dijo que no está interesada. Se podrá tomar desde el ${fechaCorta(b.hasta)}.`);
+    }
+    if (b?.tipo === 'SIN_RESPUESTA' && b.ultimo === sesion.sub) {
+      throw new ConflictException(`No te contestó en varios intentos: ahora le toca a otro asesor. Podrás retomarla desde el ${fechaCorta(b.hasta)}.`);
+    }
+
+    const retencion = await this.retencion.inicial();
     const tomada = await this.db.transaction(async (tx) => {
       const filas = await tx.query(
-        `UPDATE clientes SET asesor_id = $1, asignado_at = now(), ultima_gestion_at = now(), updated_at = now()
-         WHERE id = $2 AND asesor_id IS NULL RETURNING id`,
-        [sesion.sub, id],
+        `UPDATE clientes SET asesor_id = $1, asignado_at = now(), ultima_gestion_at = now(), updated_at = now(),
+                retencion_hasta = $3, prorrogada = false, aviso_liberacion = false, bloqueo_tipo = NULL, bloqueo_hasta = NULL
+         WHERE id = $2 AND asesor_id IS NULL
+           AND NOT COALESCE(bloqueo_hasta > now() AND (bloqueo_tipo = 'RECHAZO' OR ultimo_asesor_id = $1), false)
+         RETURNING id`,
+        [sesion.sub, id, retencion],
       );
       // TypeORM devuelve [filas, cantidad] en UPDATE … RETURNING
       const actualizadas = Array.isArray(filas[0]) ? filas[0] : filas;
@@ -224,7 +271,9 @@ export class EmpresasService {
       if (!actual) throw new NotFoundException('La empresa no existe');
       if (actual.asesorId === asesorId) throw new BadRequestException('La empresa ya está asignada a ese asesor');
       await tx.query(
-        `UPDATE clientes SET asesor_id = $1, asignado_at = now(), ultima_gestion_at = now(), updated_at = now() WHERE id = $2`,
+        `UPDATE clientes SET asesor_id = $1, asignado_at = now(), ultima_gestion_at = now(), updated_at = now(),
+                prorrogada = false, aviso_liberacion = false, bloqueo_tipo = NULL, bloqueo_hasta = NULL
+         WHERE id = $2`,
         [asesorId, id],
       );
       await tx.query(
@@ -237,8 +286,35 @@ export class EmpresasService {
         `UPDATE oportunidades SET asesor_id = $1, updated_at = now() WHERE cliente_id = $2 AND resultado = 'EN_CURSO'`,
         [asesorId, id],
       );
+      await this.retencion.recalcular(tx, id);
     });
     return this.detalle(id, sesion);
+  }
+
+  // ───────────── Tiempo en la ficha (solo el asesor a cargo) ─────────────
+  /** Se llama al abrir la ficha. Devuelve el id de la visita, o null si no es su empresa. */
+  async iniciarVisita(clienteId: string, sesion: SesionUsuario) {
+    const [c] = await this.db.query(`SELECT asesor_id AS "asesorId" FROM clientes WHERE id = $1`, [clienteId]);
+    if (!c) throw new NotFoundException('La empresa no existe');
+    if (c.asesorId !== sesion.sub) return { id: null };
+    const [v] = await this.db.query(
+      `INSERT INTO visitas_ficha (usuario_id, cliente_id) VALUES ($1, $2) RETURNING id`, [sesion.sub, clienteId],
+    );
+    return { id: v.id as string };
+  }
+
+  /**
+   * Pulso cada 20 segundos mientras la ficha está visible. Suma el tiempo real desde el pulso anterior,
+   * con tope de 40 s (si la pestaña quedó en segundo plano o se cortó la conexión, no se cuenta ese tiempo).
+   */
+  async pulsoVisita(visitaId: string, sesion: SesionUsuario) {
+    await this.db.query(
+      `UPDATE visitas_ficha
+       SET segundos = segundos + LEAST(GREATEST(extract(epoch FROM now() - ultimo_pulso), 0), 40)::int, ultimo_pulso = now()
+       WHERE id = $1 AND usuario_id = $2 AND ultimo_pulso > now() - interval '30 minutes'`,
+      [visitaId, sesion.sub],
+    );
+    return { ok: true };
   }
 
   // ───────────── Ayudantes ─────────────
@@ -259,7 +335,7 @@ export class EmpresasService {
     }
   }
 
-  private async listar(f: ListarEmpresasDto, cond: string[], params: unknown[]) {
+  private async listar(f: ListarEmpresasDto, cond: string[], params: unknown[], sesion: SesionUsuario, orden = 'c.updated_at DESC') {
     const p = [...params];
     const where = [...cond];
     if (f.q?.trim()) {
@@ -276,9 +352,12 @@ export class EmpresasService {
     const pagina = f.pagina ?? 1;
     const filas = await this.db.query(
       `SELECT ${COLUMNAS_GENERALES} ${UNIONES} ${filtro}
-       ORDER BY c.updated_at DESC LIMIT ${porPagina} OFFSET ${(pagina - 1) * porPagina}`,
+       ORDER BY ${orden} LIMIT ${porPagina} OFFSET ${(pagina - 1) * porPagina}`,
       p,
     );
-    return { total, pagina, porPagina, paginas: Math.max(1, Math.ceil(total / porPagina)), filas };
+    return {
+      total, pagina, porPagina, paginas: Math.max(1, Math.ceil(total / porPagina)),
+      filas: filas.map((f: Parameters<typeof conBloqueo>[0]) => conBloqueo(f, sesion.sub)),
+    };
   }
 }

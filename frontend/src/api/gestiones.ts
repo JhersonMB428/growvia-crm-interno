@@ -18,13 +18,19 @@ export interface Gestion {
   reprogramaciones: number;
   fecha: string;
   usuario: string;
+  /** Segundos en la ficha antes de registrarla (solo lo ven supervisión y gerencia) */
+  segundosFicha: number | null;
 }
+
+/** Lo que devuelve el registro: si la empresa volvió al repositorio y su nuevo plazo */
+export type GestionRegistrada = Gestion & { liberada: 'RECHAZO' | 'SIN_RESPUESTA' | null; retencionHasta: string | null };
 
 export interface NuevaGestion {
   clienteId: string;
   canal: Canal;
   resultado: ResultadoGestion;
-  comentario: string;
+  /** Opcional en "No contestó" y "No interesado" */
+  comentario?: string;
   proximaAccion?: string;
   proximoCanal?: Canal;
 }
@@ -41,8 +47,9 @@ export interface Notificacion {
 }
 
 export const gestionesApi = {
-  crear: (g: NuevaGestion) => api<Gestion>('/gestiones', { metodo: 'POST', cuerpo: g }),
-  deEmpresa: (clienteId: string) => api<{ filas: Gestion[]; puedeRegistrar: boolean }>(`/empresas/${clienteId}/gestiones`),
+  crear: (g: NuevaGestion) => api<GestionRegistrada>('/gestiones', { metodo: 'POST', cuerpo: g }),
+  deEmpresa: (clienteId: string) =>
+    api<{ filas: Gestion[]; puedeRegistrar: boolean; segundosMinimos: number | null }>(`/empresas/${clienteId}/gestiones`),
   reprogramar: (id: string, proximaAccion: string, proximoCanal?: Canal) =>
     api<Gestion>(`/gestiones/${id}/reprogramar`, { metodo: 'PUT', cuerpo: { proximaAccion, proximoCanal } }),
   agenda: (desde: string, hasta: string) => api<{ items: Gestion[]; atrasadas: Gestion[] }>(`/agenda?desde=${desde}&hasta=${hasta}`),
@@ -68,12 +75,18 @@ export const CANALES: { valor: Canal; texto: string }[] = [
 export const TEXTO_CANAL: Record<Canal, string> = { LLAMADA: 'Llamada', WHATSAPP: 'WhatsApp', CORREO: 'Correo', VISITA: 'Visita' };
 export const RESULTADOS: { valor: ResultadoGestion; texto: string }[] = [
   { valor: 'INTERESADO', texto: 'Interesado' },
-  { valor: 'NO_CONTESTA', texto: 'No contesta' },
+  { valor: 'NO_CONTESTA', texto: 'No contestó' },
   { valor: 'VOLVER_A_LLAMAR', texto: 'Volver a llamar' },
-  { valor: 'RECHAZA', texto: 'Rechaza' },
+  { valor: 'RECHAZA', texto: 'No interesado' },
   { valor: 'OTRO', texto: 'Otro' },
 ];
 export const TEXTO_RESULTADO = Object.fromEntries(RESULTADOS.map((r) => [r.valor, r.texto])) as Record<ResultadoGestion, string>;
+
+/** Se pueden registrar sin comentario */
+export const RESULTADOS_RAPIDOS: ResultadoGestion[] = ['NO_CONTESTA', 'RECHAZA'];
+
+/** "1:05" */
+export const duracion = (s: number) => `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`;
 
 /** Horas que se ofrecen para agendar (cada 30 min, de 7:00 a 20:00) */
 export const HORAS = Array.from({ length: 27 }, (_, i) => `${String(7 + Math.floor(i / 2)).padStart(2, '0')}:${i % 2 ? '30' : '00'}`);

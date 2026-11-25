@@ -1,8 +1,8 @@
-import { useState, type FormEvent } from 'react';
+import { useEffect, useRef, useState, type FormEvent } from 'react';
 import { ErrorApi } from '../api/cliente';
 import {
-  CANALES, diaCorto, fechaISO, gestionesApi, horaCorta, HORAS, RESULTADOS, unirFechaHora,
-  type Canal, type Gestion, type ResultadoGestion,
+  CANALES, diaCorto, fechaISO, gestionesApi, horaCorta, HORAS, RESULTADOS, RESULTADOS_RAPIDOS, unirFechaHora,
+  type Canal, type GestionRegistrada, type ResultadoGestion,
 } from '../api/gestiones';
 import './gestiones.css';
 
@@ -16,12 +16,14 @@ interface Props {
   idBase?: string;
   canalInicial?: Canal;
   textoBoton?: string;
-  onGuardada: (g: Gestion) => void;
+  /** Resultado elegido desde los botones rápidos de la ficha (n cambia en cada clic) */
+  preseleccion?: { resultado: ResultadoGestion; n: number } | null;
+  onGuardada: (g: GestionRegistrada) => void;
   onCancelar?: () => void;
 }
 
 /** Formulario para registrar una gestión hecha (y opcionalmente agendar la siguiente) */
-export function FormGestion({ empresaId, idBase = 'g', canalInicial = 'LLAMADA', textoBoton = 'Guardar gestión', onGuardada, onCancelar }: Props) {
+export function FormGestion({ empresaId, idBase = 'g', canalInicial = 'LLAMADA', textoBoton = 'Guardar gestión', preseleccion, onGuardada, onCancelar }: Props) {
   const [canal, setCanal] = useState<Canal>(canalInicial);
   const [resultado, setResultado] = useState<ResultadoGestion | ''>('');
   const [comentario, setComentario] = useState('');
@@ -34,13 +36,27 @@ export function FormGestion({ empresaId, idBase = 'g', canalInicial = 'LLAMADA',
 
   function elegirResultado(r: ResultadoGestion) {
     setResultado(r);
-    // "Volver a llamar" o "No contesta" casi siempre llevan una próxima acción
-    if (r === 'VOLVER_A_LLAMAR' || r === 'NO_CONTESTA') setAgendar(true);
+    // "Interesado", "Volver a llamar" o "No contestó" casi siempre llevan una próxima acción
+    if (r === 'VOLVER_A_LLAMAR' || r === 'NO_CONTESTA' || r === 'INTERESADO') setAgendar(true);
     if (r === 'RECHAZA') setAgendar(false);
   }
 
+  // Desde los botones rápidos: elige el resultado (al renderizar) y lleva el foco al comentario
+  const [preseleccionVista, setPreseleccionVista] = useState(preseleccion?.n ?? 0);
+  if (preseleccion && preseleccion.n !== preseleccionVista) {
+    setPreseleccionVista(preseleccion.n);
+    setCanal('LLAMADA');
+    elegirResultado(preseleccion.resultado);
+  }
+  const comentarioRef = useRef<HTMLTextAreaElement>(null);
+  useEffect(() => {
+    if (preseleccion) comentarioRef.current?.focus({ preventScroll: true });
+  }, [preseleccion]);
+
+  const comentarioOpcional = !!resultado && RESULTADOS_RAPIDOS.includes(resultado);
   const fechaValida = !agendar || (!!fecha && new Date(`${fecha}T${hora}:00`) > new Date());
-  const listo = !!resultado && comentario.trim().length >= 3 && fechaValida;
+  const comentarioValido = comentario.trim().length >= 3 || (comentarioOpcional && comentario.trim().length === 0);
+  const listo = !!resultado && comentarioValido && fechaValida;
 
   async function guardar(e: FormEvent) {
     e.preventDefault();
@@ -48,7 +64,7 @@ export function FormGestion({ empresaId, idBase = 'g', canalInicial = 'LLAMADA',
     setGuardando(true); setError('');
     try {
       const g = await gestionesApi.crear({
-        clienteId: empresaId, canal, resultado, comentario: comentario.trim(),
+        clienteId: empresaId, canal, resultado, ...(comentario.trim() ? { comentario: comentario.trim() } : {}),
         ...(agendar ? { proximaAccion: unirFechaHora(fecha, hora), proximoCanal } : {}),
       });
       setResultado(''); setComentario(''); setAgendar(false); setFecha(masDias(1)); setHora('09:00');
@@ -81,10 +97,16 @@ export function FormGestion({ empresaId, idBase = 'g', canalInicial = 'LLAMADA',
         </div>
       </div>
       <div className="campo">
-        <label htmlFor={`${idBase}-comentario`} className="etiqueta">Comentario</label>
-        <textarea id={`${idBase}-comentario`} className="entrada area" rows={3} maxLength={2000} value={comentario} onChange={(e) => setComentario(e.target.value)}
+        <label htmlFor={`${idBase}-comentario`} className="etiqueta">Comentario{comentarioOpcional ? ' (opcional)' : ''}</label>
+        <textarea ref={comentarioRef} id={`${idBase}-comentario`} className="entrada area" rows={3} maxLength={2000} value={comentario} onChange={(e) => setComentario(e.target.value)}
           placeholder="Ej. Pidió la propuesta por correo. Compara con su operador actual; decide esta semana." />
       </div>
+
+      {resultado === 'RECHAZA' && (
+        <div className="alerta" role="note">
+          Al guardar, la empresa vuelve al repositorio y nadie podrá tomarla por un tiempo, para no volver a llamarla.
+        </div>
+      )}
 
       <label className="casilla">
         <input type="checkbox" checked={agendar} onChange={(e) => setAgendar(e.target.checked)} />

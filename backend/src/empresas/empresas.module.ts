@@ -5,11 +5,12 @@ import { EmpresasService } from './empresas.service';
 import { Cliente } from './entities/cliente.entity';
 import { Contacto } from './entities/contacto.entity';
 import { LiberacionService } from './liberacion.service';
+import { RetencionService } from './retencion';
 
 @Module({
   imports: [TypeOrmModule.forFeature([Cliente, Contacto])],
   controllers: [EmpresasController],
-  providers: [EmpresasService, LiberacionService],
-  exports: [EmpresasService, LiberacionService],
+  providers: [EmpresasService, LiberacionService, RetencionService],
+  exports: [EmpresasService, LiberacionService, RetencionService],
 })
 export class EmpresasModule {}

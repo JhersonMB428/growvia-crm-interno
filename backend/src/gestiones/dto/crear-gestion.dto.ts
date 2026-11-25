@@ -4,6 +4,8 @@ import { IsDate, IsIn, IsOptional, IsString, IsUUID, Length, ValidateIf } from '
 export const CANALES = ['LLAMADA', 'WHATSAPP', 'CORREO', 'VISITA'] as const;
 export const RESULTADOS = ['INTERESADO', 'NO_CONTESTA', 'VOLVER_A_LLAMAR', 'RECHAZA', 'OTRO'] as const;
 export type Canal = (typeof CANALES)[number];
+/** Resultados que se pueden registrar sin comentario */
+export const RESULTADOS_RAPIDOS: string[] = ['NO_CONTESTA', 'RECHAZA'];
 
 export class CrearGestionDto {
   @IsUUID('4', { message: 'Empresa no válida' })
@@ -15,9 +17,11 @@ export class CrearGestionDto {
   @IsIn(RESULTADOS, { message: 'Elige el resultado' })
   resultado: (typeof RESULTADOS)[number];
 
-  @IsString()
+  /** Obligatorio salvo en "No contestó" y "No interesado" (se registran con un clic) */
+  @ValidateIf((o: CrearGestionDto) => !RESULTADOS_RAPIDOS.includes(o.resultado) || !!o.comentario?.trim())
+  @IsString({ message: 'Escribe un comentario (mínimo 3 caracteres)' })
   @Length(3, 2000, { message: 'Escribe un comentario (mínimo 3 caracteres)' })
-  comentario: string;
+  comentario?: string;
 
   /** Fecha y hora de la próxima acción (ISO). Opcional. */
   @IsOptional()

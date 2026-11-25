@@ -5,6 +5,7 @@ import { randomInt } from 'crypto';
 import { DataSource, EntityManager } from 'typeorm';
 import { SesionUsuario } from '../auth/decorators/usuario-actual.decorator';
 import { CorreoService } from '../correo/correo.service';
+import { RetencionService } from '../empresas/retencion';
 import { ParametrosService } from '../sistema/parametros.service';
 
 /** Back office solo administra asesores y supervisores; administración, todos los roles */
@@ -35,6 +36,7 @@ export class AdminUsuariosService {
     private readonly correo: CorreoService,
     private readonly parametros: ParametrosService,
     private readonly config: ConfigService,
+    private readonly retencion: RetencionService,
   ) {}
 
   private puedeGestionar(s: SesionUsuario, rol: string) {
@@ -177,12 +179,16 @@ export class AdminUsuariosService {
       if (!d) throw new BadRequestException('Elige un asesor o supervisor activo para sus empresas');
     }
 
+    // Las empresas que pasan a otro asesor reciben el plazo de una base asignada (son muchas de golpe)
+    const plazo = await this.retencion.inicial(true);
     const resumen = await this.db.transaction(async (tx) => {
       let empresas = 0;
       let negociaciones = 0;
       if (destino && destino !== 'repositorio') {
         const movidas = filasDe<{ id: string }>(await tx.query(
-          `UPDATE clientes SET asesor_id = $2, asignado_at = now(), updated_at = now() WHERE asesor_id = $1 RETURNING id`, [id, destino],
+          `UPDATE clientes SET asesor_id = $2, asignado_at = now(), updated_at = now(), prorrogada = false, aviso_liberacion = false,
+                  retencion_hasta = CASE WHEN retencion_hasta IS NULL AND estado = 'VENTA' THEN NULL ELSE $3::timestamptz END
+           WHERE asesor_id = $1 RETURNING id`, [id, destino, plazo],
         ));
         empresas = movidas.length;
         await tx.query(
@@ -206,7 +212,9 @@ export class AdminUsuariosService {
           );
         }
         const liberadas = filasDe<{ id: string }>(await tx.query(
-          `UPDATE clientes SET asesor_id = NULL, asignado_at = NULL, updated_at = now() WHERE asesor_id = $1 RETURNING id`, [id],
+          `UPDATE clientes SET asesor_id = NULL, asignado_at = NULL, updated_at = now(), retencion_hasta = NULL, prorrogada = false,
+                  aviso_liberacion = false, ultimo_asesor_id = $1
+           WHERE asesor_id = $1 RETURNING id`, [id],
         ));
         empresas = liberadas.length;
         await tx.query(

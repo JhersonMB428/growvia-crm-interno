@@ -3,6 +3,7 @@ import * as ExcelJS from 'exceljs';
 import { Readable } from 'stream';
 import { DataSource } from 'typeorm';
 import { SesionUsuario } from '../auth/decorators/usuario-actual.decorator';
+import { RetencionService } from '../empresas/retencion';
 import { NotificacionesService } from '../notificaciones/notificaciones.service';
 
 const MAX_FILAS = 5000;
@@ -42,7 +43,11 @@ interface FilaError { fila: number; ruc: string | null; motivo: Motivo; detalle:
  */
 @Injectable()
 export class BasesService {
-  constructor(private readonly db: DataSource, private readonly notificaciones: NotificacionesService) {}
+  constructor(
+    private readonly db: DataSource,
+    private readonly notificaciones: NotificacionesService,
+    private readonly retencion: RetencionService,
+  ) {}
 
   // ───────────── Plantilla vacía (no contiene datos) ─────────────
   async plantilla(): Promise<Buffer> {
@@ -173,8 +178,9 @@ export class BasesService {
 
       const creadas = await tx.query(
         `WITH nuevas AS (
-           INSERT INTO clientes (ruc, razon_social, distrito_id, asesor_id, origen, lote_id, asignado_at, creado_por)
-           SELECT f.ruc, f.razon_social, f.distrito_id, $2, 'BASE', $1, CASE WHEN $2::uuid IS NULL THEN NULL ELSE now() END, $3
+           INSERT INTO clientes (ruc, razon_social, distrito_id, asesor_id, origen, lote_id, asignado_at, creado_por, retencion_hasta)
+           SELECT f.ruc, f.razon_social, f.distrito_id, $2, 'BASE', $1, CASE WHEN $2::uuid IS NULL THEN NULL ELSE now() END, $3,
+                  CASE WHEN $2::uuid IS NULL THEN NULL ELSE $4::timestamptz END
            FROM lote_filas f WHERE f.lote_id = $1 AND NOT EXISTS (SELECT 1 FROM clientes c WHERE c.ruc = f.ruc)
            ON CONFLICT (ruc) DO NOTHING
            RETURNING id, ruc
@@ -189,7 +195,7 @@ export class BasesService {
            SELECT n.id, $2, 'CARGA', $3 FROM nuevas n
          )
          SELECT count(*)::int AS n FROM nuevas`,
-        [id, l.asignarA, s.sub],
+        [id, l.asignarA, s.sub, await this.retencion.inicial(true)],
       );
       const n = creadas[0].n as number;
       await tx.query(

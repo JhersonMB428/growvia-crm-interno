@@ -113,6 +113,7 @@ export function MiEquipo() {
             {[
               [al.porAprobar, 'ventas esperan tu aprobación', '/aprobaciones'],
               [al.sinGestionesHoy, 'asesores sin gestiones registradas hoy', null],
+              [al.llamadasRapidasHoy, 'llamadas de hoy registradas casi sin abrir la ficha de la empresa', null],
               [al.prospectosSinContacto, 'prospectos sin gestión hace más de 7 días', null],
               [al.negociacionesAntiguas, 'negociaciones abiertas hace más de 15 días', '/negociaciones'],
             ].map(([n, texto, ruta]) => (

@@ -6,10 +6,11 @@ import { CorregirEmpresaDto, CrearEmpresaDto, GuardarContactosDto } from './dto/
 import { ListarEmpresasDto } from './dto/listar.dto';
 import { ReasignarDto } from './dto/reasignar.dto';
 import { EmpresasService } from './empresas.service';
+import { LiberacionService } from './liberacion.service';
 
 @Controller('empresas')
 export class EmpresasController {
-  constructor(private readonly empresas: EmpresasService) {}
+  constructor(private readonly empresas: EmpresasService, private readonly liberacion: LiberacionService) {}
 
   /** ¿Existe el RUC? Se llama mientras el asesor escribe, para la alerta roja */
   @Get('ruc/:ruc')
@@ -28,8 +29,8 @@ export class EmpresasController {
   /** Repositorio: todas las empresas, solo datos generales */
   @Get('repositorio')
   @RequierePermisos('REPOSITORIO_VER')
-  repositorio(@Query() f: ListarEmpresasDto) {
-    return this.empresas.repositorio(f);
+  repositorio(@Query() f: ListarEmpresasDto, @UsuarioActual() s: SesionUsuario) {
+    return this.empresas.repositorio(f, s);
   }
 
   /** Asesores activos a los que se puede reasignar una empresa (gerencia y admin) */
@@ -75,6 +76,34 @@ export class EmpresasController {
   @RequierePermisos('EMPRESA_EDITAR')
   corregir(@Param('id', ParseUUIDPipe) id: string, @Body() dto: CorregirEmpresaDto, @UsuarioActual() s: SesionUsuario) {
     return this.empresas.corregirDatos(id, dto.razonSocial, dto.distritoId, s);
+  }
+
+  /** El asesor a cargo suma 24 h al plazo de liberación (una vez hasta su siguiente gestión) */
+  @Post(':id/mantener')
+  @RequierePermisos('PROSPECTO_CREAR')
+  mantener(@Param('id', ParseUUIDPipe) id: string, @UsuarioActual() s: SesionUsuario) {
+    return this.liberacion.mantener(id, s);
+  }
+
+  /** El asesor a cargo devuelve la empresa al repositorio */
+  @Post(':id/liberar')
+  @RequierePermisos('PROSPECTO_CREAR')
+  liberar(@Param('id', ParseUUIDPipe) id: string, @UsuarioActual() s: SesionUsuario) {
+    return this.liberacion.devolver(id, s);
+  }
+
+  /** Tiempo en la ficha: al abrirla */
+  @Post(':id/visitas')
+  @RequierePermisos('REPOSITORIO_VER')
+  iniciarVisita(@Param('id', ParseUUIDPipe) id: string, @UsuarioActual() s: SesionUsuario) {
+    return this.empresas.iniciarVisita(id, s);
+  }
+
+  /** Tiempo en la ficha: cada 20 s mientras está visible */
+  @Put('visitas/:visitaId')
+  @RequierePermisos('REPOSITORIO_VER')
+  pulsoVisita(@Param('visitaId', ParseUUIDPipe) visitaId: string, @UsuarioActual() s: SesionUsuario) {
+    return this.empresas.pulsoVisita(visitaId, s);
   }
 
   @Post(':id/reasignar')
