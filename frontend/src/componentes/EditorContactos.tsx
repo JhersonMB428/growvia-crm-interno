@@ -66,7 +66,8 @@ export function EditorContactos({ contactos, onChange, mostrarErrores = false, t
               <label htmlFor={`cc${i}`} className={`etiqueta${i === 0 && telefonoRepOpcional ? '' : ' obligatorio'}`}>Teléfono</label>
               <input id={`cc${i}`} className="entrada numeros" inputMode="numeric" maxLength={9} value={celular} placeholder="Celular o fijo con código (01…)"
                 onChange={(e) => cambiar(i, 'celular', e.target.value.replace(/\D/g, '').slice(0, 9))} aria-invalid={!!ver('celular', celular)} />
-              <AyudaCampo id={`cc${i}-a`} problema={ver('celular', celular)} />
+              <AyudaCampo id={`cc${i}-a`} problema={ver('celular', celular)}
+                ayuda={i === 0 && telefonoRepOpcional && !celular ? 'Si aún no lo tienes, déjalo vacío y complétalo después' : ''} />
             </div>
             <div className="campo">
               <label htmlFor={`ce${i}`} className="etiqueta">Correo (opcional)</label>
