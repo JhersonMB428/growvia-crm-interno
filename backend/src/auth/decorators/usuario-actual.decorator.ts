@@ -8,6 +8,8 @@ export interface SesionUsuario {
   permisos: string[];
   /** Solo en el modo "ver como": id del administrador de soporte que está mirando (solo lectura) */
   vistaDe?: string;
+  /** Cuenta de soporte que ya eligió con qué rol entrar (puede ser distinto de su rol real) */
+  rolElegido?: boolean;
 }
 
 /** Ej.: perfil(@UsuarioActual() u: SesionUsuario) */

@@ -26,6 +26,7 @@ import { Perfil } from './paginas/perfil/Perfil';
 import { ResumenGerencia } from './paginas/tableros/ResumenGerencia';
 import { Verificar } from './paginas/Verificar';
 import { RutaPrivada } from './sesion/RutaPrivada';
+import { ElegirRol } from './paginas/ElegirRol';
 import { SesionProvider } from './sesion/SesionContext';
 import { TemaProvider } from './tema/TemaContext';
 
@@ -40,6 +41,7 @@ export default function App() {
 
             <Route element={<RutaPrivada><AppLayout /></RutaPrivada>}>
               <Route path="/" element={<InicioPorRol />} />
+              <Route path="/elegir-rol" element={<ElegirRol />} />
               {/* Asesor */}
               <Route path="/inicio" element={<RutaPrivada roles={['ASESOR']}><InicioAsesor /></RutaPrivada>} />
               <Route path="/empresas" element={<RutaPrivada roles={['ASESOR', 'SUPERVISOR']}><MisEmpresas /></RutaPrivada>} />

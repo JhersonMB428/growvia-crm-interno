@@ -18,6 +18,8 @@ export function RutaPrivada({ children, roles }: Props) {
   if (!usuario) return <Navigate to="/login" replace state={{ desde: ubicacion.pathname }} />;
   // Con contraseña temporal, primero debe elegir una propia en su perfil
   if (usuario.debeCambiarClave && ubicacion.pathname !== '/perfil') return <Navigate to="/perfil" replace />;
+  // Soporte: antes de entrar elige con qué rol usar el CRM
+  if (usuario.soporte && !usuario.rolElegido && !usuario.debeCambiarClave && ubicacion.pathname !== '/elegir-rol') return <Navigate to="/elegir-rol" replace />;
   if (roles && !roles.includes(usuario.rol.codigo)) return <Navigate to="/" replace />;
   return <>{children}</>;
 }
