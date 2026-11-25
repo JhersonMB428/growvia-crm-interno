@@ -31,7 +31,7 @@ export interface TableroEquipo {
   mes: string;
   equipo: { id: string; nombre: string; metaLineas: number | null; lineas: number; proyeccion: number } | null;
   asesores: AsesorEquipo[];
-  alertas: { sinGestionesHoy: number; prospectosSinContacto: number; negociacionesAntiguas: number; porAprobar: number } | null;
+  alertas: { sinGestionesHoy: number; llamadasRapidasHoy: number; prospectosSinContacto: number; negociacionesAntiguas: number; porAprobar: number } | null;
 }
 
 export interface TableroGerencia {

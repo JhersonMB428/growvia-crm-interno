@@ -162,7 +162,7 @@ function ItemAgenda({ g, conDia, onCambio }: { g: Gestion; conDia?: boolean; onC
         <div style={{ gridColumn: '1 / -1' }}>
           <FormGestion empresaId={g.clienteId} idBase={`a-${g.id}`} canalInicial={g.proximoCanal ?? 'LLAMADA'} textoBoton="Guardar como hecha"
             onCancelar={() => setPanel('')}
-            onGuardada={(n) => { setPanel(''); onCambio(n.proximaAccion ? `${g.razonSocial}: hecha. La siguiente quedó para el ${diaCorto(n.proximaAccion)} a las ${horaCorta(n.proximaAccion)}.` : `${g.razonSocial}: gestión hecha.`); }} />
+            onGuardada={(n) => { setPanel(''); onCambio(n.liberada ? `${g.razonSocial}: volvió al repositorio (${n.liberada === 'RECHAZO' ? 'no está interesada' : 'no contestó en varios intentos'}).` : n.proximaAccion ? `${g.razonSocial}: hecha. La siguiente quedó para el ${diaCorto(n.proximaAccion)} a las ${horaCorta(n.proximaAccion)}.` : `${g.razonSocial}: gestión hecha.`); }} />
         </div>
       )}
 

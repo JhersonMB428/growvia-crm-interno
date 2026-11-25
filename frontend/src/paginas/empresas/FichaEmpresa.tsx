@@ -1,7 +1,10 @@
 import { useCallback, useEffect, useState } from 'react';
 import { useLocation, useNavigate, useParams } from 'react-router-dom';
 import { ErrorApi } from '../../api/cliente';
-import { empresasApi, ubicacion, type Contacto, type EmpresaDetalle } from '../../api/empresas';
+import { empresasApi, textoBloqueo, ubicacion, type Contacto, type EmpresaDetalle } from '../../api/empresas';
+import type { GestionRegistrada, ResultadoGestion } from '../../api/gestiones';
+import { LlamadaRapida } from '../../componentes/LlamadaRapida';
+import { useVisitaFicha } from '../../hooks/useVisitaFicha';
 import { contactosCompletos, EditorContactos, limpiarContactos } from '../../componentes/EditorContactos';
 import { GestionesEmpresa } from '../../componentes/GestionesEmpresa';
 import { fechaLarga, negociacionesApi, type Operador } from '../../api/negociaciones';
@@ -13,8 +16,12 @@ import { useSesion } from '../../sesion/SesionContext';
 
 const MOTIVO: Record<string, string> = {
   CREACION: 'Registró la empresa', TOMA: 'Tomó la empresa del repositorio', REASIGNACION: 'Reasignó la empresa',
-  LIBERACION: 'Volvió al repositorio por inactividad', CARGA: 'Llegó en una base cargada',
+  LIBERACION: 'Volvió al repositorio: venció su plazo', CARGA: 'Llegó en una base cargada',
+  DEVUELTA: 'El asesor la devolvió al repositorio', SIN_RESPUESTA: 'Volvió al repositorio: no contestó en varios intentos',
+  RECHAZO: 'Volvió al repositorio: no está interesada',
 };
+/** Motivos en que la empresa se fue del asesor anterior */
+const SALIDAS = ['LIBERACION', 'DEVUELTA', 'SIN_RESPUESTA', 'RECHAZO'];
 const fecha = (iso: string | null) => (iso ? new Date(iso).toLocaleDateString('es-PE', { day: '2-digit', month: 'short', year: 'numeric' }) : '—');
 
 export function FichaEmpresa() {
@@ -28,12 +35,39 @@ export function FichaEmpresa() {
   const [ocupado, setOcupado] = useState(false);
   const [corrigiendo, setCorrigiendo] = useState<{ razonSocial: string; distritoId: string } | null>(null);
   const [reasignando, setReasignando] = useState(false);
+  const [preseleccion, setPreseleccion] = useState<{ resultado: ResultadoGestion; n: number } | null>(null);
+  const [recargaGestiones, setRecargaGestiones] = useState(0);
   // Estable para que el selector de ubigeo no se re-ejecute en cada render
   const alCambiarDistrito = useCallback((d: string) => setCorrigiendo((c) => (c && c.distritoId !== d ? { ...c, distritoId: d } : c)), []);
 
   useEffect(() => {
     empresasApi.detalle(id).then(setE).catch((err) => setError(err instanceof ErrorApi ? err.message : 'No se pudo cargar la empresa'));
   }, [id]);
+
+  // Tiempo en la ficha: solo cuenta para el asesor a cargo
+  useVisitaFicha(id, !!e?.puedeEditar);
+
+  /** Tras registrar una gestión: si la empresa se liberó, vuelve a la cartera; si no, actualiza el plazo */
+  function alRegistrar(g: GestionRegistrada) {
+    if (g.liberada && e) {
+      navegar('/empresas', {
+        state: {
+          aviso: g.liberada === 'RECHAZO'
+            ? `${e.razonSocial} volvió al repositorio como no interesada. Nadie la llamará por un tiempo.`
+            : `${e.razonSocial} no contestó en varios intentos: volvió al repositorio para que la intente otro asesor.`,
+        },
+      });
+      return;
+    }
+    setE((x) => (x ? { ...x, retencionHasta: g.retencionHasta, ultimaGestionAt: g.fecha, prorrogada: false } : x));
+    setRecargaGestiones((n) => n + 1);
+    setAviso(g.resultado === 'NO_CONTESTA' ? 'Registrado: no contestó. Vuelve a intentarlo antes de que venza el plazo.' : 'Gestión registrada.');
+  }
+
+  function preseleccionar(resultado: ResultadoGestion) {
+    setPreseleccion((p) => ({ resultado, n: (p?.n ?? 0) + 1 }));
+    document.getElementById('gestiones')?.scrollIntoView({ behavior: 'smooth' });
+  }
 
   async function tomar() {
     setOcupado(true); setError('');
@@ -72,7 +106,8 @@ export function FichaEmpresa() {
         <div style={{ display: 'flex', gap: 10, alignItems: 'center', flexWrap: 'wrap' }}>
           <span className={`chip ${e.estado === 'VENTA' ? 'chip--lima' : 'chip--gris'}`}>{e.estado === 'VENTA' ? 'Venta' : 'Prospecto'}</span>
           {e.libre && <span className="chip chip--crema">Libre</span>}
-          {e.libre && puede('EMPRESA_TOMAR') && <button type="button" className="boton" onClick={tomar} disabled={ocupado}>{ocupado ? 'Tomando…' : 'Tomar empresa'}</button>}
+          {e.libre && e.bloqueadaParaMi && <span className="chip chip--gris" title="Por ahora no se puede tomar">{textoBloqueo(e)}</span>}
+          {e.libre && !e.bloqueadaParaMi && puede('EMPRESA_TOMAR') && <button type="button" className="boton" onClick={tomar} disabled={ocupado}>{ocupado ? 'Tomando…' : 'Tomar empresa'}</button>}
           {puede('EMPRESA_REASIGNAR') && !reasignando && (
             <button type="button" className="boton-secundario" onClick={() => setReasignando(true)}>{e.libre ? 'Asignar' : 'Reasignar'}</button>
           )}
@@ -85,6 +120,11 @@ export function FichaEmpresa() {
 
       {aviso && <div className="aviso" role="status">{aviso}</div>}
       {error && <div className="alerta" role="alert">{error}</div>}
+      {e.puedeEditar && e.estado === 'PROSPECTO' && puede('NEGOCIACION_GESTIONAR') && (
+        <LlamadaRapida empresa={e} onPreseleccion={preseleccionar} onRegistrada={alRegistrar}
+          onMantenida={(h) => { setE({ ...e, retencionHasta: h, prorrogada: true }); setAviso('Listo: tienes 24 horas más con esta empresa.'); }}
+          onLiberada={() => navegar('/empresas', { state: { aviso: `${e.razonSocial} volvió al repositorio.` } })} />
+      )}
       {reasignando && (
         <Reasignar e={e} onCancelar={() => setReasignando(false)}
           onHecho={(d) => { setE(d); setReasignando(false); setAviso(`La empresa ahora está a cargo de ${d.asesor}.`); }} />
@@ -173,7 +213,7 @@ export function FichaEmpresa() {
               <li key={i} style={{ display: 'flex', flexDirection: 'column', gap: 2, paddingLeft: 14, borderLeft: '2px solid var(--linea)' }}>
                 <b style={{ fontSize: 14 }}>{MOTIVO[h.motivo] ?? h.motivo}</b>
                 <span style={{ fontSize: 13, color: 'var(--texto-suave)' }}>
-                  {h.motivo === 'LIBERACION' ? `Antes: ${h.asesorAnterior ?? '—'}` : h.hechoPor}
+                  {SALIDAS.includes(h.motivo) ? `Antes: ${h.asesorAnterior ?? '—'}` : h.hechoPor}
                   {h.motivo === 'REASIGNACION' && ` · de ${h.asesorAnterior ?? '—'} a ${h.asesorNuevo ?? '—'}`}
                   {' · '}{fecha(h.fecha)}
                 </span>
@@ -185,7 +225,9 @@ export function FichaEmpresa() {
 
       {/* Solo quien ve la información comercial ve sus negociaciones */}
       {e.contactos !== null && <NegociacionesEmpresa empresaId={e.id} puedeAbrir={e.puedeEditar && puede('NEGOCIACION_GESTIONAR')} />}
-      {e.contactos !== null && <GestionesEmpresa empresaId={e.id} />}
+      {e.contactos !== null && (
+        <GestionesEmpresa empresaId={e.id} preseleccion={preseleccion} recarga={recargaGestiones} onRegistrada={alRegistrar} />
+      )}
     </>
   );
 }

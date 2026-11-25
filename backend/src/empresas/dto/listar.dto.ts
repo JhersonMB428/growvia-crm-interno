@@ -9,8 +9,8 @@ export class ListarEmpresasDto {
   q?: string;
 
   @IsOptional()
-  @IsIn(['todas', 'libres', 'asignadas'])
-  filtro?: 'todas' | 'libres' | 'asignadas';
+  @IsIn(['todas', 'libres', 'asignadas', 'por_vencer'])
+  filtro?: 'todas' | 'libres' | 'asignadas' | 'por_vencer';
 
   @IsOptional()
   @IsIn(['PROSPECTO', 'VENTA'])

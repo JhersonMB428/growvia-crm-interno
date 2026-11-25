@@ -52,7 +52,17 @@ export const adminApi = {
 
 /** Nombre legible de cada parámetro */
 export const TEXTO_PARAMETRO: Record<string, string> = {
-  dias_liberacion_inactividad: 'Días sin gestión para liberar una empresa',
+  horas_primer_contacto: 'Horas para la primera gestión de una empresa tomada',
+  dias_retencion_base: 'Días para la primera gestión de una base asignada',
+  horas_sin_respuesta: 'Horas para reintentar después de “No contestó”',
+  horas_extra_whatsapp_correo: 'Horas extra si el intento fue por WhatsApp o correo',
+  dias_retencion_interesado: 'Días que se guarda una empresa interesada',
+  dias_retencion_negociacion: 'Días que se guarda una empresa en negociación',
+  max_intentos_sin_respuesta: 'Días sin respuesta antes de pasarla a otro asesor',
+  dias_espera_sin_respuesta: 'Días antes de que el mismo asesor la retome',
+  dias_bloqueo_rechazo: 'Días bloqueada tras “No interesado”',
+  horas_aviso_liberacion: 'Horas de aviso antes de liberar una empresa',
+  segundos_minimos_ficha: 'Segundos mínimos en la ficha por llamada',
   limite_toma_repositorio: 'Empresas que un asesor puede tomar del repositorio',
   max_correcciones_venta: 'Correcciones permitidas por venta observada',
   minutos_recordatorio_defecto: 'Minutos de recordatorio para usuarios nuevos',
@@ -61,6 +71,5 @@ export const TEXTO_PARAMETRO: Record<string, string> = {
   minutos_validez_codigo: 'Minutos de validez del código del correo',
   max_intentos_codigo: 'Intentos para ingresar el código',
   dias_max_acceso_movil: 'Días máximos de acceso desde celular',
-  dias_aviso_liberacion: 'Días de aviso antes de liberar',
   dias_primer_aviso_renovacion: 'Días antes del fin de contrato para el primer aviso',
 };

@@ -7,14 +7,16 @@ interface Props {
   vacio: string;
   /** Qué mostrar en la última columna (por defecto, el estado) */
   accion?: (e: EmpresaResumen) => React.ReactNode;
+  /** Título de la última columna */
+  tituloAccion?: string;
   onPagina: (p: number) => void;
 }
 
-export function ListaEmpresas({ datos, cargando, vacio, accion, onPagina }: Props) {
+export function ListaEmpresas({ datos, cargando, vacio, accion, tituloAccion = 'Estado', onPagina }: Props) {
   return (
     <div className="lista">
       <div className="lista__cabecera">
-        <span>RUC</span><span>Razón social</span><span>Ubicación</span><span>Asesor</span><span>Estado</span>
+        <span>RUC</span><span>Razón social</span><span>Ubicación</span><span>Asesor</span><span>{tituloAccion}</span>
       </div>
       {cargando && !datos && <div className="lista__vacia">Cargando…</div>}
       {datos && datos.filas.length === 0 && <div className="lista__vacia">{vacio}</div>}

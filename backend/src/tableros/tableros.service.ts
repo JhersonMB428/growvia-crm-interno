@@ -133,6 +133,11 @@ export class TablerosService {
           WHERE u.equipo_id = $1 AND c.estado = 'PROSPECTO' AND COALESCE(c.ultima_gestion_at, c.asignado_at) < now() - interval '7 days') AS "prospectosSinContacto",
          (SELECT count(*)::int FROM oportunidades o JOIN usuarios u ON u.id = o.asesor_id
           WHERE u.equipo_id = $1 AND o.resultado = 'EN_CURSO' AND o.created_at < now() - interval '15 days') AS "negociacionesAntiguas",
+         -- Llamadas de hoy registradas con muy poco tiempo en la ficha de la empresa
+         (SELECT count(*)::int FROM gestiones g JOIN usuarios u ON u.id = g.usuario_id
+          WHERE u.equipo_id = $1 AND g.canal = 'LLAMADA' AND g.segundos_ficha IS NOT NULL
+            AND g.segundos_ficha < COALESCE((SELECT valor::int FROM parametros WHERE clave = 'segundos_minimos_ficha'), 60)
+            AND (g.created_at AT TIME ZONE '${ZONA}')::date = (now() AT TIME ZONE '${ZONA}')::date) AS "llamadasRapidasHoy",
          (SELECT count(*)::int FROM oportunidades o JOIN pasos_validacion p ON p.id = o.paso_actual_id JOIN roles r ON r.id = p.rol_id
           WHERE o.equipo_id = $1 AND o.estado_venta = 'EN_VALIDACION' AND r.codigo = 'SUPERVISOR') AS "porAprobar"`,
       [s.equipoId],

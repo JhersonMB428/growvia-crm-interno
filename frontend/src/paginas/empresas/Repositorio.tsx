@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { ErrorApi } from '../../api/cliente';
-import { empresasApi, type EmpresaResumen, type Pagina } from '../../api/empresas';
+import { empresasApi, textoBloqueo, type EmpresaResumen, type Pagina } from '../../api/empresas';
 import { ListaEmpresas } from '../../componentes/ListaEmpresas';
 import { useDebounce } from '../../hooks/useDebounce';
 import { useSesion } from '../../sesion/SesionContext';
@@ -79,7 +79,9 @@ export function Repositorio() {
         </div>
         {error && <div className="alerta" role="alert">{error}</div>}
         <ListaEmpresas datos={datos} cargando={cargando} onPagina={setPagina} vacio="No hay empresas con ese filtro."
-          accion={(e) => (e.asesorId || !puedeTomar)
+          accion={(e) => (!e.asesorId && e.bloqueadaParaMi)
+            ? <span className="chip chip--gris" title="Por ahora no puedes tomarla">{textoBloqueo(e)}</span>
+            : (e.asesorId || !puedeTomar)
             ? <span className={`chip ${e.estado === 'VENTA' ? 'chip--lima' : 'chip--gris'}`}>{e.estado === 'VENTA' ? 'Venta' : 'Prospecto'}</span>
             : <button type="button" className="boton" style={{ height: 38, fontSize: 14, padding: '0 16px' }} disabled={tomando === e.id} onClick={() => tomar(e)}>
                 {tomando === e.id ? 'Tomando…' : 'Tomar'}

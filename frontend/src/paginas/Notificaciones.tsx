@@ -11,6 +11,7 @@ function enlace(n: Notificacion): string {
   if (n.entidad === 'LOTE' && n.entidadId) return `/bases/${n.entidadId}`;
   if (n.entidad === 'ACCESO') return '/accesos-celular';
   if (n.tipo.startsWith('GESTION')) return '/agenda';
+  if (n.tipo === 'EMPRESAS_LIBERADAS') return '/empresas';
   return '/notificaciones';
 }
 

@@ -20,6 +20,7 @@
 .proxima { font-size: 13px; font-weight: 600; color: var(--acento); }
 .proxima--hecha { color: var(--texto-tenue); text-decoration: line-through; }
 .proxima--no_realizada { color: var(--salir); }
+.tiempo-rapido { color: var(--salir); font-weight: 700; }
 
 /* Agenda */
 .agenda { display: flex; flex-wrap: wrap; gap: 20px; align-items: flex-start; }

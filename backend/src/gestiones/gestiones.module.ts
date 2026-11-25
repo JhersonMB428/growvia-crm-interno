@@ -1,9 +1,11 @@
 import { Module } from '@nestjs/common';
+import { EmpresasModule } from '../empresas/empresas.module';
 import { GestionesController } from './gestiones.controller';
 import { GestionesService } from './gestiones.service';
 import { RecordatoriosService } from './recordatorios.service';
 
 @Module({
+  imports: [EmpresasModule],
   controllers: [GestionesController],
   providers: [GestionesService, RecordatoriosService],
   exports: [GestionesService, RecordatoriosService],
