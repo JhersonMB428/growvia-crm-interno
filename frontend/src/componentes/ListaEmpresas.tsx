@@ -28,7 +28,11 @@ export function ListaEmpresas({ datos, cargando, vacio, accion, tituloAccion = '
             <span className="lista__detalle">
               {e.lineasActuales !== null ? `${e.lineasActuales} ${e.lineasActuales === 1 ? 'línea' : 'líneas'}` : 'Líneas sin registrar'}
               {e.operadorActual && ` · ${e.operadorActual}`}
-              {!e.datosCompletos && <span className="lista__incompleta" title="Falta representante con DNI y correo, ubicación, líneas u operador">Datos incompletos</span>}
+              {!e.datosCompletos && (
+                <span className="lista__incompleta" title={`Completa en la ficha: ${(e.datosFaltantes ?? []).join(', ')}`}>
+                  Falta: {e.datosFaltantes?.length ? e.datosFaltantes.join(', ') : 'datos'}
+                </span>
+              )}
             </span>
           </span>
           <span className="tenue recortar">{ubicacion(e)}</span>

@@ -3,6 +3,7 @@ import { Link, useNavigate, useParams, useSearchParams } from 'react-router-dom'
 import { ErrorApi } from '../../api/cliente';
 import { empresasApi } from '../../api/empresas';
 import { negociacionesApi, soles, type Catalogos, type ItemNegociacion, type Modalidad } from '../../api/negociaciones';
+import { Faltantes } from '../../componentes/Faltantes';
 import './negociaciones.css';
 
 /** En el formulario los números se editan como texto para no pelear con el cursor */
@@ -10,9 +11,14 @@ type Fila = { planId: number | ''; modalidad: Modalidad; operadorOrigenId: numbe
 
 const filaVacia = (): Fila => ({ planId: '', modalidad: 'NUEVA', operadorOrigenId: '', conEquipo: false, cantidad: '1', cargo: '' });
 const num = (s: string) => (s.trim() === '' ? NaN : Number(s));
-const filaValida = (f: Fila) =>
-  f.planId !== '' && (f.modalidad === 'NUEVA' || f.operadorOrigenId !== '')
-  && Number.isInteger(num(f.cantidad)) && num(f.cantidad) > 0 && num(f.cargo) >= 0;
+/** Qué le falta a una fila del formulario, en palabras simples */
+const problemasFila = (f: Fila) => [
+  ...(f.planId === '' ? ['elige el servicio'] : []),
+  ...(f.modalidad === 'PORTABILIDAD' && f.operadorOrigenId === '' ? ['elige de qué operador viene (portabilidad)'] : []),
+  ...(!(Number.isInteger(num(f.cantidad)) && num(f.cantidad) > 0) ? ['la cantidad debe ser 1 o más'] : []),
+  ...(f.cargo.trim() === '' ? ['escribe el cargo sin IGV'] : !(num(f.cargo) >= 0) ? ['el cargo no es un número válido'] : []),
+];
+const filaValida = (f: Fila) => problemasFila(f).length === 0;
 
 /** Sirve para crear (/negociaciones/nueva?empresa=…) y para editar (/negociaciones/:id/editar). Montos sin IGV. */
 export function FormNegociacion() {
@@ -67,9 +73,15 @@ export function FormNegociacion() {
   const portas = filas.reduce((s, f) => s + (filaValida(f) && f.modalidad === 'PORTABILIDAD' ? num(f.cantidad) : 0), 0);
   const conEquipo = filas.reduce((s, f) => s + (filaValida(f) && f.conEquipo ? num(f.cantidad) : 0), 0);
   const listo = filas.length > 0 && filas.every(filaValida);
+  const [intentado, setIntentado] = useState(false);
+  const faltantes = filas.flatMap((f, i) => {
+    const p = problemasFila(f);
+    return p.length ? [`Servicio ${i + 1}: ${p.join(', ')}`] : [];
+  });
 
   async function guardar(e: FormEvent) {
     e.preventDefault();
+    setIntentado(true);
     if (!empresa || !listo) return;
     setError(''); setGuardando(true);
     const items: ItemNegociacion[] = filas.map((f) => ({
@@ -116,13 +128,14 @@ export function FormNegociacion() {
       <form onSubmit={guardar} noValidate style={{ display: 'flex', flexWrap: 'wrap', gap: 20, alignItems: 'flex-start' }}>
         <section className="panel vidrio" style={{ flex: '3 1 860px', minWidth: 0, display: 'flex', flexDirection: 'column', gap: 12 }}>
           <h2 className="h2">Servicios negociados</h2>
+          <span className="leyenda-obligatorio">Por cada servicio: servicio, cantidad y cargo (y el operador de origen si es portabilidad)</span>
           <div className="planes">
             <div className="planes__cabecera" aria-hidden="true">
               <span>Servicio</span><span>Modalidad</span><span>Viene de</span><span>Equipo</span><span>Cantidad</span><span>Cargo sin IGV c/u</span><span style={{ textAlign: 'right' }}>Subtotal</span><span />
             </div>
             {filas.map((f, i) => (
               <div key={i} className="planes__fila">
-                <select className="entrada" aria-label={`Servicio ${i + 1}`} value={f.planId}
+                <select className="entrada" aria-label={`Servicio ${i + 1}`} value={f.planId} aria-invalid={intentado && f.planId === ''}
                   onChange={(e) => cambiar(i, { planId: e.target.value === '' ? '' : Number(e.target.value) })}>
                   <option value="">Elige el servicio</option>
                   {moviles.length > 0 && <optgroup label="Línea móvil">{moviles.map((p) => <option key={p.id} value={p.id}>{p.nombre}</option>)}</optgroup>}
@@ -134,7 +147,7 @@ export function FormNegociacion() {
                   <option value="PORTABILIDAD">Portabilidad</option>
                 </select>
                 <select className="entrada" aria-label={`Operador de origen del servicio ${i + 1}`} value={f.operadorOrigenId}
-                  disabled={f.modalidad !== 'PORTABILIDAD'}
+                  disabled={f.modalidad !== 'PORTABILIDAD'} aria-invalid={intentado && f.modalidad === 'PORTABILIDAD' && f.operadorOrigenId === ''}
                   onChange={(e) => cambiar(i, { operadorOrigenId: e.target.value === '' ? '' : Number(e.target.value) })}>
                   <option value="">{f.modalidad === 'PORTABILIDAD' ? 'Elige operador' : '—'}</option>
                   {cat.operadores.map((o) => <option key={o.id} value={o.id}>{o.nombre}</option>)}
@@ -144,9 +157,9 @@ export function FormNegociacion() {
                   <option value="NO">Sin equipo</option>
                   <option value="SI">Con equipo</option>
                 </select>
-                <input className="entrada numeros" aria-label={`Cantidad del servicio ${i + 1}`} inputMode="numeric" value={f.cantidad}
+                <input className="entrada numeros" aria-label={`Cantidad del servicio ${i + 1}`} inputMode="numeric" value={f.cantidad} aria-invalid={intentado && !(num(f.cantidad) > 0)}
                   onChange={(e) => cambiar(i, { cantidad: e.target.value.replace(/\D/g, '').slice(0, 4) })} />
-                <input className="entrada numeros" aria-label={`Cargo sin IGV por unidad del servicio ${i + 1}`} inputMode="decimal" placeholder="S/ 0.00" value={f.cargo}
+                <input className="entrada numeros" aria-label={`Cargo sin IGV por unidad del servicio ${i + 1}`} inputMode="decimal" placeholder="S/ 0.00" value={f.cargo} aria-invalid={intentado && !(num(f.cargo) >= 0)}
                   onChange={(e) => cambiar(i, { cargo: e.target.value.replace(',', '.').replace(/[^\d.]/g, '').replace(/^(\d*\.\d{0,2}).*$/, '$1') })} />
                 <span className="planes__subtotal numeros">{soles(subtotal(f))}</span>
                 <button type="button" className="boton-quitar" aria-label={`Quitar el servicio ${i + 1}`} disabled={filas.length === 1}
@@ -173,8 +186,8 @@ export function FormNegociacion() {
             <span style={{ fontSize: 13, color: 'var(--texto-tenue)' }}>mensual</span>
           </div>
           {error && <div className="alerta" role="alert">{error}</div>}
-          {!listo && <span style={{ fontSize: 13, color: 'var(--texto-tenue)' }}>Completa servicio, cantidad y cargo de cada fila (y el operador si es portabilidad).</span>}
-          <button type="submit" className="boton" disabled={!listo || guardando}>{guardando ? 'Guardando…' : id ? 'Guardar cambios' : 'Abrir negociación'}</button>
+          {intentado && <Faltantes items={faltantes} />}
+          <button type="submit" className="boton" disabled={guardando}>{guardando ? 'Guardando…' : id ? 'Guardar cambios' : 'Abrir negociación'}</button>
           <Link to={volver} className="boton-secundario">Cancelar</Link>
         </aside>
       </form>

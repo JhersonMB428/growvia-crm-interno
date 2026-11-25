@@ -7,6 +7,7 @@ import { ParametrosService } from '../sistema/parametros.service';
 import { ContactoDto } from './dto/contacto.dto';
 import { CrearEmpresaDto } from './dto/crear-empresa.dto';
 import { ListarEmpresasDto } from './dto/listar.dto';
+import { errorRuc } from './ruc';
 import { RetencionService } from './retencion';
 
 /** Columnas generales de una empresa (lo que cualquier rol puede ver en el repositorio) */
@@ -22,9 +23,16 @@ const COLUMNAS_GENERALES = `
   CASE WHEN c.bloqueo_hasta > now() THEN c.bloqueo_hasta END AS "bloqueoHasta",
   c.ultimo_asesor_id AS "ultimoAsesorId",
   c.lineas_actuales AS "lineasActuales", opx.nombre AS "operadorActual",
-  -- Estructura completa (Ann): representante con DNI, teléfono y correo, ubicación, líneas y operador
-  (c.distrito_id IS NOT NULL AND c.lineas_actuales IS NOT NULL AND c.operador_actual_id IS NOT NULL
-   AND EXISTS (SELECT 1 FROM contactos k WHERE k.cliente_id = c.id AND k.posicion = 1 AND k.dni IS NOT NULL AND k.correo IS NOT NULL)) AS "datosCompletos"`;
+  -- Estructura completa (Ann): qué le falta a la empresa (vacío = completa)
+  (SELECT ARRAY_REMOVE(ARRAY[
+     CASE WHEN rep.id IS NULL THEN 'representante legal' END,
+     CASE WHEN rep.id IS NOT NULL AND rep.dni IS NULL THEN 'DNI del representante' END,
+     CASE WHEN rep.id IS NOT NULL AND rep.correo IS NULL THEN 'correo' END,
+     CASE WHEN c.distrito_id IS NULL THEN 'ubicación' END,
+     CASE WHEN c.lineas_actuales IS NULL THEN 'cantidad de líneas' END,
+     CASE WHEN c.operador_actual_id IS NULL THEN 'operador' END
+   ], NULL)
+   FROM (SELECT NULL) x LEFT JOIN contactos rep ON rep.cliente_id = c.id AND rep.posicion = 1) AS "datosFaltantes"`;
 
 /**
  * ¿Esta persona puede tomar la empresa libre?
@@ -33,7 +41,8 @@ const COLUMNAS_GENERALES = `
 function conBloqueo<T extends { bloqueoTipo: string | null; ultimoAsesorId: string | null }>(fila: T, usuarioId: string) {
   const { ultimoAsesorId, ...resto } = fila;
   const bloqueadaParaMi = fila.bloqueoTipo === 'RECHAZO' || (fila.bloqueoTipo === 'SIN_RESPUESTA' && ultimoAsesorId === usuarioId);
-  return { ...resto, bloqueadaParaMi };
+  const faltantes = (fila as { datosFaltantes?: string[] }).datosFaltantes ?? [];
+  return { ...resto, bloqueadaParaMi, datosCompletos: faltantes.length === 0 };
 }
 
 const UNIONES = `
@@ -60,7 +69,8 @@ export class EmpresasService {
 
   // ───────────── ¿El RUC ya existe? (para la alerta roja antes de guardar) ─────────────
   async verificarRuc(ruc: string) {
-    if (!/^(10|20)\d{9}$/.test(ruc)) throw new BadRequestException('El RUC debe tener 11 dígitos y empezar con 10 o 20');
+    const problema = errorRuc(ruc);
+    if (problema) throw new BadRequestException(problema);
     const [fila] = await this.db.query(`SELECT ${COLUMNAS_GENERALES} ${UNIONES} WHERE c.ruc = $1`, [ruc]);
     if (!fila) return { existe: false };
     return {

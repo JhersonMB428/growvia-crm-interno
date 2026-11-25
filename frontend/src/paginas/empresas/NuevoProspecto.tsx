@@ -2,9 +2,11 @@ import { useCallback, useEffect, useState, type FormEvent } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { ErrorApi } from '../../api/cliente';
 import { empresasApi, type Contacto } from '../../api/empresas';
-import { contactosCompletos, EditorContactos, limpiarContactos } from '../../componentes/EditorContactos';
+import { EditorContactos, limpiarContactos, problemasContactos } from '../../componentes/EditorContactos';
 import { SelectorUbigeo } from '../../componentes/SelectorUbigeo';
 import { useDebounce } from '../../hooks/useDebounce';
+import { AyudaCampo, Faltantes } from '../../componentes/Faltantes';
+import { problemaRuc } from '../../utilidades/validacion';
 
 type Revision = { estado: 'nada' | 'revisando' | 'libre' } | { estado: 'existe'; mensaje: string; empresaId: string; tomable: boolean };
 
@@ -18,11 +20,13 @@ export function NuevoProspecto() {
   const [error, setError] = useState('');
   const [guardando, setGuardando] = useState(false);
   const rucListo = useDebounce(ruc, 300);
-  const rucValido = /^(10|20)\d{9}$/.test(ruc);
+  const errRuc = problemaRuc(ruc);
+  const rucValido = !errRuc;
+  const [intentado, setIntentado] = useState(false);
 
   // Apenas el RUC está completo, se revisa si ya existe en el CRM
   useEffect(() => {
-    if (!/^(10|20)\d{9}$/.test(rucListo)) { setRevision({ estado: 'nada' }); return; }
+    if (problemaRuc(rucListo)) { setRevision({ estado: 'nada' }); return; }
     setRevision({ estado: 'revisando' });
     empresasApi.verificarRuc(rucListo)
       .then((r) => setRevision(r.existe
@@ -32,10 +36,18 @@ export function NuevoProspecto() {
   }, [rucListo]);
 
   const alCambiarDistrito = useCallback((id: string) => setDistritoId(id), []);
-  const listo = rucValido && revision.estado === 'libre' && razon.trim().length >= 3 && !!distritoId && contactosCompletos(contactos);
+  const faltantes = [
+    ...(errRuc ? [`RUC: ${errRuc}`] : revision.estado === 'existe' ? ['RUC: ya está registrado en el CRM'] : revision.estado === 'revisando' ? ['RUC: espera a que terminemos de revisarlo'] : []),
+    ...(razon.trim().length < 3 ? [razon.trim() ? 'Razón social: escribe al menos 3 letras' : 'Escribe la razón social'] : []),
+    ...(!distritoId ? ['Elige departamento, provincia y distrito'] : []),
+    ...problemasContactos(contactos),
+  ];
+  const listo = faltantes.length === 0 && revision.estado === 'libre';
 
   async function guardar(e: FormEvent) {
     e.preventDefault();
+    setIntentado(true);
+    if (!listo) return;
     setError(''); setGuardando(true);
     try {
       const creada = await empresasApi.crear({ ruc, razonSocial: razon.trim(), distritoId, contactos: limpiarContactos(contactos) });
@@ -58,21 +70,22 @@ export function NuevoProspecto() {
       <form onSubmit={guardar} className="panel vidrio" style={{ display: 'flex', flexDirection: 'column', gap: 22 }} noValidate>
         <section style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
           <h2 className="h2">Empresa</h2>
+          <span className="leyenda-obligatorio">Campos obligatorios</span>
           <div className="rejilla-2">
             <div className="campo">
-              <label htmlFor="ruc" className="etiqueta">RUC</label>
+              <label htmlFor="ruc" className="etiqueta obligatorio">RUC</label>
               <input id="ruc" className="entrada numeros" inputMode="numeric" maxLength={11} placeholder="20XXXXXXXXX" autoFocus
                 value={ruc} onChange={(e) => setRuc(e.target.value.replace(/\D/g, '').slice(0, 11))}
-                aria-invalid={revision.estado === 'existe' || (ruc.length === 11 && !rucValido)} aria-describedby="ruc-ayuda" />
-              <span id="ruc-ayuda" style={{ fontSize: 13, color: 'var(--texto-tenue)' }}>
-                {ruc.length === 11 && !rucValido ? 'Debe empezar con 10 o 20' :
-                  revision.estado === 'revisando' ? 'Revisando…' :
-                  revision.estado === 'libre' ? '✓ RUC disponible' : '11 dígitos, empieza con 10 o 20'}
-              </span>
+                aria-invalid={revision.estado === 'existe' || ((ruc.length === 11 || (intentado && !!ruc) || /^[^12]|^1[^0]|^2[^0]/.test(ruc)) && !rucValido)} aria-describedby="ruc-ayuda" />
+              <AyudaCampo id="ruc-ayuda"
+                problema={(ruc.length === 11 || intentado || /^[^12]|^1[^0]|^2[^0]/.test(ruc)) && errRuc ? errRuc : ''}
+                ayuda={revision.estado === 'revisando' ? 'Revisando…' : revision.estado === 'libre' ? '✓ RUC válido y disponible' : '11 dígitos, empieza con 10 o 20'} />
             </div>
             <div className="campo">
-              <label htmlFor="razon" className="etiqueta">Razón social</label>
-              <input id="razon" className="entrada" maxLength={200} placeholder="Ej. Transportes Andinos S.A.C." value={razon} onChange={(e) => setRazon(e.target.value)} />
+              <label htmlFor="razon" className="etiqueta obligatorio">Razón social</label>
+              <input id="razon" className="entrada" maxLength={200} placeholder="Ej. Transportes Andinos S.A.C." value={razon} onChange={(e) => setRazon(e.target.value)}
+                aria-invalid={intentado && razon.trim().length < 3} aria-describedby="razon-ayuda" />
+              <AyudaCampo id="razon-ayuda" problema={intentado && razon.trim().length < 3 ? 'Escribe la razón social (como figura en SUNAT)' : ''} />
             </div>
           </div>
 
@@ -88,13 +101,14 @@ export function NuevoProspecto() {
 
         <section style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
           <h2 className="h2">Contactos <span style={{ fontSize: 14, fontWeight: 500, color: 'var(--texto-tenue)' }}>· máximo 2</span></h2>
-          <EditorContactos contactos={contactos} onChange={setContactos} />
+          <EditorContactos contactos={contactos} onChange={setContactos} mostrarErrores={intentado} />
         </section>
 
+        {intentado && <Faltantes items={faltantes} />}
         {error && <div className="alerta" role="alert">{error}</div>}
         <div className="fila-acciones">
           <Link to="/empresas" className="boton-secundario">Cancelar</Link>
-          <button type="submit" className="boton" disabled={!listo || guardando}>{guardando ? 'Guardando…' : 'Guardar prospecto'}</button>
+          <button type="submit" className="boton" disabled={guardando}>{guardando ? 'Guardando…' : 'Guardar prospecto'}</button>
         </div>
       </form>
     </>

@@ -1,16 +1,40 @@
 import type { Contacto } from '../api/empresas';
+import { problemaCorreo, problemaDni, problemaTelefono } from '../utilidades/validacion';
+import { AyudaCampo } from './Faltantes';
 
-/** Teléfono válido: celular (9…) o fijo con código de ciudad (01…, 044…), 9 dígitos */
-const telefonoValido = (t: string) => /^[90]\d{8}$/.test(t);
+/** Problemas de un contacto, campo por campo ('' = bien) */
+function problemasDe(c: Contacto, i: number) {
+  return {
+    nombre: c.nombre.trim().length >= 2 ? '' : c.nombre.trim() ? 'El nombre es muy corto' : 'Escribe el nombre',
+    dni: i === 0 ? problemaDni(c.dni ?? '') : '',
+    celular: problemaTelefono(c.celular),
+    correo: problemaCorreo(c.correo ?? ''),
+  };
+}
+
+const NOMBRE_CAMPO = { nombre: 'nombre', dni: 'DNI', celular: 'teléfono', correo: 'correo' } as const;
+
+/** Lista legible de lo que falta o está mal en los contactos */
+export function problemasContactos(cs: Contacto[]): string[] {
+  if (!cs.length) return ['Agrega al representante legal'];
+  return cs.flatMap((c, i) => {
+    const quien = i === 0 ? 'Representante legal' : 'Otro contacto';
+    return Object.entries(problemasDe(c, i)).filter(([, p]) => p).map(([k, p]) => `${quien} – ${NOMBRE_CAMPO[k as keyof typeof NOMBRE_CAMPO]}: ${p}`);
+  });
+}
 
 /** Hasta 2 contactos: el 1 es el representante legal (SUNAT) y el 2 es opcional */
-export function EditorContactos({ contactos, onChange }: { contactos: Contacto[]; onChange: (c: Contacto[]) => void }) {
+export function EditorContactos({ contactos, onChange, mostrarErrores = false }: { contactos: Contacto[]; onChange: (c: Contacto[]) => void; mostrarErrores?: boolean }) {
   const cambiar = (i: number, campo: keyof Contacto, valor: string) =>
     onChange(contactos.map((c, k) => (k === i ? { ...c, [campo]: valor } : c)));
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-      {contactos.map((c, i) => (
+      {contactos.map((c, i) => {
+        const p = problemasDe(c, i);
+        // Se avisa al intentar guardar, o apenas el campo tiene algo escrito y está mal
+        const ver = (campo: keyof typeof p, valor: string) => (mostrarErrores || (valor.length > 0 && campo !== 'nombre' && (campo !== 'celular' || valor.length >= 9 || !/^[90]/.test(valor)) && (campo !== 'dni' || valor.length >= 8)) ? p[campo] : '');
+        return (
         <div key={i} className="bloque">
           <div className="fila-acciones">
             <b style={{ fontSize: 14 }}>{i === 0 ? 'Representante legal (SUNAT)' : 'Otro contacto'}</b>
@@ -18,28 +42,35 @@ export function EditorContactos({ contactos, onChange }: { contactos: Contacto[]
           </div>
           <div className={i === 0 ? 'rejilla-contacto' : 'rejilla-3'}>
             <div className="campo">
-              <label htmlFor={`cn${i}`} className="etiqueta">{i === 0 ? 'Nombre completo' : 'Nombre'}</label>
-              <input id={`cn${i}`} className="entrada" value={c.nombre} maxLength={100} placeholder={i === 0 ? 'Como figura en SUNAT' : 'Ej. Sr. Pérez'} onChange={(e) => cambiar(i, 'nombre', e.target.value)} />
+              <label htmlFor={`cn${i}`} className="etiqueta obligatorio">{i === 0 ? 'Nombre completo' : 'Nombre'}</label>
+              <input id={`cn${i}`} className="entrada" value={c.nombre} maxLength={100} placeholder={i === 0 ? 'Como figura en SUNAT' : 'Ej. Sr. Pérez'} onChange={(e) => cambiar(i, 'nombre', e.target.value)}
+                aria-invalid={!!ver('nombre', c.nombre)} />
+              <AyudaCampo id={`cn${i}-a`} problema={ver('nombre', c.nombre)} />
             </div>
             {i === 0 && (
               <div className="campo">
                 <label htmlFor={`cd${i}`} className="etiqueta">DNI</label>
                 <input id={`cd${i}`} className="entrada numeros" inputMode="numeric" maxLength={8} value={c.dni ?? ''} placeholder="8 dígitos"
-                  onChange={(e) => cambiar(i, 'dni', e.target.value.replace(/\D/g, '').slice(0, 8))} />
+                  onChange={(e) => cambiar(i, 'dni', e.target.value.replace(/\D/g, '').slice(0, 8))} aria-invalid={!!ver('dni', c.dni ?? '')} />
+                <AyudaCampo id={`cd${i}-a`} problema={ver('dni', c.dni ?? '')} />
               </div>
             )}
             <div className="campo">
-              <label htmlFor={`cc${i}`} className="etiqueta">Teléfono</label>
+              <label htmlFor={`cc${i}`} className="etiqueta obligatorio">Teléfono</label>
               <input id={`cc${i}`} className="entrada numeros" inputMode="numeric" maxLength={9} value={c.celular} placeholder="Celular o fijo con código (01…)"
-                onChange={(e) => cambiar(i, 'celular', e.target.value.replace(/\D/g, '').slice(0, 9))} />
+                onChange={(e) => cambiar(i, 'celular', e.target.value.replace(/\D/g, '').slice(0, 9))} aria-invalid={!!ver('celular', c.celular)} />
+              <AyudaCampo id={`cc${i}-a`} problema={ver('celular', c.celular)} />
             </div>
             <div className="campo">
               <label htmlFor={`ce${i}`} className="etiqueta">Correo (opcional)</label>
-              <input id={`ce${i}`} className="entrada" type="email" value={c.correo ?? ''} placeholder="nombre@empresa.pe" onChange={(e) => cambiar(i, 'correo', e.target.value)} />
+              <input id={`ce${i}`} className="entrada" type="email" value={c.correo ?? ''} placeholder="nombre@empresa.pe" onChange={(e) => cambiar(i, 'correo', e.target.value)}
+                aria-invalid={!!ver('correo', c.correo ?? '')} />
+              <AyudaCampo id={`ce${i}-a`} problema={ver('correo', c.correo ?? '')} />
             </div>
           </div>
         </div>
-      ))}
+        );
+      })}
       {contactos.length < 2 && (
         <button type="button" className="boton-secundario" style={{ alignSelf: 'flex-start', borderStyle: 'dashed' }}
           onClick={() => onChange([...contactos, { nombre: '', celular: '', correo: '' }])}>
@@ -58,6 +89,4 @@ export const limpiarContactos = (cs: Contacto[]) =>
     ...(i === 0 && c.dni ? { dni: c.dni } : {}),
   }));
 
-export const contactosCompletos = (cs: Contacto[]) =>
-  cs.length >= 1 && cs.every((c) => c.nombre.trim().length >= 2 && telefonoValido(c.celular))
-  && (!cs[0].dni || /^\d{8}$/.test(cs[0].dni));
+export const contactosCompletos = (cs: Contacto[]) => problemasContactos(cs).length === 0;

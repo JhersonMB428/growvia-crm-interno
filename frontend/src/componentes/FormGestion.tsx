@@ -4,6 +4,8 @@ import {
   CANALES, diaCorto, fechaISO, gestionesApi, horaCorta, HORAS, RESULTADOS, RESULTADOS_RAPIDOS, unirFechaHora,
   type Canal, type GestionRegistrada, type ResultadoGestion,
 } from '../api/gestiones';
+import { problemaFechaHora } from '../utilidades/validacion';
+import { AyudaCampo, Faltantes } from './Faltantes';
 import './gestiones.css';
 
 const masDias = (n: number) => fechaISO(new Date(Date.now() + n * 86_400_000));
@@ -54,12 +56,20 @@ export function FormGestion({ empresaId, idBase = 'g', canalInicial = 'LLAMADA',
   }, [preseleccion]);
 
   const comentarioOpcional = !!resultado && RESULTADOS_RAPIDOS.includes(resultado);
-  const fechaValida = !agendar || (!!fecha && new Date(`${fecha}T${hora}:00`) > new Date());
+  const errFecha = agendar ? problemaFechaHora(fecha, hora) : '';
   const comentarioValido = comentario.trim().length >= 3 || (comentarioOpcional && comentario.trim().length === 0);
-  const listo = !!resultado && comentarioValido && fechaValida;
+  const errComentario = comentarioValido ? '' : comentario.trim() ? 'El comentario es muy corto (mínimo 3 letras)' : 'Escribe un comentario: qué pasó en la gestión';
+  const [intentado, setIntentado] = useState(false);
+  const faltantes = [
+    ...(!resultado ? ['Elige el resultado de la gestión'] : []),
+    ...(errComentario ? [errComentario] : []),
+    ...(errFecha ? [`Próxima acción: ${errFecha}`] : []),
+  ];
+  const listo = faltantes.length === 0;
 
   async function guardar(e: FormEvent) {
     e.preventDefault();
+    setIntentado(true);
     if (!listo || !resultado) return;
     setGuardando(true); setError('');
     try {
@@ -67,7 +77,7 @@ export function FormGestion({ empresaId, idBase = 'g', canalInicial = 'LLAMADA',
         clienteId: empresaId, canal, resultado, ...(comentario.trim() ? { comentario: comentario.trim() } : {}),
         ...(agendar ? { proximaAccion: unirFechaHora(fecha, hora), proximoCanal } : {}),
       });
-      setResultado(''); setComentario(''); setAgendar(false); setFecha(masDias(1)); setHora('09:00');
+      setResultado(''); setComentario(''); setAgendar(false); setFecha(masDias(1)); setHora('09:00'); setIntentado(false);
       onGuardada(g);
     } catch (err) {
       setError(err instanceof ErrorApi ? err.message : 'No se pudo guardar la gestión');
@@ -79,7 +89,8 @@ export function FormGestion({ empresaId, idBase = 'g', canalInicial = 'LLAMADA',
   return (
     <form onSubmit={guardar} className="bloque" noValidate>
       <div className="gestion-form__fila">
-        <span className="etiqueta">¿Cómo la hiciste?</span>
+        <span className="leyenda-obligatorio">Campos obligatorios</span>
+        <span className="etiqueta obligatorio">¿Cómo la hiciste?</span>
         <div className="pestanas" role="radiogroup" aria-label="Canal">
           {CANALES.map((c) => (
             <button key={c.valor} type="button" role="radio" aria-checked={canal === c.valor}
@@ -88,7 +99,7 @@ export function FormGestion({ empresaId, idBase = 'g', canalInicial = 'LLAMADA',
         </div>
       </div>
       <div className="gestion-form__fila">
-        <span className="etiqueta">Resultado</span>
+        <span className="etiqueta obligatorio">Resultado</span>
         <div className="chips-opcion" role="radiogroup" aria-label="Resultado">
           {RESULTADOS.map((r) => (
             <button key={r.valor} type="button" role="radio" aria-checked={resultado === r.valor}
@@ -97,9 +108,11 @@ export function FormGestion({ empresaId, idBase = 'g', canalInicial = 'LLAMADA',
         </div>
       </div>
       <div className="campo">
-        <label htmlFor={`${idBase}-comentario`} className="etiqueta">Comentario{comentarioOpcional ? ' (opcional)' : ''}</label>
+        <label htmlFor={`${idBase}-comentario`} className={`etiqueta${comentarioOpcional ? '' : ' obligatorio'}`}>Comentario{comentarioOpcional ? ' (opcional)' : ''}</label>
         <textarea ref={comentarioRef} id={`${idBase}-comentario`} className="entrada area" rows={3} maxLength={2000} value={comentario} onChange={(e) => setComentario(e.target.value)}
-          placeholder="Ej. Pidió la propuesta por correo. Compara con su operador actual; decide esta semana." />
+          placeholder="Ej. Pidió la propuesta por correo. Compara con su operador actual; decide esta semana."
+          aria-invalid={intentado && !!errComentario} />
+        <AyudaCampo id={`${idBase}-comentario-a`} problema={intentado ? errComentario : ''} />
       </div>
 
       {resultado === 'RECHAZA' && (
@@ -121,30 +134,32 @@ export function FormGestion({ empresaId, idBase = 'g', canalInicial = 'LLAMADA',
           </div>
           <div className="rejilla-3">
             <div className="campo">
-              <label htmlFor={`${idBase}-fecha`} className="etiqueta">Día</label>
-              <input id={`${idBase}-fecha`} type="date" className="entrada" min={fechaISO(new Date())} max={masDias(365)} value={fecha} onChange={(e) => setFecha(e.target.value)} />
+              <label htmlFor={`${idBase}-fecha`} className="etiqueta obligatorio">Día</label>
+              <input id={`${idBase}-fecha`} type="date" className="entrada" min={fechaISO(new Date())} max={masDias(365)} value={fecha} required
+                onChange={(e) => setFecha(e.target.value)} aria-invalid={!!errFecha} />
             </div>
             <div className="campo">
-              <label htmlFor={`${idBase}-hora`} className="etiqueta">Hora</label>
+              <label htmlFor={`${idBase}-hora`} className="etiqueta obligatorio">Hora</label>
               <select id={`${idBase}-hora`} className="entrada" value={hora} onChange={(e) => setHora(e.target.value)}>
-                {HORAS.map((h) => <option key={h} value={h}>{h}</option>)}
+                {HORAS.map((h) => <option key={h} value={h} disabled={fecha === fechaISO(new Date()) && new Date(`${fecha}T${h}:00`) <= new Date()}>{h}</option>)}
               </select>
             </div>
             <div className="campo">
-              <label htmlFor={`${idBase}-canal`} className="etiqueta">Cómo</label>
+              <label htmlFor={`${idBase}-canal`} className="etiqueta obligatorio">Cómo</label>
               <select id={`${idBase}-canal`} className="entrada" value={proximoCanal} onChange={(e) => setProximoCanal(e.target.value as Canal)}>
                 {CANALES.map((c) => <option key={c.valor} value={c.valor}>{c.texto}</option>)}
               </select>
             </div>
           </div>
-          {!fechaValida && <span style={{ fontSize: 13, color: 'var(--salir)' }}>Elige una fecha y hora futuras.</span>}
+          <AyudaCampo id={`${idBase}-fecha-a`} problema={errFecha} />
         </div>
       )}
 
+      {intentado && <Faltantes items={faltantes} />}
       {error && <div className="alerta" role="alert">{error}</div>}
       <div className="fila-acciones" style={{ justifyContent: 'flex-end' }}>
         {onCancelar && <button type="button" className="boton-secundario" onClick={onCancelar}>Cancelar</button>}
-        <button type="submit" className="boton" disabled={!listo || guardando}>{guardando ? 'Guardando…' : textoBoton}</button>
+        <button type="submit" className="boton" disabled={guardando}>{guardando ? 'Guardando…' : textoBoton}</button>
       </div>
     </form>
   );

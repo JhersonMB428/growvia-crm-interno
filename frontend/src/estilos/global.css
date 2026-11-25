@@ -156,3 +156,6 @@ p { margin: 0; }
 
 .sugerencia-ligero { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 12px; }
 .sugerencia-ligero__botones { display: flex; gap: 8px; flex-wrap: wrap; }
+/* En tema claro el fondo de la página también es claro: evita la franja oscura al final de páginas largas */
+body:has(.app[data-tema='claro']) { background: #f2f4ec; }
+.app { min-height: 100%; }

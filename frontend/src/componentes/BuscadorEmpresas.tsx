@@ -4,6 +4,7 @@ import { empresasApi, ubicacion, type EmpresaResumen } from '../api/empresas';
 import { useDebounce } from '../hooks/useDebounce';
 import { Icono } from '../layout/Icono';
 import './buscador.css';
+import { recortarRuc } from '../utilidades/validacion';
 
 /** Buscador de la barra superior: cualquier empresa por RUC o razón social (solo datos generales) */
 export function BuscadorEmpresas() {
@@ -52,7 +53,7 @@ export function BuscadorEmpresas() {
       <input id="buscar" type="search" placeholder="Buscar por RUC o razón social" autoComplete="off"
         role="combobox" aria-expanded={mostrar} aria-controls="buscar-resultados" aria-autocomplete="list"
         aria-activedescendant={mostrar && filas?.length ? `buscar-${filas[marcado]?.id}` : undefined}
-        value={q} onChange={(e) => { setQ(e.target.value); setAbierto(true); }} onFocus={() => setAbierto(true)} onKeyDown={tecla} />
+        value={q} maxLength={100} onChange={(e) => { setQ(recortarRuc(e.target.value)); setAbierto(true); }} onFocus={() => setAbierto(true)} onKeyDown={tecla} />
       {mostrar && (
         <div className="buscador__panel" id="buscar-resultados" role="listbox" aria-label="Empresas encontradas">
           {q.trim().length < 3 && <p className="buscador__nota">Escribe al menos 3 letras o números.</p>}

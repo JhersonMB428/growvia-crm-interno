@@ -5,7 +5,8 @@ import { empresasApi, textoBloqueo, ubicacion, type Contacto, type EmpresaDetall
 import type { GestionRegistrada, ResultadoGestion } from '../../api/gestiones';
 import { LlamadaRapida } from '../../componentes/LlamadaRapida';
 import { useVisitaFicha } from '../../hooks/useVisitaFicha';
-import { contactosCompletos, EditorContactos, limpiarContactos } from '../../componentes/EditorContactos';
+import { contactosCompletos, EditorContactos, limpiarContactos, problemasContactos } from '../../componentes/EditorContactos';
+import { Faltantes } from '../../componentes/Faltantes';
 import { GestionesEmpresa } from '../../componentes/GestionesEmpresa';
 import { negociacionesApi, type Operador } from '../../api/negociaciones';
 import { NegociacionesEmpresa } from '../../componentes/NegociacionesEmpresa';
@@ -30,6 +31,7 @@ export function FichaEmpresa() {
   const [e, setE] = useState<EmpresaDetalle | null>(null);
   const [error, setError] = useState('');
   const [editando, setEditando] = useState<Contacto[] | null>(null);
+  const [intentoContactos, setIntentoContactos] = useState(false);
   const [ocupado, setOcupado] = useState(false);
   const [corrigiendo, setCorrigiendo] = useState<{ razonSocial: string; distritoId: string } | null>(null);
   const [reasignando, setReasignando] = useState(false);
@@ -189,10 +191,12 @@ export function FichaEmpresa() {
           )}
           {editando && (
             <>
-              <EditorContactos contactos={editando} onChange={setEditando} />
+              <EditorContactos contactos={editando} onChange={setEditando} mostrarErrores={intentoContactos} />
+              {intentoContactos && <Faltantes items={problemasContactos(editando)} />}
               <div className="fila-acciones">
-                <button type="button" className="boton-secundario" onClick={() => setEditando(null)}>Cancelar</button>
-                <button type="button" className="boton" disabled={!contactosCompletos(editando) || ocupado} onClick={guardarContactos}>Guardar contactos</button>
+                <button type="button" className="boton-secundario" onClick={() => { setEditando(null); setIntentoContactos(false); }}>Cancelar</button>
+                <button type="button" className="boton" disabled={ocupado}
+                  onClick={() => { setIntentoContactos(true); if (contactosCompletos(editando)) { setIntentoContactos(false); guardarContactos(); } }}>Guardar contactos</button>
               </div>
             </>
           )}
