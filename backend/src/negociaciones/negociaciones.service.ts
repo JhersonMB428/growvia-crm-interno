@@ -3,6 +3,7 @@ import {
 } from '@nestjs/common';
 import { DataSource, EntityManager } from 'typeorm';
 import { SesionUsuario } from '../auth/decorators/usuario-actual.decorator';
+import { RetencionService } from '../empresas/retencion';
 import { NotificacionesService } from '../notificaciones/notificaciones.service';
 import { CambiarEtapaDto, PerderNegociacionDto } from './dto/etapa.dto';
 import { CrearNegociacionDto, GuardarNegociacionDto } from './dto/guardar-negociacion.dto';
@@ -49,6 +50,7 @@ export class NegociacionesService {
   constructor(
     private readonly db: DataSource,
     private readonly notificaciones: NotificacionesService,
+    private readonly retencion: RetencionService,
   ) {}
 
   // ───────────── Catálogos para el formulario ─────────────
@@ -365,7 +367,9 @@ export class NegociacionesService {
   }
 
   /** Mover la negociación cuenta como actividad: la empresa no vuelve al repositorio */
-  private marcarGestion(tx: EntityManager, clienteId: string) {
-    return tx.query(`UPDATE clientes SET ultima_gestion_at = now(), updated_at = now() WHERE id = $1`, [clienteId]);
+  /** Cuenta como movimiento en la empresa y renueva su plazo de liberación (con negociación abierta, 15 días) */
+  private async marcarGestion(tx: EntityManager, clienteId: string) {
+    await tx.query(`UPDATE clientes SET ultima_gestion_at = now(), updated_at = now() WHERE id = $1`, [clienteId]);
+    await this.retencion.recalcular(tx, clienteId);
   }
 }
