@@ -76,10 +76,12 @@ const REGLAS: Record<string, Regla> = {
 };
 
 /** Acciones sin valor de auditoría */
-const IGNORAR = new Set(['POST /notificaciones/leer-todas', 'POST /notificaciones/:id/leida', 'POST /auth/reenviar', 'PUT /perfil/guia']);
+const IGNORAR = new Set(['POST /notificaciones/leer-todas', 'POST /notificaciones/:id/leida', 'POST /auth/reenviar', 'PUT /perfil/guia',
+  // "Ver como" se registra a mano con el administrador que mira (VISTA_INICIAR / VISTA_SALIR)
+  'POST /auth/ver-como', 'POST /auth/salir-vista']);
 /** Grupos para el filtro de la pantalla */
 export const CATEGORIAS: Record<string, string[]> = {
-  accesos: ['LOGIN', 'LOGIN_FALLIDO', 'CODIGO_FALLIDO', 'LOGIN_BLOQUEADO', 'ACCESO_DENEGADO', 'SESION_MOVIL_CORTADA',
+  accesos: ['LOGIN', 'LOGIN_FALLIDO', 'CODIGO_FALLIDO', 'LOGIN_BLOQUEADO', 'ACCESO_DENEGADO', 'SESION_MOVIL_CORTADA', 'VISTA_INICIAR', 'VISTA_SALIR',
         'ACCESO_MOVIL_SOLICITAR', 'ACCESO_MOVIL_APROBAR', 'ACCESO_MOVIL_RECHAZAR', 'ACCESO_MOVIL_REVOCAR', 'ACCESO_MOVIL_OTORGAR',
     'CLAVE_CAMBIAR', 'CLAVE_FALLIDA', 'DISPOSITIVO_QUITAR', 'DISPOSITIVOS_QUITAR_TODOS', 'FOTO_CAMBIAR', 'FOTO_QUITAR'],
   empresas: ['EMPRESA_CREAR', 'EMPRESA_TOMAR', 'EMPRESA_REASIGNAR', 'EMPRESA_CORREGIR', 'CONTACTOS_EDITAR', 'EMPRESA_CONTRATO', 'GESTION_REGISTRAR', 'GESTION_REPROGRAMAR'],

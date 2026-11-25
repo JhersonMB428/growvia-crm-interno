@@ -12,6 +12,10 @@ export interface Usuario {
   guiaVista?: boolean;
   /** Cambia cada vez que cambia su foto (null = sin foto, se muestran las iniciales) */
   fotoVersion?: number | null;
+  /** Modo "ver como" del soporte: quién está mirando (solo lectura) */
+  vista?: { de: string } | null;
+  /** Puede abrir el modo "ver como" (correos de soporte) */
+  puedeVerComo?: boolean;
 }
 
 export type RespuestaLogin =

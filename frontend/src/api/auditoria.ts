@@ -51,6 +51,7 @@ export const bitacoraApi = {
 export const TEXTO_ACCION: Record<string, string> = {
   LOGIN: 'Ingresó al CRM', LOGIN_FALLIDO: 'Contraseña incorrecta', CODIGO_FALLIDO: 'Código de verificación incorrecto',
   LOGIN_BLOQUEADO: 'Ingreso bloqueado', ACCESO_DENEGADO: 'Intentó entrar sin permiso',
+  VISTA_INICIAR: 'Vio el CRM como otro usuario (soporte)', VISTA_SALIR: 'Volvió a su cuenta (soporte)',
   EMPRESA_CREAR: 'Registró una empresa', EMPRESA_TOMAR: 'Tomó una empresa', EMPRESA_REASIGNAR: 'Reasignó una empresa',
   EMPRESA_CORREGIR: 'Corrigió datos de la empresa', CONTACTOS_EDITAR: 'Editó contactos', EMPRESA_CONTRATO: 'Registró su contrato actual',
   GESTION_REGISTRAR: 'Registró una gestión', GESTION_REPROGRAMAR: 'Reprogramó una gestión',
