@@ -76,7 +76,12 @@ export class SunatService {
     this.hoy = { dia, n: (this.hoy.dia === dia ? this.hoy.n : 0) + 1 };
     const [empresa, reps] = await Promise.all([this.llamar('/ruc', ruc), this.llamar('/ruc-representantes', ruc).catch((err) => { this.log.warn(`Representantes de ${ruc}: ${(err as Error)?.message}`); return []; })]);
     const e = primero(empresa);
-    const ubic = await this.ubicar({ ubigeo: txt(e.ubigeo), departamento: txt(e.departamento), provincia: txt(e.provincia), distrito: txt(e.distrito) });
+    // El ubigeo puede venir como texto, como número (sin el 0 inicial) o como objeto con código y nombres
+    const u = e.ubigeo && typeof e.ubigeo === 'object' ? primero(e.ubigeo) : {};
+    const ubic = await this.ubicar({
+      ubigeo: txt(typeof e.ubigeo === 'object' ? u.ubigeo ?? u.codigo ?? u.id : e.ubigeo),
+      departamento: txt(e.departamento ?? u.departamento), provincia: txt(e.provincia ?? u.provincia), distrito: txt(e.distrito ?? u.distrito),
+    });
     const estado = txt(e.estado).toUpperCase() || null;
     const condicion = txt(e.condicion).toUpperCase() || null;
     const datos: DatosSunat = {
