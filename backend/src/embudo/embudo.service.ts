@@ -58,13 +58,13 @@ export class EmbudoService {
     const [embudo] = await this.db.query(
       `WITH c AS (
          SELECT o.resultado, o.estado_venta,
-                COALESCE((SELECT max(CASE h.etapa_nueva WHEN 'CONTACTO' THEN 2 WHEN 'NEGOCIACION' THEN 3 ELSE 1 END)
-                          FROM historial_etapas h WHERE h.oportunidad_id = o.id AND h.etapa_nueva <> 'CIERRE'), 1) AS nivel
+                (o.etapa = 'CIERRE' OR o.resultado = 'GANADA'
+                 OR EXISTS (SELECT 1 FROM historial_etapas h WHERE h.oportunidad_id = o.id AND h.etapa_nueva = 'CIERRE'
+                            AND h.etapa_anterior = 'NEGOCIACION')) AS cierre
          ${BASE} WHERE ${filtro} AND ${CREADA}
        )
        SELECT count(*)::int AS abiertas,
-              count(*) FILTER (WHERE nivel >= 2 OR resultado = 'GANADA')::int AS contacto,
-              count(*) FILTER (WHERE nivel >= 3 OR resultado = 'GANADA')::int AS negociacion,
+              count(*) FILTER (WHERE cierre)::int AS cierre,
               count(*) FILTER (WHERE resultado = 'GANADA' AND estado_venta <> 'ANULADA')::int AS ganadas,
               count(*) FILTER (WHERE estado_venta = 'ACTIVA')::int AS activas,
               count(*) FILTER (WHERE resultado = 'PERDIDA')::int AS perdidas,
@@ -92,7 +92,7 @@ export class EmbudoService {
                          lead(h.created_at) OVER (PARTITION BY h.oportunidad_id ORDER BY h.created_at) AS siguiente
                   FROM historial_etapas h WHERE h.oportunidad_id IN (SELECT id FROM ops))
        SELECT etapa, round(avg(${DIAS('created_at', 'siguiente')})::numeric, 1)::float8 AS dias, count(*)::int AS n
-       FROM h WHERE siguiente IS NOT NULL AND etapa <> 'CIERRE' GROUP BY etapa`, p,
+       FROM h WHERE siguiente IS NOT NULL AND etapa IN ('NEGOCIACION', 'CIERRE') GROUP BY etapa`, p,
     );
 
     // 4. Motivos de pérdida y en qué etapa se pierden
@@ -101,10 +101,10 @@ export class EmbudoService {
        ${BASE} WHERE ${filtro} AND ${CERRADA} AND o.resultado = 'PERDIDA'
        GROUP BY 1 ORDER BY n DESC, cargo DESC`, [...p, motivos],
     );
+    // La perdida queda en la etapa donde se perdió
     const porEtapa = await this.db.query(
-      `SELECT h.etapa_anterior AS etapa, count(*)::int AS n
-       ${BASE} JOIN historial_etapas h ON h.oportunidad_id = o.id AND h.etapa_nueva = 'CIERRE'
-       WHERE ${filtro} AND ${CERRADA} AND o.resultado = 'PERDIDA' AND h.etapa_anterior IS NOT NULL
+      `SELECT o.etapa, count(*)::int AS n
+       ${BASE} WHERE ${filtro} AND ${CERRADA} AND o.resultado = 'PERDIDA'
        GROUP BY 1`, p,
     );
     const otros = await this.db.query(

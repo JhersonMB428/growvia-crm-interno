@@ -39,6 +39,8 @@ export interface EstadoCuenta {
   /** Última gestión del asesor actual desde que la tiene */
   ultima: { fecha: Date; resultado: string; canal: string; proximaAccion: Date | null } | null;
   negociando: boolean;
+  /** Último movimiento en la empresa (gestión o cambio en su negociación) */
+  ultimaActividad?: Date | null;
   ganada: boolean;
   prorrogada: boolean;
 }
@@ -69,7 +71,10 @@ export function calcularRetencion(e: EstadoCuenta, r: Reglas): Date | null {
     const extra = u.canal === 'WHATSAPP' || u.canal === 'CORREO' ? r.horasExtraWhatsappCorreo : 0;
     hasta = +u.fecha + (r.horasSinRespuesta + extra) * HORA;
   }
-  if (e.negociando) hasta = Math.max(hasta, +(u?.fecha ?? e.asignadoAt) + r.diasRetencionNegociacion * DIA);
+  if (e.negociando) {
+    const desde = Math.max(+(u?.fecha ?? e.asignadoAt), +(e.ultimaActividad ?? 0));
+    hasta = Math.max(hasta, desde + r.diasRetencionNegociacion * DIA);
+  }
   let fecha = saltarFinDeSemana(new Date(hasta));
   if (e.prorrogada) fecha = saltarFinDeSemana(new Date(+fecha + DIA));
   return fecha;
@@ -107,7 +112,7 @@ export class RetencionService {
   /** Vuelve a calcular el plazo de la empresa con su estado actual y lo guarda */
   async recalcular(tx: EntityManager, clienteId: string): Promise<Date | null> {
     const [c] = await tx.query(
-      `SELECT c.asesor_id AS "asesorId", c.asignado_at AS "asignadoAt", c.estado, c.prorrogada,
+      `SELECT c.asesor_id AS "asesorId", c.asignado_at AS "asignadoAt", c.estado, c.prorrogada, c.ultima_gestion_at AS "ultimaActividad",
               (SELECT a.motivo FROM asignaciones a WHERE a.cliente_id = c.id ORDER BY a.created_at DESC LIMIT 1) = 'CARGA' AS "deBase",
               EXISTS (SELECT 1 FROM oportunidades o WHERE o.cliente_id = c.id AND o.resultado = 'EN_CURSO') AS negociando,
               EXISTS (SELECT 1 FROM oportunidades o WHERE o.cliente_id = c.id AND o.resultado = 'GANADA' AND o.estado_venta <> 'ANULADA') AS ganada
@@ -124,6 +129,7 @@ export class RetencionService {
       deBase: !!c.deBase,
       ultima: u ? { fecha: u.fecha, resultado: u.resultado, canal: u.canal, proximaAccion: u.proximaAccion } : null,
       negociando: c.negociando,
+      ultimaActividad: c.ultimaActividad,
       ganada: c.ganada || c.estado === 'VENTA',
       prorrogada: c.prorrogada,
     }, await this.reglas());

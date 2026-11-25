@@ -10,7 +10,10 @@ export interface CargaResumen {
 export interface CargaDetalle extends CargaResumen {
   revisadoAt: string | null; revisadoPor: string | null; motivoRechazo: string | null;
   errores: { fila: number; ruc: string | null; motivo: MotivoError; detalle: string; datos: Record<string, string> }[];
-  muestra: { fila: number; ruc: string; razonSocial: string; distrito: string | null; provincia: string | null; contactos: number }[];
+  muestra: { fila: number; ruc: string; razonSocial: string; distrito: string | null; provincia: string | null; contactos: number;
+    representante: string | null; lineas: number | null; operador: string | null }[];
+  /** Filas válidas a las que les falta algún dato de la estructura completa */
+  incompletas: number;
   puedeRevisar: boolean;
 }
 

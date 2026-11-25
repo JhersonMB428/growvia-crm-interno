@@ -2,33 +2,39 @@ import { useEffect, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { ErrorApi } from '../../api/cliente';
 import {
-  negociacionesApi, resumenLineas, soles, TEXTO_ESTADO_VENTA, TEXTO_SERVICIO, TEXTO_TIPO, type NegociacionResumen,
+  estadoDe, negociacionesApi, resumenLineas, soles, TEXTO_SERVICIO, type NegociacionDetalle, type NegociacionResumen,
 } from '../../api/negociaciones';
 import { useSesion } from '../../sesion/SesionContext';
 import './negociaciones.css';
 
 type Servicio = '' | 'MOVIL' | 'FIJA' | 'AMBOS';
+type Grupo = 'NEGOCIACION' | 'CIERRE' | 'GANADA' | 'PERDIDA';
 
-const COLUMNAS: { clave: string; titulo: string; filtro: (n: NegociacionResumen) => boolean; suma: boolean }[] = [
-  { clave: 'PROSPECCION', titulo: 'Prospección', filtro: (n) => n.resultado === 'EN_CURSO' && n.etapa === 'PROSPECCION', suma: true },
-  { clave: 'CONTACTO', titulo: 'Contacto', filtro: (n) => n.resultado === 'EN_CURSO' && n.etapa === 'CONTACTO', suma: true },
-  { clave: 'NEGOCIACION', titulo: 'Negociación', filtro: (n) => n.resultado === 'EN_CURSO' && n.etapa === 'NEGOCIACION', suma: true },
-  { clave: 'GANADA', titulo: 'Ganadas del mes', filtro: (n) => n.resultado === 'GANADA', suma: true },
-  { clave: 'PERDIDA', titulo: 'Perdidas del mes', filtro: (n) => n.resultado === 'PERDIDA', suma: false },
+const GRUPOS: { clave: Grupo; titulo: string; filtro: (n: NegociacionResumen) => boolean }[] = [
+  { clave: 'NEGOCIACION', titulo: 'En negociación', filtro: (n) => n.resultado === 'EN_CURSO' && n.etapa !== 'CIERRE' },
+  { clave: 'CIERRE', titulo: 'En cierre', filtro: (n) => n.resultado === 'EN_CURSO' && n.etapa === 'CIERRE' },
+  { clave: 'GANADA', titulo: 'Ganadas del mes', filtro: (n) => n.resultado === 'GANADA' },
+  { clave: 'PERDIDA', titulo: 'Perdidas del mes', filtro: (n) => n.resultado === 'PERDIDA' },
 ];
+const fecha = (iso: string) => new Date(iso).toLocaleDateString('es-PE', { day: '2-digit', month: 'short' });
 
+/** Lista a la izquierda y resumen de la negociación elegida a la derecha */
 export function Negociaciones() {
   const { usuario } = useSesion();
-  const esAsesor = usuario?.rol.codigo === 'ASESOR';
+  const rol = usuario?.rol.codigo;
+  const esAsesor = rol === 'ASESOR';
   const [filas, setFilas] = useState<NegociacionResumen[] | null>(null);
   const [error, setError] = useState('');
   const [q, setQ] = useState('');
   const [servicio, setServicio] = useState<Servicio>('');
+  // Back office llega a ver las ventas ganadas; los demás, lo que está en negociación
+  const [grupo, setGrupo] = useState<Grupo>(rol === 'BACKOFFICE' ? 'GANADA' : 'NEGOCIACION');
+  const [elegida, setElegida] = useState<string | null>(null);
 
   useEffect(() => {
     negociacionesApi.embudo()
       .then((d) => setFilas(d.filas))
-      .catch((e) => setError(e instanceof ErrorApi ? e.message : 'No se pudo cargar el embudo'));
+      .catch((e) => setError(e instanceof ErrorApi ? e.message : 'No se pudieron cargar las negociaciones'));
   }, []);
 
   const visibles = useMemo(() => {
@@ -39,17 +45,20 @@ export function Negociaciones() {
         || n.codigo.toLowerCase().includes(texto) || n.asesor.toLowerCase().includes(texto)));
   }, [filas, q, servicio]);
 
-  const abiertas = visibles.filter((n) => n.resultado === 'EN_CURSO');
+  const actual = GRUPOS.find((g) => g.clave === grupo)!;
+  const lista = visibles.filter(actual.filtro);
+  const seleccion = lista.find((n) => n.id === elegida) ?? lista[0] ?? null;
+  const abiertas = (filas ?? []).filter((n) => n.resultado === 'EN_CURSO');
 
   return (
     <>
       <div className="fila-acciones" style={{ padding: '8px 4px 0', alignItems: 'flex-end' }}>
         <div className="encabezado" style={{ padding: 0 }}>
-          <h1>Negociaciones</h1>
+          <h1>{rol === 'BACKOFFICE' ? 'Ventas' : 'Negociaciones'}</h1>
           <p>
             {filas
-              ? `${abiertas.length} ${abiertas.length === 1 ? 'abierta' : 'abiertas'} · ${soles(abiertas.reduce((s, n) => s + n.total, 0))} en cargo fijo mensual`
-              : esAsesor ? 'Tu embudo de ventas' : 'El embudo de ventas de tu alcance'}
+              ? `${abiertas.length} ${abiertas.length === 1 ? 'abierta' : 'abiertas'} · ${soles(abiertas.reduce((s, n) => s + n.total, 0))} mensual sin IGV`
+              : 'Cargando…'}
           </p>
         </div>
         {esAsesor && <Link to="/empresas" className="boton">+ Nueva negociación</Link>}
@@ -69,6 +78,18 @@ export function Negociaciones() {
           </div>
         </div>
 
+        <div className="pestanas neg-grupos" role="tablist" aria-label="Estado">
+          {GRUPOS.map((g) => {
+            const n = visibles.filter(g.filtro);
+            return (
+              <button key={g.clave} type="button" role="tab" aria-selected={grupo === g.clave}
+                className={`pestana${grupo === g.clave ? ' pestana--activa' : ''}`} onClick={() => { setGrupo(g.clave); setElegida(null); }}>
+                {g.titulo} · {n.length}
+              </button>
+            );
+          })}
+        </div>
+
         {error && <div className="alerta" role="alert">{error}</div>}
         {!filas && !error && <p style={{ color: 'var(--texto-suave)' }}>Cargando…</p>}
         {esAsesor && filas?.length === 0 && (
@@ -78,20 +99,26 @@ export function Negociaciones() {
         )}
 
         {filas && (
-          <div className="embudo">
-            {COLUMNAS.map((col) => {
-              const lista = visibles.filter(col.filtro);
-              return (
-                <section key={col.clave} className="embudo__columna" aria-label={col.titulo}>
-                  <header className="embudo__cabecera">
-                    <h2>{col.titulo} · {lista.length}</h2>
-                    {col.suma && <span className="numeros">{soles(lista.reduce((s, n) => s + n.total, 0))}</span>}
-                  </header>
-                  {lista.length === 0 && <div className="embudo__vacia">Sin negociaciones</div>}
-                  {lista.map((n) => <Tarjeta key={n.id} n={n} verAsesor={!esAsesor} />)}
-                </section>
-              );
-            })}
+          <div className="neg-maestro">
+            <ul className="neg-lista" aria-label={actual.titulo}>
+              {lista.length === 0 && <li className="embudo__vacia">Sin negociaciones {actual.titulo.toLowerCase()}</li>}
+              {lista.map((n) => (
+                <li key={n.id}>
+                  <button type="button" className={`neg-item${seleccion?.id === n.id ? ' neg-item--activa' : ''}`}
+                    aria-current={seleccion?.id === n.id} onClick={() => setElegida(n.id)}>
+                    <span className="neg-item__texto">
+                      <b className="recortar">{n.razonSocial}</b>
+                      <span className="tenue recortar numeros">
+                        {n.codigo}{n.servicio ? ` · ${TEXTO_SERVICIO[n.servicio]}` : ''}{!esAsesor ? ` · ${n.asesor}` : ''}
+                      </span>
+                    </span>
+                    <span className="numeros neg-item__monto">{soles(n.total)}</span>
+                    <span className="neg-item__flecha" aria-hidden="true">→</span>
+                  </button>
+                </li>
+              ))}
+            </ul>
+            <ResumenNegociacion key={seleccion?.id ?? 'ninguna'} n={seleccion} verAsesor={!esAsesor} />
           </div>
         )}
       </section>
@@ -99,20 +126,74 @@ export function Negociaciones() {
   );
 }
 
-function Tarjeta({ n, verAsesor }: { n: NegociacionResumen; verAsesor: boolean }) {
+/** Resumen de la negociación elegida (trae sus servicios y el último comentario). Se monta de nuevo al cambiar de negociación. */
+function ResumenNegociacion({ n, verAsesor }: { n: NegociacionResumen | null; verAsesor: boolean }) {
+  const [d, setD] = useState<NegociacionDetalle | null>(null);
+  const id = n?.id;
+
+  useEffect(() => {
+    if (id) negociacionesApi.detalle(id).then(setD).catch(() => undefined);
+  }, [id]);
+
+  if (!n) return <aside className="neg-resumen neg-resumen--vacio">Elige una negociación de la lista para ver su resumen.</aside>;
+
+  const chip = n.resultado === 'GANADA' ? 'chip--lima' : n.resultado === 'PERDIDA' ? 'chip--crema' : 'chip--gris';
+  const conEquipo = d?.items.filter((i) => i.conEquipo).reduce((s, i) => s + i.cantidad, 0) ?? 0;
+  const ultimo = d?.gestiones[0];
+
   return (
-    <article className="tarjeta-op">
-      <Link to={`/negociaciones/${n.id}`} className="recortar" title={n.razonSocial}>{n.razonSocial}</Link>
-      <span className="tenue numeros">{n.codigo} · {TEXTO_TIPO[n.tipo]}{n.servicio ? ` · ${TEXTO_SERVICIO[n.servicio]}` : ''}</span>
-      <span>{resumenLineas(n)}</span>
-      {verAsesor && <span className="tenue recortar">{n.asesor}{n.equipo ? ` · ${n.equipo}` : ''}</span>}
-      <div className="tarjeta-op__pie">
-        <b className="numeros">{soles(n.total)}</b>
-        {n.resultado === 'GANADA' && n.estadoVenta && (
-          <span className={`chip ${n.estadoVenta === 'ACTIVA' || n.estadoVenta === 'VALIDADA' ? 'chip--lima' : 'chip--crema'}`}>{TEXTO_ESTADO_VENTA[n.estadoVenta]}</span>
-        )}
-        {n.resultado === 'PERDIDA' && <span className="chip chip--gris recortar" title={n.motivoPerdida ?? ''}>{n.motivoPerdida}</span>}
+    <aside className="neg-resumen" aria-label={`Resumen de ${n.razonSocial}`}>
+      <div className="fila-acciones" style={{ alignItems: 'flex-start', flexWrap: 'nowrap' }}>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 4, minWidth: 0 }}>
+          <h2 className="h2 recortar" title={n.razonSocial}>{n.razonSocial}</h2>
+          <span className="tenue numeros">{n.codigo} · RUC {n.ruc}</span>
+        </div>
+        <span className={`chip ${chip}`}>{estadoDe(n)}</span>
       </div>
-    </article>
+
+      <div className="dato">
+        <span>Subtotal sin IGV</span>
+        <span className="total-grande numeros">{soles(n.total)}</span>
+        <span style={{ fontSize: 13, color: 'var(--texto-tenue)' }}>mensual · {resumenLineas(n)}</span>
+      </div>
+
+      <div className="rejilla-2">
+        {verAsesor && <div className="dato"><span>Asesor</span><b>{n.asesor}</b></div>}
+        {verAsesor && <div className="dato"><span>Equipo</span><b>{n.equipo ?? '—'}</b></div>}
+        <div className="dato"><span>Servicio</span><b>{n.servicio ? TEXTO_SERVICIO[n.servicio] : '—'}</b></div>
+        <div className="dato"><span>Con equipo</span><b className="numeros">{d ? (conEquipo ? `${conEquipo} ${conEquipo === 1 ? 'línea' : 'líneas'}` : 'No') : '…'}</b></div>
+        <div className="dato"><span>Abierta</span><b>{fecha(n.creadoAt)}</b></div>
+        <div className="dato"><span>{n.fechaCierre ? 'Cerrada' : 'Último movimiento'}</span><b>{fecha(n.fechaCierre ?? n.actualizadoAt)}</b></div>
+      </div>
+
+      {n.resultado === 'PERDIDA' && <p style={{ margin: 0 }}><b>Motivo:</b> {n.motivoPerdida}</p>}
+
+      {d && d.items.length > 0 && (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+          <span className="etiqueta">Servicios</span>
+          <ul className="neg-servicios">
+            {d.items.map((i) => (
+              <li key={i.id}>
+                <span className="recortar"><b>{i.cantidad}</b> × {i.plan}{i.modalidad === 'PORTABILIDAD' ? ` · porta de ${i.operadorOrigen}` : ''}{i.conEquipo ? ' · con equipo' : ''}</span>
+                <span className="numeros">{soles(i.subtotal ?? 0)}</span>
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
+
+      {ultimo && (
+        <div className="bloque" style={{ gap: 4 }}>
+          <span className="etiqueta">Último comentario</span>
+          <span style={{ fontSize: 14 }}>“{ultimo.comentario}”</span>
+          <span style={{ fontSize: 12, color: 'var(--texto-tenue)' }}>{ultimo.usuario} · {fecha(ultimo.fecha)}</span>
+        </div>
+      )}
+
+      <div className="fila-acciones" style={{ justifyContent: 'flex-end', marginTop: 'auto' }}>
+        <Link to={`/empresas/${n.clienteId}`} className="boton-secundario">Ver empresa</Link>
+        <Link to={`/negociaciones/${n.id}`} className="boton">Abrir negociación</Link>
+      </div>
+    </aside>
   );
 }

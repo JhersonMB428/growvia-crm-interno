@@ -7,9 +7,7 @@ import { LlamadaRapida } from '../../componentes/LlamadaRapida';
 import { useVisitaFicha } from '../../hooks/useVisitaFicha';
 import { contactosCompletos, EditorContactos, limpiarContactos } from '../../componentes/EditorContactos';
 import { GestionesEmpresa } from '../../componentes/GestionesEmpresa';
-import { fechaLarga, negociacionesApi, type Operador } from '../../api/negociaciones';
-import { textoDias, urgencia } from '../../api/renovaciones';
-import '../renovaciones/renovaciones.css';
+import { negociacionesApi, type Operador } from '../../api/negociaciones';
 import { NegociacionesEmpresa } from '../../componentes/NegociacionesEmpresa';
 import { SelectorUbigeo } from '../../componentes/SelectorUbigeo';
 import { useSesion } from '../../sesion/SesionContext';
@@ -165,9 +163,9 @@ export function FichaEmpresa() {
           <div style={{ height: 1, background: 'var(--linea)' }} />
 
           <div className="fila-acciones">
-            <h2 className="h2">Contactos</h2>
+            <h2 className="h2">Representante y contactos</h2>
             {(e.puedeEditar || e.puedeCorregirDatos) && !editando && e.contactos && (
-              <button type="button" className="boton-secundario" onClick={() => setEditando(e.contactos!.map((c) => ({ nombre: c.nombre, celular: c.celular, correo: c.correo ?? '' })))}>Editar</button>
+              <button type="button" className="boton-secundario" onClick={() => setEditando(e.contactos!.map((c) => ({ nombre: c.nombre, celular: c.celular, correo: c.correo ?? '', dni: c.dni ?? '' })))}>Editar</button>
             )}
           </div>
 
@@ -180,8 +178,9 @@ export function FichaEmpresa() {
             <div className="rejilla-2">
               {e.contactos.map((c) => (
                 <div key={c.id} className="bloque" style={{ gap: 6 }}>
-                  <span style={{ fontSize: 12, fontWeight: 700, color: 'var(--texto-tenue)', textTransform: 'uppercase', letterSpacing: '.05em' }}>{c.posicion === 1 ? 'Principal' : 'Secundario'}</span>
+                  <span style={{ fontSize: 12, fontWeight: 700, color: 'var(--texto-tenue)', textTransform: 'uppercase', letterSpacing: '.05em' }}>{c.posicion === 1 ? 'Representante legal (SUNAT)' : 'Otro contacto'}</span>
                   <b>{c.nombre}</b>
+                  {c.posicion === 1 && <span className="numeros" style={{ fontSize: 14, color: 'var(--texto-suave)' }}>{c.dni ? `DNI ${c.dni}` : 'DNI sin registrar'}</span>}
                   <a href={`tel:${c.celular}`} className="numeros" style={{ textDecoration: 'none' }}>{c.celular.replace(/(\d{3})(\d{3})(\d{3})/, '$1 $2 $3')}</a>
                   {c.correo && <a href={`mailto:${c.correo}`} style={{ textDecoration: 'none' }}>{c.correo}</a>}
                 </div>
@@ -198,24 +197,27 @@ export function FichaEmpresa() {
             </>
           )}
 
-          {e.contratoActual && e.estado === 'PROSPECTO' && (
-            <ContratoActual e={e} editable={e.puedeEditar || !!e.puedeCorregirDatos}
-              onGuardado={(d) => { setE(d); setAviso('Contrato actual guardado.'); }} />
+          {e.contratoActual && (
+            <OperadorLineas e={e} editable={e.puedeEditar || !!e.puedeCorregirDatos}
+              onGuardado={(d) => { setE(d); setAviso('Operador y líneas guardados.'); }} />
           )}
         </section>
 
         <aside className="panel vidrio" style={{ flex: '1 1 300px', minWidth: 0, display: 'flex', flexDirection: 'column', gap: 14 }}>
-          <h2 className="h2">Historial</h2>
+          <h2 className="h2">Historial de asesores</h2>
           {e.historial === null && <p style={{ color: 'var(--texto-suave)' }}>Sin acceso al historial de esta empresa.</p>}
           {e.historial?.length === 0 && <p style={{ color: 'var(--texto-suave)' }}>Sin movimientos todavía.</p>}
           <ol style={{ listStyle: 'none', margin: 0, padding: 0, display: 'flex', flexDirection: 'column', gap: 12 }}>
             {e.historial?.map((h, i) => (
               <li key={i} style={{ display: 'flex', flexDirection: 'column', gap: 2, paddingLeft: 14, borderLeft: '2px solid var(--linea)' }}>
                 <b style={{ fontSize: 14 }}>{MOTIVO[h.motivo] ?? h.motivo}</b>
+                <span style={{ fontSize: 14 }}>
+                  {h.motivo === 'REASIGNACION' ? <>De <b>{h.asesorAnterior ?? 'repositorio'}</b> a <b>{h.asesorNuevo ?? 'repositorio'}</b></>
+                    : SALIDAS.includes(h.motivo) ? <>Dejó de estar con <b>{h.asesorAnterior ?? '—'}</b></>
+                    : <>A cargo de <b>{h.asesorNuevo ?? 'nadie (repositorio)'}</b></>}
+                </span>
                 <span style={{ fontSize: 13, color: 'var(--texto-suave)' }}>
-                  {SALIDAS.includes(h.motivo) ? `Antes: ${h.asesorAnterior ?? '—'}` : h.hechoPor}
-                  {h.motivo === 'REASIGNACION' && ` · de ${h.asesorAnterior ?? '—'} a ${h.asesorNuevo ?? '—'}`}
-                  {' · '}{fecha(h.fecha)}
+                  {h.hechoPor} · {fecha(h.fecha)}
                 </span>
               </li>
             ))}
@@ -233,24 +235,28 @@ export function FichaEmpresa() {
 }
 
 
-/** Con qué operador está el prospecto y cuándo termina su contrato: el mejor momento para ofrecer la portabilidad */
-function ContratoActual({ e, editable, onGuardado }: { e: EmpresaDetalle; editable: boolean; onGuardado: (d: EmpresaDetalle) => void }) {
+/** Operador actual y cantidad de líneas que tiene hoy (estructura de Ann): dicen si vale la pena llamar primero */
+function OperadorLineas({ e, editable, onGuardado }: { e: EmpresaDetalle; editable: boolean; onGuardado: (d: EmpresaDetalle) => void }) {
   const c = e.contratoActual!;
   const [editando, setEditando] = useState(false);
   const [operadores, setOperadores] = useState<Operador[]>([]);
   const [operadorId, setOperadorId] = useState<number | ''>(c.operadorId ?? '');
-  const [fin, setFin] = useState(c.fin ?? '');
+  const [lineas, setLineas] = useState(c.lineas === null ? '' : String(c.lineas));
   const [ocupado, setOcupado] = useState(false);
   const [error, setError] = useState('');
 
   function abrir() {
-    setOperadorId(c.operadorId ?? ''); setFin(c.fin ?? ''); setError(''); setEditando(true);
+    setOperadorId(c.operadorId ?? ''); setLineas(c.lineas === null ? '' : String(c.lineas)); setError(''); setEditando(true);
     if (!operadores.length) negociacionesApi.catalogos().then((k) => setOperadores(k.operadores)).catch(() => undefined);
   }
 
   async function guardar() {
     setOcupado(true); setError('');
-    try { onGuardado(await empresasApi.guardarContratoActual(e.id, operadorId === '' ? null : operadorId, fin || null)); setEditando(false); }
+    try {
+      // La fecha de fin de contrato (si la hubiera) se conserva tal cual
+      onGuardado(await empresasApi.guardarContratoActual(e.id, operadorId === '' ? null : operadorId, c.fin, lineas === '' ? null : Number(lineas)));
+      setEditando(false);
+    }
     catch (err) { setError(err instanceof ErrorApi ? err.message : 'No se pudo guardar'); }
     finally { setOcupado(false); }
   }
@@ -259,27 +265,22 @@ function ContratoActual({ e, editable, onGuardado }: { e: EmpresaDetalle; editab
     <>
       <div style={{ height: 1, background: 'var(--linea)' }} />
       <div className="fila-acciones">
-        <h2 className="h2">Contrato con su operador actual</h2>
-        {editable && !editando && <button type="button" className="boton-secundario" onClick={abrir}>{c.fin || c.operadorId ? 'Editar' : 'Registrar'}</button>}
+        <h2 className="h2">Operador actual y líneas</h2>
+        {editable && !editando && <button type="button" className="boton-secundario" onClick={abrir}>{c.operadorId || c.lineas !== null ? 'Editar' : 'Registrar'}</button>}
       </div>
       {!editando && (
-        c.fin || c.operador ? (
-          <div className="contrato-actual">
-            <div className="contrato-actual__dato">
-              <b>{c.operador ?? 'Operador no registrado'}</b>
-              <span style={{ fontSize: 14, color: 'var(--texto-suave)' }}>{c.fin ? `Su contrato termina el ${fechaLarga(c.fin)}` : 'Sin fecha de fin registrada'}</span>
-            </div>
-            {c.fin && c.dias !== null && <span className={`reno-dias reno-dias--${urgencia(c.dias)}`}>{textoDias(c.dias)}</span>}
+        c.operador || c.lineas !== null ? (
+          <div className="rejilla-2">
+            <div className="dato"><span>Operador</span><b>{c.operador ?? 'Sin registrar'}</b></div>
+            <div className="dato"><span>Cantidad de líneas</span><b>{c.lineas === null ? 'Sin registrar' : c.lineas}</b></div>
           </div>
         ) : (
-          <p style={{ margin: 0, color: 'var(--texto-suave)', lineHeight: 1.5 }}>
-            ¿Sabes cuándo termina su contrato con su operador? Regístralo y te avisaremos con tiempo para ofrecerle la portabilidad.
-          </p>
+          <p style={{ margin: 0, color: 'var(--texto-suave)', lineHeight: 1.5 }}>¿Con qué operador está y cuántas líneas tiene hoy? Regístralo para priorizar esta empresa.</p>
         )
       )}
       {editando && (
         <div className="bloque">
-          <div className="contrato-actual__form">
+          <div className="rejilla-2">
             <div className="campo">
               <label htmlFor="op-actual" className="etiqueta">Operador actual</label>
               <select id="op-actual" className="entrada" value={operadorId} onChange={(ev) => setOperadorId(ev.target.value === '' ? '' : Number(ev.target.value))}>
@@ -288,8 +289,9 @@ function ContratoActual({ e, editable, onGuardado }: { e: EmpresaDetalle; editab
               </select>
             </div>
             <div className="campo">
-              <label htmlFor="fin-actual" className="etiqueta">Fin de su contrato</label>
-              <input id="fin-actual" type="date" className="entrada" value={fin} onChange={(ev) => setFin(ev.target.value)} />
+              <label htmlFor="lineas-actual" className="etiqueta">Cantidad de líneas</label>
+              <input id="lineas-actual" className="entrada numeros" inputMode="numeric" maxLength={5} value={lineas} placeholder="Ej. 25"
+                onChange={(ev) => setLineas(ev.target.value.replace(/\D/g, '').slice(0, 5))} />
             </div>
           </div>
           {error && <div className="alerta" role="alert">{error}</div>}

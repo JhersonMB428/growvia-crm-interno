@@ -7,8 +7,8 @@ import { MigrationInterface, QueryRunner } from 'typeorm';
  *  - Varias llamadas sin respuesta seguidas: la empresa pasa a otro asesor.
  *  - Se mide el tiempo que el asesor pasa en la ficha de la empresa antes de registrar la gestión.
  */
-export class Retencion1791270000018 implements MigrationInterface {
-  name = 'Retencion1791270000018';
+export class Retencion1791270000019 implements MigrationInterface {
+  name = 'Retencion1791270000019';
 
   public async up(q: QueryRunner): Promise<void> {
     await q.query(`

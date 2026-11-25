@@ -34,10 +34,8 @@ export function Embudo() {
   const c = r?.cierres;
   const pasos = e ? [
     { titulo: 'Abiertas', valor: e.abiertas, nota: 'negociaciones nuevas en el periodo' },
-    { titulo: 'Llegaron a contacto', valor: e.contacto, nota: 'hablaron con el cliente' },
-    { titulo: 'Llegaron a negociación', valor: e.negociacion, nota: 'recibieron una propuesta' },
-    { titulo: 'Ganadas', valor: e.ganadas, nota: 'el cliente aceptó' },
-    { titulo: 'Activas', valor: e.activas, nota: 'servicio instalado y sumando a la meta' },
+    { titulo: 'Llegaron a cierre', valor: e.cierre, nota: 'el cliente aceptó la oferta' },
+    { titulo: 'Ganadas', valor: e.ganadas, nota: 'expediente enviado y sumando a la meta' },
   ] : [];
   const tiempo = (etapa: string) => r?.tiempos.find((t) => t.etapa === etapa);
 
@@ -129,7 +127,7 @@ export function Embudo() {
             <section className="panel vidrio" style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
               <div className="panel-titulo"><h2 className="h2">Tiempo en cada etapa</h2><span>promedio</span></div>
               <div className="embudo-tiempos">
-                {(['PROSPECCION', 'CONTACTO', 'NEGOCIACION'] as const).map((et) => {
+                {(['NEGOCIACION', 'CIERRE'] as const).map((et) => {
                   const t = tiempo(et);
                   return (
                     <div key={et} className="embudo-tiempo">
@@ -143,7 +141,7 @@ export function Embudo() {
               <div className="panel-titulo"><h2 className="h2">¿En qué etapa se pierden?</h2></div>
               {r.porEtapa.length === 0
                 ? <p className="embudo-vacio">No hay negociaciones perdidas en el periodo.</p>
-                : <Barras titulo="Negociaciones perdidas por etapa" datos={(['PROSPECCION', 'CONTACTO', 'NEGOCIACION'] as const)
+                : <Barras titulo="Negociaciones perdidas por etapa" datos={(['NEGOCIACION', 'CIERRE'] as const)
                     .map((et) => ({ etiqueta: TEXTO_ETAPA[et], valor: r.porEtapa.find((x) => x.etapa === et)?.n ?? 0 }))} />}
             </section>
           </div>

@@ -145,16 +145,16 @@ export class LiberacionService {
       `INSERT INTO asignaciones (cliente_id, asesor_anterior, motivo, asignado_por) VALUES ($1, $2, $3, $4)`,
       [clienteId, asesorId, motivo, hechoPor],
     );
-    // Si tenía una negociación abierta, se cierra como perdida
+    // Si tenía una negociación abierta, se cierra como perdida (queda en la etapa en que estaba)
     const abiertas = filasDe<{ id: string; etapa: string }>(await tx.query(
-      `UPDATE oportunidades SET etapa = 'CIERRE', resultado = 'PERDIDA', fecha_cierre = now(), updated_at = now(), motivo_perdida = $2
+      `UPDATE oportunidades SET resultado = 'PERDIDA', fecha_cierre = now(), updated_at = now(), motivo_perdida = $2
        FROM (SELECT id, etapa FROM oportunidades WHERE cliente_id = $1 AND resultado = 'EN_CURSO' FOR UPDATE) a
        WHERE oportunidades.id = a.id RETURNING oportunidades.id, a.etapa`,
       [clienteId, DETALLE[motivo]],
     ));
     for (const o of abiertas) {
       await tx.query(
-        `INSERT INTO historial_etapas (oportunidad_id, etapa_anterior, etapa_nueva, detalle, usuario_id) VALUES ($1, $2, 'CIERRE', $3, $4)`,
+        `INSERT INTO historial_etapas (oportunidad_id, etapa_anterior, etapa_nueva, detalle, usuario_id) VALUES ($1, $2, 'PERDIDA', $3, $4)`,
         [o.id, o.etapa, `Perdida: ${DETALLE[motivo].toLowerCase()}`, hechoPor],
       );
     }

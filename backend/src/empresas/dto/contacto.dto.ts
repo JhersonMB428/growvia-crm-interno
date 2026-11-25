@@ -5,8 +5,14 @@ export class ContactoDto {
   @Length(2, 100, { message: 'El nombre del contacto debe tener entre 2 y 100 caracteres' })
   nombre: string;
 
-  @Matches(/^9\d{8}$/, { message: 'El celular debe tener 9 dígitos y empezar con 9' })
+  /** Celular (9…) o fijo con código de ciudad (01…, 044…): siempre 9 dígitos */
+  @Matches(/^[90]\d{8}$/, { message: 'El teléfono debe tener 9 dígitos: celular (9…) o fijo con código de ciudad (01…, 044…)' })
   celular: string;
+
+  /** DNI del representante legal (solo en el contacto 1) */
+  @IsOptional()
+  @Matches(/^\d{8}$/, { message: 'El DNI debe tener 8 dígitos' })
+  dni?: string;
 
   @IsOptional()
   @IsEmail({}, { message: 'El correo del contacto no es válido' })

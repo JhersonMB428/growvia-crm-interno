@@ -3,6 +3,7 @@ import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { ErrorApi } from '../../api/cliente';
 import { empresasApi, textoBloqueo, type EmpresaResumen, type Pagina } from '../../api/empresas';
 import { ListaEmpresas } from '../../componentes/ListaEmpresas';
+import { FiltrosComerciales } from '../../componentes/FiltrosComerciales';
 import { useDebounce } from '../../hooks/useDebounce';
 import { useSesion } from '../../sesion/SesionContext';
 
@@ -16,6 +17,7 @@ export function Repositorio() {
   const [q, setQ] = useState(params.get('q') ?? '');
   const [filtro, setFiltro] = useState<Filtro>(params.get('q') ? 'todas' : 'libres');
   const [pagina, setPagina] = useState(1);
+  const [comercial, setComercial] = useState<{ operadorId: number | ''; lineasMin: number | '' }>({ operadorId: '', lineasMin: '' });
   const [datos, setDatos] = useState<Pagina<EmpresaResumen> | null>(null);
   const [cargando, setCargando] = useState(true);
   const [tomando, setTomando] = useState<string | null>(null);
@@ -29,13 +31,13 @@ export function Repositorio() {
 
   const cargar = () => {
     setCargando(true);
-    empresasApi.repositorio({ q: busqueda, filtro, pagina })
+    empresasApi.repositorio({ q: busqueda, filtro, pagina, operadorId: comercial.operadorId || undefined, lineasMin: comercial.lineasMin || undefined })
       .then((d) => { setDatos(d); setError(''); })
       .catch((e) => setError(e instanceof ErrorApi ? e.message : 'No se pudo cargar el repositorio'))
       .finally(() => setCargando(false));
   };
-  useEffect(() => { setPagina(1); }, [busqueda, filtro]);
-  useEffect(cargar, [busqueda, filtro, pagina]);
+  useEffect(() => { setPagina(1); }, [busqueda, filtro, comercial]);
+  useEffect(cargar, [busqueda, filtro, pagina, comercial]);
 
   async function tomar(e: EmpresaResumen) {
     setTomando(e.id); setError('');
@@ -71,6 +73,7 @@ export function Repositorio() {
             <label htmlFor="q" className="oculto-visual">Buscar</label>
             <input id="q" className="entrada" type="search" placeholder="Buscar por RUC o razón social" value={q} onChange={(e) => setQ(e.target.value)} />
           </div>
+          <FiltrosComerciales {...comercial} onCambio={setComercial} />
           <div className="pestanas" role="group" aria-label="Filtrar">
             {([['libres', 'Libres'], ['asignadas', 'Asignadas'], ['todas', 'Todas']] as [Filtro, string][]).map(([v, t]) => (
               <button key={v} type="button" className={`pestana${filtro === v ? ' pestana--activa' : ''}`} aria-pressed={filtro === v} onClick={() => setFiltro(v)}>{t}</button>
