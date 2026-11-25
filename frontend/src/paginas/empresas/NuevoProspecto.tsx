@@ -66,7 +66,8 @@ export function NuevoProspecto() {
     ...(errRuc ? [`RUC: ${errRuc}`] : revision.estado === 'existe' ? ['RUC: ya está registrado en el CRM'] : revision.estado === 'revisando' ? ['RUC: espera a que terminemos de revisarlo'] : []),
     ...(razon.trim().length < 3 ? [razon.trim() ? 'Razón social: escribe al menos 3 letras' : 'Escribe la razón social'] : []),
     ...(!distritoId ? ['Elige departamento, provincia y distrito'] : []),
-    ...problemasContactos(contactos),
+    // Sin teléfono se puede guardar: la empresa queda marcada con "Falta: teléfono"
+    ...problemasContactos(contactos, true),
   ];
   const listo = faltantes.length === 0 && revision.estado === 'libre';
 
@@ -136,7 +137,7 @@ export function NuevoProspecto() {
 
         <section style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
           <h2 className="h2">Contactos <span style={{ fontSize: 14, fontWeight: 500, color: 'var(--texto-tenue)' }}>· máximo 2</span></h2>
-          <EditorContactos contactos={contactos} onChange={setContactos} mostrarErrores={intentado} />
+          <EditorContactos contactos={contactos} onChange={setContactos} mostrarErrores={intentado} telefonoRepOpcional />
         </section>
 
         {intentado && <Faltantes items={faltantes} />}
