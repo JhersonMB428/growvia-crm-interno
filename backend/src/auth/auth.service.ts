@@ -1,5 +1,6 @@
 import {
   ForbiddenException, HttpException, HttpStatus, Injectable, UnauthorizedException,
+  BadRequestException,
 } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { JwtService } from '@nestjs/jwt';
@@ -7,7 +8,9 @@ import { InjectRepository } from '@nestjs/typeorm';
 import * as bcrypt from 'bcrypt';
 import { createHash, randomInt } from 'crypto';
 import { IsNull, LessThanOrEqual, MoreThan, Repository } from 'typeorm';
+import { BitacoraService } from '../bitacora/bitacora.service';
 import { CorreoService } from '../correo/correo.service';
+import { SesionUsuario } from './decorators/usuario-actual.decorator';
 import { ParametrosService } from '../sistema/parametros.service';
 import { Usuario } from '../usuarios/entities/usuario.entity';
 import { nombreDelEquipo } from './clave';
@@ -39,6 +42,7 @@ export class AuthService {
     private readonly config: ConfigService,
     private readonly parametros: ParametrosService,
     private readonly correo: CorreoService,
+    private readonly bitacora: BitacoraService,
   ) {}
 
   // ───────────────────────── 1. Correo + contraseña ─────────────────────────
@@ -150,6 +154,63 @@ export class AuthService {
       /** Cambia cada vez que se cambia la foto (null = sin foto) */
       fotoVersion: u.fotoAt ? u.fotoAt.getTime() : null,
     };
+  }
+
+  // ───────────────────────── Ver el CRM como otro usuario (soporte) ─────────────────────────
+  /**
+   * Solo los correos de la variable CORREOS_SOPORTE (Jherson y Samuel), con rol de administrador.
+   * Pueden ver cualquier pantalla tal como la ve otro usuario, sin poder cambiar nada (lo bloquea JwtAuthGuard).
+   */
+  async esSoporte(usuarioId: string): Promise<boolean> {
+    const lista = (this.config.get<string>('CORREOS_SOPORTE') ?? '').split(',').map((c) => c.trim().toLowerCase()).filter(Boolean);
+    if (!lista.length) return false;
+    const u = await this.usuarios.findOne({ where: { id: usuarioId }, relations: { rol: true } });
+    return !!u?.activo && u.rol.codigo === 'ADMIN' && lista.includes(u.email.toLowerCase());
+  }
+
+  /** Datos del usuario en pantalla; en modo "ver como" dice quién está mirando */
+  async yo(s: SesionUsuario) {
+    const perfil = await this.perfil(s.sub);
+    if (s.vistaDe) {
+      const [admin] = await this.usuarios.query(`SELECT nombres || ' ' || apellidos AS nombre FROM usuarios WHERE id = $1`, [s.vistaDe]);
+      // Mientras mira no se le pide cambiar contraseña ni se le muestra el recorrido al otro usuario
+      return { ...perfil, debeCambiarClave: false, guiaVista: true, vista: { de: admin?.nombre ?? 'Soporte' }, puedeVerComo: false };
+    }
+    return { ...perfil, vista: null, puedeVerComo: await this.esSoporte(s.sub) };
+  }
+
+  /** Usuarios activos que se pueden mirar, agrupados por rol en la pantalla */
+  async usuariosParaVer(s: SesionUsuario) {
+    if (s.vistaDe || !(await this.esSoporte(s.sub))) throw new ForbiddenException('Esta opción es solo para soporte del CRM');
+    return this.usuarios.query(
+      `SELECT u.id, u.nombres || ' ' || u.apellidos AS nombre, u.email, r.codigo AS rol, r.nombre AS "rolNombre", e.nombre AS equipo
+       FROM usuarios u JOIN roles r ON r.id = u.rol_id LEFT JOIN equipos e ON e.id = u.equipo_id
+       WHERE u.activo AND u.id <> $1
+       ORDER BY CASE r.codigo WHEN 'ASESOR' THEN 1 WHEN 'SUPERVISOR' THEN 2 WHEN 'GERENTE' THEN 3 WHEN 'BACKOFFICE' THEN 4 ELSE 5 END,
+                e.nombre NULLS LAST, u.nombres`, [s.sub],
+    );
+  }
+
+  /** Token de solo lectura con los datos del otro usuario (vence en 2 horas) */
+  async verComo(s: SesionUsuario, usuarioId: string, ip: string) {
+    if (s.vistaDe) throw new BadRequestException('Primero vuelve a tu cuenta');
+    if (!(await this.esSoporte(s.sub))) throw new ForbiddenException('Esta opción es solo para soporte del CRM');
+    if (usuarioId === s.sub) throw new BadRequestException('Elige a otro usuario');
+    const usuario = await this.perfil(usuarioId).catch(() => { throw new BadRequestException('El usuario no existe o no está activo'); });
+    const token = await this.jwt.signAsync(
+      { sub: usuario.id, tipo: 'acceso', rol: usuario.rol.codigo, equipoId: usuario.equipo?.id ?? null, permisos: usuario.permisos, vistaDe: s.sub },
+      { expiresIn: 2 * 3600 },
+    );
+    await this.bitacora.registrar(s.sub, 'VISTA_INICIAR', { ip, entidad: 'USUARIO', entidadId: usuario.id, detalle: { email: usuario.email, rol: usuario.rol.codigo } });
+    return { token, usuario: await this.yo({ ...s, sub: usuario.id, vistaDe: s.sub }) };
+  }
+
+  /** Vuelve a la sesión normal del administrador */
+  async salirDeVista(s: SesionUsuario, ip: string) {
+    if (!s.vistaDe) throw new BadRequestException('No estás viendo el CRM como otro usuario');
+    await this.bitacora.registrar(s.vistaDe, 'VISTA_SALIR', { ip, entidad: 'USUARIO', entidadId: s.sub });
+    const sesion = await this.emitirSesion(s.vistaDe);
+    return { ...sesion, usuario: await this.yo({ ...s, sub: s.vistaDe, vistaDe: undefined }) };
   }
 
   // ───────────────────────── Ayudantes ─────────────────────────

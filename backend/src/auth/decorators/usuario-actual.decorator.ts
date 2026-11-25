@@ -6,6 +6,8 @@ export interface SesionUsuario {
   rol: string;
   equipoId: string | null;
   permisos: string[];
+  /** Solo en el modo "ver como": id del administrador de soporte que está mirando (solo lectura) */
+  vistaDe?: string;
 }
 
 /** Ej.: perfil(@UsuarioActual() u: SesionUsuario) */
