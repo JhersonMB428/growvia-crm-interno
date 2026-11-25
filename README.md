@@ -2,7 +2,7 @@
 
 CRM de ventas corporativas de Growvia (líneas móviles y fijas). Sirve para el día a día del equipo comercial: asesores, supervisores, back office y gerencia.
 
-> Es un sistema **separado** del Growvia CRM que se vende por suscripción a otras empresas.
+> **Uso interno y confidencial.** Este repositorio y su contenido son propiedad de Growvia. No se debe compartir fuera de la empresa.
 
 ## Qué hace
 
@@ -11,34 +11,30 @@ CRM de ventas corporativas de Growvia (líneas móviles y fijas). Sirve para el 
 | **Asesor** | Tomar empresas libres del repositorio, registrar prospectos, gestiones y agenda, negociar y cerrar ventas, subir el expediente, ver sus renovaciones y subir bases (con aprobación). |
 | **Supervisor** | Ver el avance de su equipo, aprobar ventas, definir metas, aprobar bases, ver embudo y pérdidas, y reasignar empresas. Solo ve **su** equipo. |
 | **Back office** | Validar ventas con checklist y expediente, registrar la posventa hasta que el servicio queda activo, mantener los datos de empresas y crear usuarios. |
-| **Gerencia** | Ver reportes generales (líneas, cargo fijo, metas, distritos, equipos, operadores), revisar ventas, ver embudo y renovaciones de toda la empresa, **exportar** a Excel, ver la bitácora y aprobar el acceso desde celular. |
+| **Gerencia** | Ver reportes generales, revisar ventas, ver embudo y renovaciones de toda la empresa, **exportar** a Excel, ver la bitácora y aprobar el acceso desde celular. |
 | **Administrador** | Manejar usuarios, equipos, planes, operadores y parámetros del sistema. |
 
 Para todos:
 - Verificación por código en equipos nuevos.
-- Notificaciones, buscador de empresas (sin importar tildes) y foto de perfil.
-- Modo claro, modo oscuro y modo lite (para PCs con pocos recursos).
-- Guía de uso dentro del CRM con recorrido de bienvenida por rol.
+- Notificaciones, buscador de empresas y foto de perfil.
+- Modo claro, modo oscuro y modo lite.
+- Guía de uso dentro del CRM.
 
-### Seguridad y reglas de negocio
+### Reglas de seguridad
 
-- **La información es unidireccional:** los asesores no pueden descargar la base de clientes. **Solo gerencia exporta**, y cada exportación queda en la bitácora.
-- Los datos generales de las empresas son comunes; los contactos y la información comercial son privados del asesor dueño.
+- **La información es unidireccional:** solo gerencia exporta, y cada exportación queda en la bitácora.
+- Los contactos y la información comercial son privados del asesor dueño.
 - Un supervisor no ve otros equipos.
-- El acceso desde celular está **bloqueado por defecto**. Gerencia lo aprueba con fecha de fin (máximo 30 días).
-- **Bitácora** de ingresos, accesos denegados, exportaciones y cambios. No se puede modificar ni borrar.
-- Si una empresa pasa demasiados días sin gestión, vuelve sola al repositorio.
-- En producción, los usuarios de prueba quedan desactivados automáticamente.
+- El acceso desde celular está bloqueado por defecto; gerencia lo aprueba con fecha de fin.
+- La bitácora no se puede modificar ni borrar.
 
 ## Tecnología
 
 | Parte | Stack |
 |---|---|
-| Backend | NestJS 11 + TypeORM + PostgreSQL 16, monolito modular |
-| Frontend | React 19 + Vite + TypeScript |
-| Archivos | Azure Blob Storage en producción; carpeta `backend/almacen/` en local |
-| Correo | SMTP en producción; en local se muestra en la terminal |
-| Despliegue | Docker (una sola imagen con backend y frontend) en Azure Container Apps |
+| Backend | NestJS + TypeORM + PostgreSQL, monolito modular |
+| Frontend | React + Vite + TypeScript |
+| Despliegue | Docker (una sola imagen con backend y frontend) en Azure |
 
 ## Estructura
 
@@ -46,73 +42,37 @@ Para todos:
 growvia-crm-interno/
 ├── backend/
 │   └── src/
-│       ├── auth/            Login, código de verificación, permisos
-│       ├── empresas/        Repositorio, fichas, contactos, reasignación
-│       ├── gestiones/       Llamadas, visitas y agenda
-│       ├── negociaciones/   Negociaciones, planes y renovación de contratos
-│       ├── validacion/      Aprobación del supervisor y validación de back office
+│       ├── auth/            Ingreso, verificación y permisos
+│       ├── empresas/        Repositorio, fichas y reasignación
+│       ├── gestiones/       Gestiones y agenda
+│       ├── negociaciones/   Negociaciones, planes y renovaciones de contrato
+│       ├── validacion/      Aprobación y validación de ventas
 │       ├── expediente/      Documentos de cada venta
-│       ├── renovaciones/    Contratos por vencer y avisos automáticos
-│       ├── embudo/          Conversión por etapa y motivos de pérdida
+│       ├── renovaciones/    Contratos por vencer y avisos
+│       ├── embudo/          Conversión y motivos de pérdida
 │       ├── tableros/        Inicio por rol, reportes y metas
-│       ├── bases/           Carga masiva de empresas por Excel
-│       ├── exportacion/     Exportación a Excel (solo gerencia)
-│       ├── bitacora/        Registro de auditoría
-│       ├── accesos-movil/   Permisos de acceso desde celular
-│       ├── administracion/  Usuarios, equipos, planes, parámetros
-│       ├── ...              (perfil, fotos, notificaciones, correo, almacenamiento, ubigeo)
-│       └── database/migrations/   Todas las tablas y datos iniciales
+│       ├── bases/           Carga de empresas por Excel
+│       ├── exportacion/     Exportación (solo gerencia)
+│       ├── bitacora/        Auditoría
+│       ├── accesos-movil/   Acceso desde celular
+│       ├── administracion/  Usuarios, equipos y parámetros
+│       ├── ...              Perfil, fotos, notificaciones, correo, almacenamiento, ubigeo
+│       └── database/migrations/
 ├── frontend/
-│   ├── public/img/          Logo y fondos
 │   └── src/
-│       ├── paginas/         Una carpeta por sección del CRM
+│       ├── paginas/         Una carpeta por sección
 │       ├── componentes/     Piezas reutilizables
 │       ├── api/             Llamadas al backend
-│       ├── sesion/          Sesión del usuario y rutas privadas
-│       └── tema/            Modo claro/oscuro y modo lite
-├── scripts/desplegar.ps1    Publica una nueva versión en Azure
+│       ├── sesion/          Sesión y rutas privadas
+│       └── tema/            Modo claro/oscuro y lite
+├── scripts/                 Despliegue
 ├── Dockerfile
-├── INSTALACION.md           Guía paso a paso para levantarlo en local
-└── .env                     Variables locales (NO se sube a git)
+└── INSTALACION.md           Cómo levantarlo en local
 ```
 
 ## Levantarlo en local
 
-La guía completa está en **[INSTALACION.md](INSTALACION.md)**. En resumen:
-
-```powershell
-# 1. Base de datos
-docker run -d --name growvia-crm-db -e POSTGRES_USER=growvia -e POSTGRES_PASSWORD=growvia_dev -e POSTGRES_DB=growvia_crm -p 5432:5432 -v growvia-crm-datos:/var/lib/postgresql/data postgres:16
-
-# 2. Crear .env en la raíz (ver INSTALACION.md)
-
-# 3. Backend
-cd backend
-npm install
-npm run migration:run
-npm run start:dev
-
-# 4. Frontend (otra terminal)
-cd frontend
-npm install
-npm run dev
-```
-
-Abrir http://localhost:5173
-
-### Usuarios de prueba (solo local)
-
-Contraseña para todos: `Growvia2026!`
-
-| Correo | Rol |
-|---|---|
-| mrios@growvia.global | Asesora, Equipo 1 |
-| cmendoza@growvia.global | Supervisor, Equipo 1 |
-| lherrera@growvia.global | Gerente |
-| rparedes@growvia.global | Back office |
-| admin@growvia.global | Administrador |
-
-El código de verificación aparece en la terminal del backend.
+Sigue la guía **[INSTALACION.md](INSTALACION.md)**. Las credenciales de prueba las entrega el responsable del proyecto; no se publican en el repositorio.
 
 ## Comandos útiles
 
@@ -120,9 +80,9 @@ Se corren **dentro de `backend/`**:
 
 | Comando | Para qué |
 |---|---|
-| `npm run start:dev` | Levanta el backend con recarga automática |
+| `npm run start:dev` | Levanta el backend en modo desarrollo |
 | `npm run migration:run` | Aplica las migraciones pendientes |
-| `npm run migration:show` | Muestra qué migraciones están aplicadas |
+| `npm run migration:show` | Muestra las migraciones aplicadas |
 | `npm run migration:revert` | Deshace la última migración |
 | `npm run build` | Compila para producción |
 
@@ -130,48 +90,21 @@ Se corren **dentro de `frontend/`**:
 
 | Comando | Para qué |
 |---|---|
-| `npm run dev` | Levanta el frontend en http://localhost:5173 |
+| `npm run dev` | Levanta el frontend |
 | `npm run build` | Compila para producción |
 
-**Regla:** las tablas solo se crean o cambian con migraciones (`synchronize` está apagado). Para cambiar la base de datos se crea una migración nueva en `backend/src/database/migrations/`. Nunca se edita una que ya fue aplicada.
+**Regla:** la base de datos solo se cambia con migraciones nuevas en `backend/src/database/migrations/`. Nunca se edita una que ya fue aplicada.
 
-## Variables de entorno
+## Configuración
 
-| Variable | Local | Producción | Descripción |
-|---|---|---|---|
-| `DATABASE_URL` | ✔ | ✔ | Conexión a PostgreSQL |
-| `JWT_SECRET` | ✔ | ✔ (mín. 32 caracteres) | Firma de las sesiones |
-| `JWT_EXPIRES_IN` | ✔ | ✔ | Duración de la sesión (ej. `8h`) |
-| `FRONTEND_URL` | ✔ | ✔ (https) | Dirección del CRM |
-| `PORT` | opcional | — | Puerto del backend (3000) |
-| `SMTP_HOST`, `SMTP_PORT`, `SMTP_USER`, `SMTP_PASS` | — | ✔ | Servidor de correo para los códigos |
-| `CORREO_REMITENTE` | — | opcional | Remitente de los correos |
-| `AZURE_STORAGE_CONNECTION_STRING` | — | ✔ | Almacenamiento de documentos y fotos |
-| `AZURE_STORAGE_CONTAINER` | — | opcional | Contenedor (por defecto `expedientes`) |
-| `CORREO_ADMIN_INICIAL` | — | primer arranque | Correo real del administrador |
-| `MIGRAR_AL_INICIAR` | — | `true` (en el Dockerfile) | Aplica migraciones al arrancar |
+La configuración va en variables de entorno. En local se ponen en un archivo `.env` en la raíz, que **no se sube a git**; en producción se configuran en Azure. Las variables necesarias están en INSTALACION.md. En producción, el backend no arranca si falta alguna obligatoria.
 
-En producción, el backend **no arranca** si falta alguna variable obligatoria.
+## Despliegue
 
-## Despliegue en Azure
-
-- Una sola imagen Docker: el backend sirve también el frontend compilado.
-- Destino: Azure Container Apps (`growvia-crm`, grupo `growvia-crm-rg`), imagen en `growviaregistry`.
-- Base de datos `growvia_crm` en el servidor PostgreSQL de Growvia; archivos en Azure Blob Storage.
-- Dominio: `crm.growvia.global`.
-
-Para publicar una nueva versión, primero haz commit y luego, desde la raíz:
-
-```powershell
-powershell -ExecutionPolicy Bypass -File .\scripts\desplegar.ps1
-```
+El despliegue a Azure se hace con el script de `scripts/`, solo por personal autorizado.
 
 ## Reglas del repositorio
 
-- **Nunca** subir el `.env`, contraseñas, claves de Azure ni la carpeta `backend/almacen/`.
-- Los usuarios de prueba y la clave `Growvia2026!` son solo para local.
+- **Nunca** subir el `.env`, contraseñas, claves o cadenas de conexión, ni la carpeta `backend/almacen/`.
+- No subir datos reales de clientes (bases, Excel, documentos).
 - Antes de hacer push, revisa `git status`.
-
----
-
-Desarrollado por Corevia para Growvia · 2026

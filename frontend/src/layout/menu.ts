@@ -38,42 +38,35 @@ export const ICONOS = {
 
 const I = (ruta: string, etiqueta: string, icono: ItemMenu['icono']): ItemMenu => ({ ruta, etiqueta, icono });
 
-/** Menú lateral de cada rol (según la matriz acordada en la reunión del 05/10) */
+/** Menú lateral de cada rol (matriz del 05/10, con los ajustes de gerencia del 12/10) */
 export const MENU_POR_ROL: Record<Rol, ItemMenu[]> = {
   ASESOR: [
     I('/inicio', 'Inicio', 'inicio'),
     I('/empresas', 'Mis empresas', 'empresas'),
     I('/negociaciones', 'Negociaciones', 'negociaciones'),
-    I('/renovaciones', 'Renovaciones', 'renovar'),
     I('/agenda', 'Agenda', 'agenda'),
-    I('/bases', 'Cargar base', 'base'),
   ],
   SUPERVISOR: [
     I('/equipo', 'Mi equipo', 'equipo'),
-    I('/aprobaciones', 'Aprobaciones', 'validar'),
     I('/embudo', 'Embudo y pérdidas', 'embudo'),
     I('/metas', 'Metas', 'metas'),
     I('/repositorio', 'Empresas', 'empresas'),
     I('/negociaciones', 'Negociaciones', 'negociaciones'),
-    I('/renovaciones', 'Renovaciones', 'renovar'),
     I('/bases', 'Cargar base', 'base'),
   ],
   GERENTE: [
     I('/reportes', 'Reportes', 'reportes'),
     I('/embudo', 'Embudo y pérdidas', 'embudo'),
-    I('/revision', 'Revisión de ventas', 'validar'),
     I('/metas', 'Metas', 'metas'),
     I('/repositorio', 'Empresas', 'empresas'),
     I('/negociaciones', 'Negociaciones', 'negociaciones'),
-    I('/renovaciones', 'Renovaciones', 'renovar'),
     I('/bases', 'Cargar base', 'base'),
     I('/exportar', 'Exportar', 'exportar'),
     I('/bitacora', 'Bitácora', 'bitacora'),
     I('/accesos-celular', 'Acceso celular', 'celular'),
   ],
   BACKOFFICE: [
-    I('/resumen', 'Resumen', 'inicio'),
-    I('/validacion', 'Validar ventas', 'validar'),
+    I('/negociaciones', 'Ventas', 'negociaciones'),
     I('/repositorio', 'Empresas', 'empresas'),
     I('/usuarios', 'Usuarios', 'usuarios'),
   ],
@@ -89,6 +82,6 @@ export const INICIO_POR_ROL: Record<Rol, string> = {
   ASESOR: '/inicio',
   SUPERVISOR: '/equipo',
   GERENTE: '/reportes',
-  BACKOFFICE: '/resumen',
+  BACKOFFICE: '/negociaciones',
   ADMIN: '/usuarios',
 };

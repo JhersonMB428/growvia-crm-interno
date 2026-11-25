@@ -1,21 +1,14 @@
 import { useEffect, useState } from 'react';
 import { Link, useLocation, useNavigate, useParams } from 'react-router-dom';
 import { ErrorApi } from '../../api/cliente';
+import { TEXTO_CANAL } from '../../api/gestiones';
 import {
-  ETAPAS, fechaLarga, negociacionesApi, resumenLineas, soles, textoPlazo, TEXTO_ESTADO_VENTA, TEXTO_ETAPA, TEXTO_SERVICIO, TEXTO_TIPO,
-  type Etapa, type NegociacionDetalle,
+  estadoDe, negociacionesApi, resumenLineas, soles, TEXTO_ETAPA, TEXTO_SERVICIO, type NegociacionDetalle,
 } from '../../api/negociaciones';
-import { textoDias } from '../../api/renovaciones';
-import { TEXTO_DECISION, TEXTO_EVENTO, validacionApi } from '../../api/validacion';
-import { ExpedienteVenta } from '../../componentes/ExpedienteVenta';
+import { FormGestion } from '../../componentes/FormGestion';
 import './negociaciones.css';
+
 const fecha = (iso: string) => new Date(iso).toLocaleString('es-PE', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' });
-const ORDEN: Etapa[] = ['PROSPECCION', 'CONTACTO', 'NEGOCIACION', 'CIERRE'];
-/** Días que faltan hasta una fecha AAAA-MM-DD (negativo si ya pasó) */
-const diasHasta = (d: string) => {
-  const hoy = new Date(); hoy.setHours(12, 0, 0, 0);
-  return Math.round((new Date(`${d}T12:00:00`).getTime() - hoy.getTime()) / 86400000);
-};
 
 export function FichaNegociacion() {
   const { id = '' } = useParams();
@@ -26,8 +19,12 @@ export function FichaNegociacion() {
   const [error, setError] = useState('');
   const [ocupado, setOcupado] = useState(false);
   const [cierre, setCierre] = useState<'' | 'GANADA' | 'PERDIDA'>('');
+  const [enviado, setEnviado] = useState(false);
   const [motivo, setMotivo] = useState('');
   const [otro, setOtro] = useState('');
+  const [comentando, setComentando] = useState(false);
+
+  const cargar = () => negociacionesApi.detalle(id).then(setN);
 
   useEffect(() => {
     negociacionesApi.detalle(id).then(setN).catch((e) => setError(e instanceof ErrorApi ? e.message : 'No se pudo cargar la negociación'));
@@ -36,7 +33,7 @@ export function FichaNegociacion() {
 
   async function ejecutar(accion: () => Promise<NegociacionDetalle>, mensaje: string) {
     setOcupado(true); setError(''); setAviso('');
-    try { setN(await accion()); setAviso(mensaje); setCierre(''); }
+    try { setN(await accion()); setAviso(mensaje); setCierre(''); setEnviado(false); }
     catch (e) { setError(e instanceof ErrorApi ? e.message : 'No se pudo completar la acción'); }
     finally { setOcupado(false); }
   }
@@ -45,7 +42,8 @@ export function FichaNegociacion() {
   if (!n) return <p style={{ color: 'var(--texto-suave)' }}>Cargando…</p>;
 
   const motivoFinal = motivo === 'Otro' ? otro.trim() : motivo;
-  const indice = ORDEN.indexOf(n.etapa);
+  const enCurso = n.resultado === 'EN_CURSO';
+  const chip = n.resultado === 'GANADA' ? 'chip--lima' : n.resultado === 'PERDIDA' ? 'chip--crema' : 'chip--gris';
 
   return (
     <>
@@ -53,18 +51,13 @@ export function FichaNegociacion() {
         <div className="encabezado" style={{ padding: 0 }}>
           <button type="button" className="boton-texto" style={{ alignSelf: 'flex-start', minHeight: 0 }} onClick={() => navegar(-1)}>← Volver</button>
           <h1>{n.razonSocial}</h1>
-          <p className="numeros">
-            {n.codigo} · {TEXTO_TIPO[n.tipo]}
-            {n.renuevaId && <> de <Link to={`/negociaciones/${n.renuevaId}`}>{n.renuevaCodigo}</Link></>}
-            {n.servicio ? ` · ${TEXTO_SERVICIO[n.servicio]}` : ''} · RUC {n.ruc}
-          </p>
+          <p className="numeros">{n.codigo}{n.servicio ? ` · ${TEXTO_SERVICIO[n.servicio]}` : ''} · RUC {n.ruc}</p>
         </div>
         <div style={{ display: 'flex', gap: 10, alignItems: 'center', flexWrap: 'wrap' }}>
-          {n.resultado === 'EN_CURSO' && <span className="chip chip--gris">En curso · {TEXTO_ETAPA[n.etapa]}</span>}
-          {n.resultado === 'GANADA' && n.estadoVenta && <span className="chip chip--lima">Ganada · {TEXTO_ESTADO_VENTA[n.estadoVenta]}</span>}
-          {n.resultado === 'PERDIDA' && <span className="chip chip--crema">Perdida</span>}
+          <span className={`chip ${chip}`}>{enCurso ? `En curso · ${estadoDe(n)}` : estadoDe(n)}</span>
           <Link to={`/empresas/${n.clienteId}`} className="boton-secundario">Ver empresa</Link>
-          {(n.puedeEditar || n.puedeCorregir) && <Link to={`/negociaciones/${n.id}/editar`} className="boton-secundario">{n.puedeCorregir ? 'Corregir planes' : 'Editar planes'}</Link>}        </div>
+          {n.puedeEditar && <Link to={`/negociaciones/${n.id}/editar`} className="boton-secundario">Editar servicios</Link>}
+        </div>
       </div>
 
       {aviso && <div className="aviso" role="status">{aviso}</div>}
@@ -72,50 +65,57 @@ export function FichaNegociacion() {
 
       <div style={{ display: 'flex', flexWrap: 'wrap', gap: 20, alignItems: 'flex-start' }}>
         <div style={{ flex: '2 1 600px', minWidth: 0, display: 'flex', flexDirection: 'column', gap: 20 }}>
-          {/* Etapas */}
+          {/* Etapa */}
           <section className="panel vidrio" style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
             <div className="fila-acciones">
               <h2 className="h2">Etapa</h2>
               {n.puedeEditar && <span style={{ fontSize: 13, color: 'var(--texto-tenue)' }}>Toca una etapa para mover la negociación</span>}
             </div>
             <div className="etapas">
-              {ETAPAS.map((e, i) => {
-                const clase = `etapa${n.etapa === e.valor ? ' etapa--actual' : i < indice ? ' etapa--hecha' : ''}`;
+              {(['NEGOCIACION', 'CIERRE'] as const).map((e) => {
+                const clase = `etapa${n.etapa === e ? ' etapa--actual' : e === 'NEGOCIACION' && n.etapa === 'CIERRE' ? ' etapa--hecha' : ''}`;
                 return n.puedeEditar ? (
-                  <button key={e.valor} type="button" className={clase} disabled={ocupado || n.etapa === e.valor} aria-pressed={n.etapa === e.valor}
-                    onClick={() => ejecutar(() => negociacionesApi.cambiarEtapa(n.id, e.valor), `Pasó a ${e.texto}.`)}>{e.texto}</button>
-                ) : <span key={e.valor} className={clase}>{e.texto}</span>;
+                  <button key={e} type="button" className={clase} disabled={ocupado || n.etapa === e} aria-pressed={n.etapa === e}
+                    onClick={() => ejecutar(() => negociacionesApi.cambiarEtapa(n.id, e), `Pasó a ${TEXTO_ETAPA[e]}.`)}>{TEXTO_ETAPA[e]}</button>
+                ) : <span key={e} className={clase}>{TEXTO_ETAPA[e]}</span>;
               })}
-              <span className={`etapa${n.etapa === 'CIERRE' ? ' etapa--actual' : ''}`}>
-                {n.resultado === 'GANADA' ? 'Cierre · ganada' : n.resultado === 'PERDIDA' ? 'Cierre · perdida' : 'Cierre'}
-              </span>
             </div>
 
-            {n.resultado === 'PERDIDA' && <p style={{ margin: 0, color: 'var(--texto-suave)' }}><b>Motivo:</b> {n.motivoPerdida}</p>}
-            {n.resultado === 'GANADA' && n.estadoVenta === 'EN_VALIDACION' && (
-              <p style={{ margin: 0, color: 'var(--texto-suave)', lineHeight: 1.5 }}>
-                En validación{n.pasoActual ? `: ${n.pasoActual.toLowerCase()}` : ''}. Cuenta para la meta cuando el servicio queda activo.
+            {enCurso && n.etapa === 'NEGOCIACION' && (
+              <p style={{ margin: 0, color: 'var(--texto-suave)', lineHeight: 1.5, fontSize: 14 }}>
+                Cuando el cliente acepte la oferta, pásala a <b>Cierre</b>. Desde ahí se marca como ganada, una vez enviado el expediente a back office por correo.
               </p>
             )}
+            {enCurso && n.etapa === 'CIERRE' && (
+              <p style={{ margin: 0, color: 'var(--texto-suave)', lineHeight: 1.5, fontSize: 14 }}>
+                El cliente aceptó. Envía el expediente a back office <b>por correo</b> y, cuando esté enviado, márcala como ganada{n.puedeEditar ? ' (tu supervisor también puede hacerlo)' : ''}.
+              </p>
+            )}
+            {n.resultado === 'PERDIDA' && <p style={{ margin: 0, color: 'var(--texto-suave)' }}><b>Motivo:</b> {n.motivoPerdida}</p>}
+            {n.resultado === 'GANADA' && <div className="aviso" role="status">Venta ganada el {fecha(n.fechaCierre!)}. Ya suma a la meta.</div>}
 
-            {n.puedeEditar && !cierre && (
+            {(n.puedeEditar || n.puedeGanar) && !cierre && (
               <div className="fila-acciones" style={{ justifyContent: 'flex-end' }}>
-                <button type="button" className="boton-secundario" onClick={() => { setCierre('PERDIDA'); setMotivo(''); setOtro(''); }}>Marcar como perdida</button>
-                <button type="button" className="boton" onClick={() => setCierre('GANADA')}>Marcar como ganada</button>
+                {n.puedeEditar && <button type="button" className="boton-secundario" onClick={() => { setCierre('PERDIDA'); setMotivo(''); setOtro(''); }}>Marcar como perdida</button>}
+                {n.puedeGanar && <button type="button" className="boton" onClick={() => { setCierre('GANADA'); setEnviado(false); }}>Marcar como ganada</button>}
               </div>
             )}
 
             {cierre === 'GANADA' && (
               <div className="bloque" role="group" aria-label="Confirmar venta ganada">
-                <b>¿Confirmas que el cliente aceptó?</b>
+                <b>¿Marcar la venta como ganada?</b>
                 <span style={{ color: 'var(--texto-suave)', lineHeight: 1.5 }}>
-                  {resumenLineas(n)} · {soles(n.total)} mensual. Ya no podrás editar los planes; pasará a la aprobación de tu supervisor.
+                  {resumenLineas(n)} · {soles(n.total)} mensual sin IGV. Ya no se podrán editar los servicios y sumará a la meta.
                 </span>
+                <label className="casilla">
+                  <input type="checkbox" checked={enviado} onChange={(e) => setEnviado(e.target.checked)} />
+                  <span>Ya se envió el expediente a back office por correo</span>
+                </label>
                 <div className="fila-acciones" style={{ justifyContent: 'flex-end' }}>
                   <button type="button" className="boton-secundario" onClick={() => setCierre('')}>Cancelar</button>
-                  <button type="button" className="boton" disabled={ocupado}
-                    onClick={() => ejecutar(() => negociacionesApi.cerrar(n.id, 'GANADA'), '¡Venta ganada! Se envió a la aprobación de tu supervisor.')}>
-                    {ocupado ? 'Enviando…' : 'Sí, enviar a aprobación'}
+                  <button type="button" className="boton" disabled={ocupado || !enviado}
+                    onClick={() => ejecutar(() => negociacionesApi.ganar(n.id), '¡Venta ganada! Ya suma a la meta.')}>
+                    {ocupado ? 'Guardando…' : 'Sí, marcar como ganada'}
                   </button>
                 </div>
               </div>
@@ -134,7 +134,7 @@ export function FichaNegociacion() {
                 <div className="fila-acciones" style={{ justifyContent: 'flex-end' }}>
                   <button type="button" className="boton-secundario" onClick={() => setCierre('')}>Cancelar</button>
                   <button type="button" className="boton" disabled={ocupado || motivoFinal.length < 3}
-                    onClick={() => ejecutar(() => negociacionesApi.cerrar(n.id, 'PERDIDA', motivoFinal), 'La negociación se cerró como perdida.')}>
+                    onClick={() => ejecutar(() => negociacionesApi.perder(n.id, motivoFinal), 'La negociación se cerró como perdida.')}>
                     Cerrar como perdida
                   </button>
                 </div>
@@ -142,43 +142,65 @@ export function FichaNegociacion() {
             )}
           </section>
 
-          {n.resultado === 'GANADA' && <SeccionValidacion n={n} onCambio={(d, m) => { setN(d); setAviso(m); }} />}
-
-          {/* Contrato, DNI, carta de portabilidad… Se recarga al cambiar el estado (cambian los permisos) */}
-          <ExpedienteVenta key={`${n.id}-${n.estadoVenta ?? n.resultado}`} negociacionId={n.id} />
-
-          {/* Planes */}          <section className="panel vidrio" style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
-            <h2 className="h2">Planes negociados</h2>
+          {/* Servicios */}
+          <section className="panel vidrio" style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+            <h2 className="h2">Servicios negociados</h2>
             <div className="planes planes--lectura">
               <div className="planes__cabecera" aria-hidden="true">
-                <span>Plan</span><span>Modalidad</span><span>Viene de</span><span>Cantidad</span><span>Cargo fijo c/u</span><span style={{ textAlign: 'right' }}>Subtotal</span>
+                <span>Servicio</span><span>Modalidad</span><span>Viene de</span><span>Equipo</span><span>Cantidad</span><span>Cargo sin IGV c/u</span><span style={{ textAlign: 'right' }}>Subtotal</span>
               </div>
               {n.items.map((it) => (
                 <div key={it.id} className="planes__fila">
                   <span><b>{it.plan}</b> <span style={{ color: 'var(--texto-tenue)', fontSize: 12 }}>{it.tipoPlan === 'MOVIL' ? 'Móvil' : 'Fija'}</span></span>
-                  <span>{n.tipo === 'RENOVACION' ? 'Renovación' : it.modalidad === 'PORTABILIDAD' ? 'Portabilidad' : 'Línea nueva'}</span>
+                  <span>{it.modalidad === 'PORTABILIDAD' ? 'Portabilidad' : 'Línea nueva'}</span>
                   <span>{it.operadorOrigen ?? '—'}</span>
+                  <span>{it.conEquipo ? 'Con equipo' : 'Sin equipo'}</span>
                   <span className="numeros">{it.cantidad}</span>
                   <span className="numeros">{soles(it.cargoFijoUnit)}</span>
                   <span className="planes__subtotal numeros">{soles(it.subtotal ?? 0)}</span>
                 </div>
               ))}
             </div>
+            <div className="planes__total"><span>Subtotal sin IGV</span><b className="numeros">{soles(n.total)}</b></div>
+          </section>
+
+          {/* Comentarios: se guardan como gestiones de la empresa */}
+          <section className="panel vidrio" style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+            <div className="fila-acciones">
+              <h2 className="h2">Comentarios de la negociación</h2>
+              {n.puedeComentar && !comentando && <button type="button" className="boton-secundario" onClick={() => setComentando(true)}>+ Registrar gestión</button>}
+            </div>
+            {comentando && (
+              <FormGestion empresaId={n.clienteId} idBase="neg" textoBoton="Guardar comentario"
+                onCancelar={() => setComentando(false)}
+                onGuardada={() => { setComentando(false); setAviso('Comentario guardado en las gestiones de la empresa.'); cargar().catch(() => undefined); }} />
+            )}
+            {n.gestiones.length === 0 && !comentando && (
+              <p style={{ margin: 0, color: 'var(--texto-suave)' }}>
+                Aún no hay comentarios. Cada gestión que registres mientras la negociación está abierta aparece aquí.
+              </p>
+            )}
+            <ol className="comentarios">
+              {n.gestiones.map((g) => (
+                <li key={g.id}>
+                  <span style={{ fontSize: 14 }}>“{g.comentario}”</span>
+                  <span className="comentarios__meta">{TEXTO_CANAL[g.canal]} · {g.usuario} · {fecha(g.fecha)}</span>
+                </li>
+              ))}
+            </ol>
           </section>
         </div>
 
         <aside style={{ flex: '1 1 300px', minWidth: 0, display: 'flex', flexDirection: 'column', gap: 20 }}>
           <section className="panel vidrio" style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
             <div className="dato">
-              <span>Cargo fijo total</span>
+              <span>Subtotal sin IGV</span>
               <span className="total-grande numeros">{soles(n.total)}</span>
               <span style={{ fontSize: 13, color: 'var(--texto-tenue)' }}>mensual · {resumenLineas(n)}</span>
             </div>
             <div className="rejilla-2">
               <div className="dato"><span>Asesor</span><b>{n.asesor}</b></div>
               <div className="dato"><span>Equipo</span><b>{n.equipo ?? '—'}</b></div>
-              <div className="dato"><span>Plazo</span><b>{textoPlazo(n.plazoMeses)}</b></div>
-              <div className="dato"><span>Fin de contrato</span><b>{n.finContrato ? fechaLarga(n.finContrato) : '—'}</b></div>
               <div className="dato"><span>Abierta</span><b>{fecha(n.creadoAt)}</b></div>
               <div className="dato"><span>Cierre</span><b>{n.fechaCierre ? fecha(n.fechaCierre) : '—'}</b></div>
             </div>
@@ -186,11 +208,11 @@ export function FichaNegociacion() {
 
           <section className="panel vidrio" style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
             <h2 className="h2">Historial</h2>
-            <ol style={{ listStyle: 'none', margin: 0, padding: 0, display: 'flex', flexDirection: 'column', gap: 12 }}>
+            <ol className="comentarios">
               {n.historial.map((h, i) => (
-                <li key={i} style={{ display: 'flex', flexDirection: 'column', gap: 2, paddingLeft: 14, borderLeft: '2px solid var(--linea)' }}>
+                <li key={i}>
                   <b style={{ fontSize: 14 }}>{h.detalle ?? `${h.etapaAnterior ? TEXTO_ETAPA[h.etapaAnterior] : 'Inicio'} → ${TEXTO_ETAPA[h.etapaNueva]}`}</b>
-                  <span style={{ fontSize: 13, color: 'var(--texto-suave)' }}>{h.usuario} · {fecha(h.fecha)}</span>
+                  <span className="comentarios__meta">{h.usuario} · {fecha(h.fecha)}</span>
                 </li>
               ))}
             </ol>
@@ -198,90 +220,5 @@ export function FichaNegociacion() {
         </aside>
       </div>
     </>
-  );
-}
-
-/** Estado de la venta en la cadena de validación, correcciones y posventa */
-function SeccionValidacion({ n, onCambio }: { n: NegociacionDetalle; onCambio: (d: NegociacionDetalle, mensaje: string) => void }) {
-  const navegar = useNavigate();
-  const [ocupado, setOcupado] = useState(false);
-  const [error, setError] = useState('');
-  const observacion = n.validaciones.find((v) => v.decision === 'OBSERVADA');
-  const eventos = [
-    ...n.validaciones.map((v) => ({ fecha: v.fecha, titulo: TEXTO_DECISION[v.decision] ?? v.decision, quien: v.usuario, detalle: v.comentario, paso: v.paso })),
-    ...n.posventa.map((e) => ({ fecha: e.fecha, titulo: TEXTO_EVENTO[e.evento], quien: e.usuario, detalle: e.comentario, paso: 'Posventa' })),
-  ].sort((a, b) => b.fecha.localeCompare(a.fecha));
-
-  async function reenviar() {
-    setOcupado(true); setError('');
-    try {
-      await validacionApi.reenviar(n.id);
-      onCambio(await negociacionesApi.detalle(n.id), 'Venta corregida y reenviada a la aprobación de tu supervisor.');
-    } catch (e) { setError(e instanceof ErrorApi ? e.message : 'No se pudo reenviar'); }
-    finally { setOcupado(false); }
-  }
-
-  async function renovar() {
-    setOcupado(true); setError('');
-    try {
-      const r = await negociacionesApi.renovar(n.id);
-      navegar(`/negociaciones/${r.id}`, { state: { aviso: `Se abrió la renovación ${r.codigo} con los mismos planes. Ajusta lo que cambie y ciérrala cuando el cliente acepte.` } });
-    } catch (e) { setError(e instanceof ErrorApi ? e.message : 'No se pudo iniciar la renovación'); setOcupado(false); }
-  }
-
-  return (
-    <section className="panel vidrio" style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
-      <div className="fila-acciones">
-        <h2 className="h2">Validación</h2>
-        {n.correcciones > 0 && <span className="chip chip--crema">{n.correcciones} de {n.maxCorrecciones} correcciones usadas</span>}
-      </div>
-
-      {n.estadoVenta === 'OBSERVADA' && observacion && (
-        <div className="alerta" role="alert" style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-          <span><b>Observada por {observacion.usuario}:</b> “{observacion.comentario}”</span>
-          {n.puedeCorregir && (
-            <>
-              <span style={{ fontSize: 14 }}>
-                Corrige lo necesario y reenvíala. Te quedan {n.maxCorrecciones - n.correcciones} {n.maxCorrecciones - n.correcciones === 1 ? 'corrección' : 'correcciones'};
-                si vuelve a ser observada después, se anula.
-              </span>
-              <div className="fila-acciones" style={{ justifyContent: 'flex-end' }}>
-                <Link to={`/negociaciones/${n.id}/editar`} className="boton-secundario">Corregir planes</Link>
-                <button type="button" className="boton" disabled={ocupado} onClick={reenviar}>{ocupado ? 'Enviando…' : 'Reenviar a aprobación'}</button>
-              </div>
-            </>
-          )}
-        </div>
-      )}
-      {n.ordenOperador && <p style={{ margin: 0, fontSize: 14 }}><b>N° de orden del operador:</b> <span className="numeros">{n.ordenOperador}</span></p>}
-      {n.estadoVenta === 'ANULADA' && <div className="alerta" role="alert">Esta venta fue anulada y no cuenta para la meta.</div>}
-      {n.estadoVenta === 'ACTIVA' && n.fechaActivacion && <div className="aviso" role="status">Servicio activo desde el {fecha(n.fechaActivacion)}. Ya suma a la meta.</div>}
-      {n.finContrato && (
-        <div className="contrato-venta">
-          <div className="contrato-venta__texto">
-            <b>Contrato hasta el {fechaLarga(n.finContrato)}</b>
-            <span>{textoPlazo(n.plazoMeses)} desde la activación · {textoDias(diasHasta(n.finContrato))}</span>
-          </div>
-          {n.renovacion && n.renovacion.resultado !== 'PERDIDA' && (
-            <Link to={`/negociaciones/${n.renovacion.id}`} className="boton-secundario">
-              {n.renovacion.resultado === 'GANADA' ? 'Renovado' : 'Renovación en curso'} · {n.renovacion.codigo}
-            </Link>
-          )}
-          {n.puedeRenovar && <button type="button" className="boton" disabled={ocupado} onClick={renovar}>{ocupado ? 'Abriendo…' : 'Iniciar renovación'}</button>}
-        </div>
-      )}
-      {error && <div className="alerta" role="alert">{error}</div>}
-
-      {eventos.length === 0 && <p style={{ margin: 0, color: 'var(--texto-suave)' }}>Esperando la aprobación del supervisor.</p>}
-      <ol style={{ listStyle: 'none', margin: 0, padding: 0, display: 'flex', flexDirection: 'column', gap: 12 }}>
-        {eventos.map((e, i) => (
-          <li key={i} style={{ display: 'flex', flexDirection: 'column', gap: 2, paddingLeft: 14, borderLeft: '2px solid var(--linea)' }}>
-            <b style={{ fontSize: 14 }}>{e.titulo}{e.paso ? <span style={{ fontWeight: 500, color: 'var(--texto-tenue)' }}> · {e.paso}</span> : null}</b>
-            {e.detalle && <span style={{ fontSize: 14 }}>“{e.detalle}”</span>}
-            <span style={{ fontSize: 13, color: 'var(--texto-suave)' }}>{e.quien} · {fecha(e.fecha)}</span>
-          </li>
-        ))}
-      </ol>
-    </section>
   );
 }

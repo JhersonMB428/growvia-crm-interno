@@ -1,7 +1,9 @@
 import { api } from './cliente';
 import type { Pagina } from './empresas';
 
-export type Etapa = 'PROSPECCION' | 'CONTACTO' | 'NEGOCIACION' | 'CIERRE';
+/** Etapas en curso. En el historial también aparecen GANADA y PERDIDA (el cierre final). */
+export type Etapa = 'NEGOCIACION' | 'CIERRE';
+type EtapaHistorial = Etapa | 'GANADA' | 'PERDIDA' | 'PROSPECCION' | 'CONTACTO';
 export type Resultado = 'EN_CURSO' | 'GANADA' | 'PERDIDA';
 export type EstadoVenta = 'EN_VALIDACION' | 'OBSERVADA' | 'VALIDADA' | 'EN_POSVENTA' | 'ACTIVA' | 'ANULADA';
 export type Modalidad = 'NUEVA' | 'PORTABILIDAD';
@@ -45,37 +47,31 @@ export interface ItemNegociacion {
   operadorOrigenId: number | null;
   operadorOrigen?: string | null;
   cantidad: number;
+  /** Cargo fijo mensual por unidad, sin IGV */
   cargoFijoUnit: number;
   subtotal?: number;
+  /** El servicio incluye equipo */
+  conEquipo: boolean;
+}
+
+export interface GestionNegociacion {
+  id: string; canal: 'LLAMADA' | 'WHATSAPP' | 'CORREO' | 'VISITA'; resultado: string; comentario: string; fecha: string; usuario: string;
 }
 
 export interface NegociacionDetalle extends NegociacionResumen {
-  correcciones: number;
-  maxCorrecciones: number;
-  pasoActual: string | null;
-  fechaValidacion: string | null;
-  fechaActivacion: string | null;
-  ordenOperador: string | null;
   items: ItemNegociacion[];
-  historial: { etapaAnterior: Etapa | null; etapaNueva: Etapa; detalle: string | null; fecha: string; usuario: string }[];
-  validaciones: { decision: string; comentario: string | null; intento: number; fecha: string; paso: string | null; usuario: string }[];
-  posventa: { evento: 'CHIPS_ENTREGADOS' | 'PORTABILIDAD_EJECUTADA' | 'SERVICIO_ACTIVO'; fecha: string; comentario: string | null; usuario: string }[];
+  historial: { etapaAnterior: EtapaHistorial | null; etapaNueva: EtapaHistorial; detalle: string | null; fecha: string; usuario: string }[];
+  /** Comentarios: gestiones registradas mientras la negociación estaba abierta */
+  gestiones: GestionNegociacion[];
   puedeEditar: boolean;
-  /** Venta observada: el asesor puede corregir los planes y reenviarla */
-  puedeCorregir: boolean;
-  /** Si es una renovación: el contrato que renueva */
-  renuevaId: string | null;
-  renuevaCodigo: string | null;
-  /** Último día del contrato (AAAA-MM-DD), si el servicio está activo y tiene plazo */
-  finContrato: string | null;
-  /** La renovación de este contrato, si ya se inició */
-  renovacion: { id: string; codigo: string; resultado: Resultado } | null;
-  puedeRenovar: boolean;
+  puedeComentar: boolean;
+  /** En cierre: el asesor a cargo o su supervisor la marcan ganada */
+  puedeGanar: boolean;
 }
 
-type Guardar = { tipo: TipoNegociacion; plazoMeses: number; items: ItemNegociacion[] };
-const items = (lista: ItemNegociacion[]) => lista.map(({ planId, modalidad, operadorOrigenId, cantidad, cargoFijoUnit }) =>
-  ({ planId, modalidad, operadorOrigenId: modalidad === 'PORTABILIDAD' ? operadorOrigenId : null, cantidad, cargoFijoUnit }));
+type Guardar = { items: ItemNegociacion[] };
+const items = (lista: ItemNegociacion[]) => lista.map(({ planId, modalidad, operadorOrigenId, cantidad, cargoFijoUnit, conEquipo }) =>
+  ({ planId, modalidad, operadorOrigenId: modalidad === 'PORTABILIDAD' ? operadorOrigenId : null, cantidad, cargoFijoUnit, conEquipo }));
 
 export const negociacionesApi = {
   catalogos: () => api<Catalogos>('/negociaciones/catalogos'),
@@ -83,33 +79,26 @@ export const negociacionesApi = {
   deEmpresa: (clienteId: string) => api<Pagina<NegociacionResumen>>(`/negociaciones?clienteId=${clienteId}&porPagina=50`),
   detalle: (id: string) => api<NegociacionDetalle>(`/negociaciones/${id}`),
   crear: (clienteId: string, d: Guardar) =>
-    api<NegociacionDetalle>('/negociaciones', { metodo: 'POST', cuerpo: { clienteId, tipo: d.tipo, plazoMeses: d.plazoMeses, items: items(d.items) } }),
+    api<NegociacionDetalle>('/negociaciones', { metodo: 'POST', cuerpo: { clienteId, items: items(d.items) } }),
   actualizar: (id: string, d: Guardar) =>
-    api<NegociacionDetalle>(`/negociaciones/${id}`, { metodo: 'PUT', cuerpo: { tipo: d.tipo, plazoMeses: d.plazoMeses, items: items(d.items) } }),
-  /** Abre la renovación del contrato (id = la venta activa) */
-  renovar: (id: string) => api<NegociacionDetalle>(`/negociaciones/${id}/renovar`, { metodo: 'POST' }),
+    api<NegociacionDetalle>(`/negociaciones/${id}`, { metodo: 'PUT', cuerpo: { items: items(d.items) } }),
   cambiarEtapa: (id: string, etapa: Etapa) => api<NegociacionDetalle>(`/negociaciones/${id}/etapa`, { metodo: 'POST', cuerpo: { etapa } }),
-  cerrar: (id: string, resultado: 'GANADA' | 'PERDIDA', motivoPerdida?: string) =>
-    api<NegociacionDetalle>(`/negociaciones/${id}/cerrar`, { metodo: 'POST', cuerpo: { resultado, motivoPerdida } }),
+  perder: (id: string, motivoPerdida: string) =>
+    api<NegociacionDetalle>(`/negociaciones/${id}/perder`, { metodo: 'POST', cuerpo: { motivoPerdida } }),
+  /** Solo cuando el expediente ya se envió a back office por correo */
+  ganar: (id: string) => api<NegociacionDetalle>(`/negociaciones/${id}/ganar`, { metodo: 'POST', cuerpo: { expedienteEnviado: true } }),
 };
 
 // ───────── Textos y formatos ─────────
-export const ETAPAS: { valor: Exclude<Etapa, 'CIERRE'>; texto: string }[] = [
-  { valor: 'PROSPECCION', texto: 'Prospección' },
-  { valor: 'CONTACTO', texto: 'Contacto' },
-  { valor: 'NEGOCIACION', texto: 'Negociación' },
-];
-export const TEXTO_ETAPA: Record<Etapa, string> = { PROSPECCION: 'Prospección', CONTACTO: 'Contacto', NEGOCIACION: 'Negociación', CIERRE: 'Cierre' };
+export const TEXTO_ETAPA: Record<EtapaHistorial, string> = {
+  NEGOCIACION: 'Negociación', CIERRE: 'Cierre', GANADA: 'Ganada', PERDIDA: 'Perdida', PROSPECCION: 'Prospección', CONTACTO: 'Contacto',
+};
+/** Estado para mostrar: etapa si está en curso, o el resultado si ya se cerró */
+export const estadoDe = (n: Pick<NegociacionResumen, 'resultado' | 'etapa'>) =>
+  n.resultado === 'GANADA' ? 'Ganada' : n.resultado === 'PERDIDA' ? 'Perdida' : TEXTO_ETAPA[n.etapa] ?? n.etapa;
 export const TEXTO_SERVICIO = { MOVIL: 'Móvil', FIJA: 'Fija', AMBOS: 'Móvil y fija' } as const;
 export const TEXTO_TIPO: Record<TipoNegociacion, string> = { NUEVA: 'Nueva', AMPLIACION: 'Ampliación', RENOVACION: 'Renovación' };
 
-/** Plazos de contrato que se pueden elegir */
-export const PLAZOS = [18, 24, 12, 36, 6, 0];
-export const textoPlazo = (m: number) => (m ? `${m} meses` : 'Sin plazo forzoso');
-
-/** "5 de noviembre de 2026" a partir de "2026-11-05" (sin correr de día por la zona horaria) */
-export const fechaLarga = (d: string) =>
-  new Date(`${d}T12:00:00`).toLocaleDateString('es-PE', { day: 'numeric', month: 'long', year: 'numeric' });
 export const TEXTO_ESTADO_VENTA: Record<EstadoVenta, string> = {
   EN_VALIDACION: 'Por validar', OBSERVADA: 'Observada', VALIDADA: 'Validada',
   EN_POSVENTA: 'En posventa', ACTIVA: 'Activa', ANULADA: 'Anulada',
@@ -120,7 +109,7 @@ const decimales = new Intl.NumberFormat('es-PE', { style: 'currency', currency: 
 /** S/ 1,200 · S/ 1,335.50 */
 export const soles = (n: number) => (Number.isInteger(n || 0) ? enteros : decimales).format(n || 0);
 
-/** "15 portabilidades + 5 nuevas" */
+/** "15 portabilidades + 5 líneas nuevas" */
 export function resumenLineas(n: Pick<NegociacionResumen, 'lineas' | 'portabilidades'> & { tipo?: TipoNegociacion }) {
   if (n.tipo === 'RENOVACION') return n.lineas ? `${n.lineas} ${n.lineas === 1 ? 'línea renovada' : 'líneas renovadas'}` : 'Sin planes';
   const nuevas = n.lineas - n.portabilidades;

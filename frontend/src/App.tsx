@@ -23,10 +23,7 @@ import { Exportar } from './paginas/auditoria/Exportar';
 import { Ayuda } from './paginas/ayuda/Ayuda';
 import { Embudo } from './paginas/embudo/Embudo';
 import { Perfil } from './paginas/perfil/Perfil';
-import { Renovaciones } from './paginas/renovaciones/Renovaciones';
-import { ResumenBackoffice } from './paginas/tableros/ResumenBackoffice';
 import { ResumenGerencia } from './paginas/tableros/ResumenGerencia';
-import { BandejaVentas } from './paginas/validacion/BandejaVentas';
 import { Verificar } from './paginas/Verificar';
 import { RutaPrivada } from './sesion/RutaPrivada';
 import { SesionProvider } from './sesion/SesionContext';
@@ -50,28 +47,23 @@ export default function App() {
               <Route path="/empresas/:id" element={<FichaEmpresa />} />
               <Route path="/agenda" element={<RutaPrivada roles={['ASESOR']}><Agenda /></RutaPrivada>} />
               {/* Compartidas */}
-              <Route path="/negociaciones" element={<RutaPrivada roles={['ASESOR', 'SUPERVISOR', 'GERENTE']}><Negociaciones /></RutaPrivada>} />
+              <Route path="/negociaciones" element={<RutaPrivada roles={['ASESOR', 'SUPERVISOR', 'GERENTE', 'BACKOFFICE']}><Negociaciones /></RutaPrivada>} />
               <Route path="/negociaciones/nueva" element={<RutaPrivada roles={['ASESOR']}><FormNegociacion /></RutaPrivada>} />
               <Route path="/negociaciones/:id/editar" element={<RutaPrivada roles={['ASESOR']}><FormNegociacion /></RutaPrivada>} />
               <Route path="/negociaciones/:id" element={<FichaNegociacion />} />
               <Route path="/repositorio" element={<Repositorio />} />
-              <Route path="/renovaciones" element={<RutaPrivada roles={['ASESOR', 'SUPERVISOR', 'GERENTE']}><Renovaciones /></RutaPrivada>} />
               <Route path="/metas" element={<RutaPrivada roles={['SUPERVISOR', 'GERENTE']}><Metas /></RutaPrivada>} />
-              <Route path="/bases" element={<RutaPrivada roles={['ASESOR', 'SUPERVISOR', 'GERENTE']}><Bases /></RutaPrivada>} />
-              <Route path="/bases/:id" element={<RutaPrivada roles={['ASESOR', 'SUPERVISOR', 'GERENTE']}><DetalleBase /></RutaPrivada>} />
+              <Route path="/bases" element={<RutaPrivada roles={['SUPERVISOR', 'GERENTE']}><Bases /></RutaPrivada>} />
+              <Route path="/bases/:id" element={<RutaPrivada roles={['SUPERVISOR', 'GERENTE']}><DetalleBase /></RutaPrivada>} />
               {/* Supervisor */}
               <Route path="/equipo" element={<RutaPrivada roles={['SUPERVISOR']}><MiEquipo /></RutaPrivada>} />
-              <Route path="/aprobaciones" element={<RutaPrivada roles={['SUPERVISOR']}><BandejaVentas modo="aprobar" /></RutaPrivada>} />
               {/* Gerencia */}
               <Route path="/reportes" element={<RutaPrivada roles={['GERENTE']}><ResumenGerencia /></RutaPrivada>} />
               <Route path="/embudo" element={<RutaPrivada roles={['SUPERVISOR', 'GERENTE']}><Embudo /></RutaPrivada>} />
-              <Route path="/revision" element={<RutaPrivada roles={['GERENTE']}><BandejaVentas modo="revisar" /></RutaPrivada>} />
               <Route path="/exportar" element={<RutaPrivada roles={['GERENTE']}><Exportar /></RutaPrivada>} />
               <Route path="/bitacora" element={<RutaPrivada roles={['GERENTE', 'ADMIN']}><Bitacora /></RutaPrivada>} />
               <Route path="/accesos-celular" element={<RutaPrivada roles={['GERENTE']}><AccesosCelular /></RutaPrivada>} />
               {/* Back office y administración */}
-              <Route path="/resumen" element={<RutaPrivada roles={['BACKOFFICE']}><ResumenBackoffice /></RutaPrivada>} />
-              <Route path="/validacion" element={<RutaPrivada roles={['BACKOFFICE']}><BandejaVentas modo="validar" /></RutaPrivada>} />
               <Route path="/usuarios" element={<RutaPrivada roles={['BACKOFFICE', 'ADMIN']}><Administracion /></RutaPrivada>} />
               {/* Todos */}
               <Route path="/perfil" element={<Perfil />} />
