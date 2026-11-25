@@ -20,7 +20,11 @@ const COLUMNAS_GENERALES = `
   c.retencion_hasta AS "retencionHasta",
   CASE WHEN c.bloqueo_hasta > now() THEN c.bloqueo_tipo END AS "bloqueoTipo",
   CASE WHEN c.bloqueo_hasta > now() THEN c.bloqueo_hasta END AS "bloqueoHasta",
-  c.ultimo_asesor_id AS "ultimoAsesorId"`;
+  c.ultimo_asesor_id AS "ultimoAsesorId",
+  c.lineas_actuales AS "lineasActuales", opx.nombre AS "operadorActual",
+  -- Estructura completa (Ann): representante con DNI, teléfono y correo, ubicación, líneas y operador
+  (c.distrito_id IS NOT NULL AND c.lineas_actuales IS NOT NULL AND c.operador_actual_id IS NOT NULL
+   AND EXISTS (SELECT 1 FROM contactos k WHERE k.cliente_id = c.id AND k.posicion = 1 AND k.dni IS NOT NULL AND k.correo IS NOT NULL)) AS "datosCompletos"`;
 
 /**
  * ¿Esta persona puede tomar la empresa libre?
@@ -38,7 +42,8 @@ const UNIONES = `
   LEFT JOIN provincias pr ON pr.id = di.provincia_id
   LEFT JOIN departamentos de ON de.id = pr.departamento_id
   LEFT JOIN usuarios u ON u.id = c.asesor_id
-  LEFT JOIN equipos eq ON eq.id = u.equipo_id`;
+  LEFT JOIN equipos eq ON eq.id = u.equipo_id
+  LEFT JOIN operadores opx ON opx.id = c.operador_actual_id`;
 
 /** Compara sin tildes ni mayúsculas (sin depender de extensiones de PostgreSQL) */
 const SIN_TILDES = (col: string) => `translate(lower(${col}), 'áéíóúüñàèìòù', 'aeiouunaeiou')`;
@@ -128,11 +133,12 @@ export class EmpresasService {
     if (!verComercial) return { ...general, libre: !e.asesorId, contactos: null, historial: null, puedeEditar: false };
 
     const contactos = await this.db.query(
-      `SELECT id, nombre, celular, correo, posicion FROM contactos WHERE cliente_id = $1 ORDER BY posicion`, [id],
+      `SELECT id, nombre, celular, correo, dni, posicion FROM contactos WHERE cliente_id = $1 ORDER BY posicion`, [id],
     );
     // Contrato con su operador actual (para saber cuándo ofrecer la portabilidad)
     const [contratoActual] = await this.db.query(
       `SELECT c.operador_actual_id AS "operadorId", op.nombre AS operador, to_char(c.fin_contrato_actual, 'YYYY-MM-DD') AS fin,
+              c.lineas_actuales AS lineas,
               (c.fin_contrato_actual - (now() AT TIME ZONE 'America/Lima')::date)::int AS dias
        FROM clientes c LEFT JOIN operadores op ON op.id = c.operador_actual_id WHERE c.id = $1`, [id],
     );
@@ -214,7 +220,7 @@ export class EmpresasService {
   }
 
   // ───────────── Contrato con su operador actual (asesor a cargo o back office) ─────────────
-  async guardarContratoActual(id: string, operadorId: number | null, fin: string | null, sesion: SesionUsuario) {
+  async guardarContratoActual(id: string, operadorId: number | null, fin: string | null, lineas: number | null, sesion: SesionUsuario) {
     const [e] = await this.db.query(`SELECT asesor_id AS "asesorId" FROM clientes WHERE id = $1`, [id]);
     if (!e) throw new NotFoundException('La empresa no existe');
     const esDueno = e.asesorId === sesion.sub && sesion.permisos.includes('PROSPECTO_CREAR');
@@ -232,7 +238,8 @@ export class EmpresasService {
       if (!ok) throw new BadRequestException('La fecha de fin de contrato debe estar entre hace un año y dentro de cinco años');
     }
     await this.db.query(
-      `UPDATE clientes SET operador_actual_id = $1, fin_contrato_actual = $2, updated_at = now() WHERE id = $3`, [operadorId, fin, id],
+      `UPDATE clientes SET operador_actual_id = $1, fin_contrato_actual = $2, lineas_actuales = $4, updated_at = now() WHERE id = $3`,
+      [operadorId, fin, id, lineas],
     );
     return this.detalle(id, sesion);
   }
@@ -329,8 +336,9 @@ export class EmpresasService {
     await tx.query(`DELETE FROM contactos WHERE cliente_id = $1`, [clienteId]);
     for (const [i, c] of contactos.slice(0, 2).entries()) {
       await tx.query(
-        `INSERT INTO contactos (cliente_id, nombre, celular, correo, posicion) VALUES ($1, $2, $3, $4, $5)`,
-        [clienteId, c.nombre.trim(), c.celular, c.correo?.trim() || null, i + 1],
+        `INSERT INTO contactos (cliente_id, nombre, celular, correo, dni, posicion) VALUES ($1, $2, $3, $4, $5, $6)`,
+        // Solo el contacto 1 (representante legal) lleva DNI
+        [clienteId, c.nombre.trim(), c.celular, c.correo?.trim() || null, i === 0 ? c.dni || null : null, i + 1],
       );
     }
   }
@@ -345,6 +353,8 @@ export class EmpresasService {
     }
     if (f.estado) { p.push(f.estado); where.push(`c.estado = $${p.length}`); }
     if (f.distritoId) { p.push(f.distritoId); where.push(`c.distrito_id = $${p.length}`); }
+    if (f.operadorId) { p.push(f.operadorId); where.push(`c.operador_actual_id = $${p.length}`); }
+    if (f.lineasMin) { p.push(f.lineasMin); where.push(`c.lineas_actuales >= $${p.length}`); }
     const filtro = where.length ? `WHERE ${where.join(' AND ')}` : '';
 
     const [{ total }] = await this.db.query(`SELECT count(*)::int AS total FROM clientes c ${filtro}`, p);

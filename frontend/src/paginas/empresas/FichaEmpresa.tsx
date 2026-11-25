@@ -165,9 +165,9 @@ export function FichaEmpresa() {
           <div style={{ height: 1, background: 'var(--linea)' }} />
 
           <div className="fila-acciones">
-            <h2 className="h2">Contactos</h2>
+            <h2 className="h2">Representante y contactos</h2>
             {(e.puedeEditar || e.puedeCorregirDatos) && !editando && e.contactos && (
-              <button type="button" className="boton-secundario" onClick={() => setEditando(e.contactos!.map((c) => ({ nombre: c.nombre, celular: c.celular, correo: c.correo ?? '' })))}>Editar</button>
+              <button type="button" className="boton-secundario" onClick={() => setEditando(e.contactos!.map((c) => ({ nombre: c.nombre, celular: c.celular, correo: c.correo ?? '', dni: c.dni ?? '' })))}>Editar</button>
             )}
           </div>
 
@@ -180,8 +180,9 @@ export function FichaEmpresa() {
             <div className="rejilla-2">
               {e.contactos.map((c) => (
                 <div key={c.id} className="bloque" style={{ gap: 6 }}>
-                  <span style={{ fontSize: 12, fontWeight: 700, color: 'var(--texto-tenue)', textTransform: 'uppercase', letterSpacing: '.05em' }}>{c.posicion === 1 ? 'Principal' : 'Secundario'}</span>
+                  <span style={{ fontSize: 12, fontWeight: 700, color: 'var(--texto-tenue)', textTransform: 'uppercase', letterSpacing: '.05em' }}>{c.posicion === 1 ? 'Representante legal (SUNAT)' : 'Otro contacto'}</span>
                   <b>{c.nombre}</b>
+                  {c.posicion === 1 && <span className="numeros" style={{ fontSize: 14, color: 'var(--texto-suave)' }}>{c.dni ? `DNI ${c.dni}` : 'DNI sin registrar'}</span>}
                   <a href={`tel:${c.celular}`} className="numeros" style={{ textDecoration: 'none' }}>{c.celular.replace(/(\d{3})(\d{3})(\d{3})/, '$1 $2 $3')}</a>
                   {c.correo && <a href={`mailto:${c.correo}`} style={{ textDecoration: 'none' }}>{c.correo}</a>}
                 </div>
@@ -240,17 +241,21 @@ function ContratoActual({ e, editable, onGuardado }: { e: EmpresaDetalle; editab
   const [operadores, setOperadores] = useState<Operador[]>([]);
   const [operadorId, setOperadorId] = useState<number | ''>(c.operadorId ?? '');
   const [fin, setFin] = useState(c.fin ?? '');
+  const [lineas, setLineas] = useState(c.lineas === null ? '' : String(c.lineas));
   const [ocupado, setOcupado] = useState(false);
   const [error, setError] = useState('');
 
   function abrir() {
-    setOperadorId(c.operadorId ?? ''); setFin(c.fin ?? ''); setError(''); setEditando(true);
+    setOperadorId(c.operadorId ?? ''); setFin(c.fin ?? ''); setLineas(c.lineas === null ? '' : String(c.lineas)); setError(''); setEditando(true);
     if (!operadores.length) negociacionesApi.catalogos().then((k) => setOperadores(k.operadores)).catch(() => undefined);
   }
 
   async function guardar() {
     setOcupado(true); setError('');
-    try { onGuardado(await empresasApi.guardarContratoActual(e.id, operadorId === '' ? null : operadorId, fin || null)); setEditando(false); }
+    try {
+      onGuardado(await empresasApi.guardarContratoActual(e.id, operadorId === '' ? null : operadorId, fin || null, lineas === '' ? null : Number(lineas)));
+      setEditando(false);
+    }
     catch (err) { setError(err instanceof ErrorApi ? err.message : 'No se pudo guardar'); }
     finally { setOcupado(false); }
   }
@@ -259,21 +264,21 @@ function ContratoActual({ e, editable, onGuardado }: { e: EmpresaDetalle; editab
     <>
       <div style={{ height: 1, background: 'var(--linea)' }} />
       <div className="fila-acciones">
-        <h2 className="h2">Contrato con su operador actual</h2>
-        {editable && !editando && <button type="button" className="boton-secundario" onClick={abrir}>{c.fin || c.operadorId ? 'Editar' : 'Registrar'}</button>}
+        <h2 className="h2">Operador actual y líneas</h2>
+        {editable && !editando && <button type="button" className="boton-secundario" onClick={abrir}>{c.fin || c.operadorId || c.lineas !== null ? 'Editar' : 'Registrar'}</button>}
       </div>
       {!editando && (
-        c.fin || c.operador ? (
+        c.fin || c.operador || c.lineas !== null ? (
           <div className="contrato-actual">
             <div className="contrato-actual__dato">
-              <b>{c.operador ?? 'Operador no registrado'}</b>
+              <b>{c.operador ?? 'Operador no registrado'} · {c.lineas === null ? 'líneas sin registrar' : `${c.lineas} ${c.lineas === 1 ? 'línea' : 'líneas'}`}</b>
               <span style={{ fontSize: 14, color: 'var(--texto-suave)' }}>{c.fin ? `Su contrato termina el ${fechaLarga(c.fin)}` : 'Sin fecha de fin registrada'}</span>
             </div>
             {c.fin && c.dias !== null && <span className={`reno-dias reno-dias--${urgencia(c.dias)}`}>{textoDias(c.dias)}</span>}
           </div>
         ) : (
           <p style={{ margin: 0, color: 'var(--texto-suave)', lineHeight: 1.5 }}>
-            ¿Sabes cuándo termina su contrato con su operador? Regístralo y te avisaremos con tiempo para ofrecerle la portabilidad.
+            ¿Con qué operador está, cuántas líneas tiene y cuándo termina su contrato? Regístralo y te avisaremos con tiempo para ofrecerle la portabilidad.
           </p>
         )
       )}
@@ -286,6 +291,11 @@ function ContratoActual({ e, editable, onGuardado }: { e: EmpresaDetalle; editab
                 <option value="">No sé</option>
                 {operadores.map((o) => <option key={o.id} value={o.id}>{o.nombre}</option>)}
               </select>
+            </div>
+            <div className="campo">
+              <label htmlFor="lineas-actual" className="etiqueta">Cantidad de líneas</label>
+              <input id="lineas-actual" className="entrada numeros" inputMode="numeric" maxLength={5} value={lineas} placeholder="Ej. 25"
+                onChange={(ev) => setLineas(ev.target.value.replace(/\D/g, '').slice(0, 5))} />
             </div>
             <div className="campo">
               <label htmlFor="fin-actual" className="etiqueta">Fin de su contrato</label>

@@ -23,16 +23,22 @@ export interface EmpresaResumen {
   bloqueoHasta: string | null;
   /** Libre pero esta persona no puede tomarla todavía */
   bloqueadaParaMi: boolean;
+  /** Líneas que tiene hoy con su operador actual */
+  lineasActuales: number | null;
+  operadorActual: string | null;
+  /** Tiene la estructura completa: representante con DNI, teléfono y correo, ubicación, líneas y operador */
+  datosCompletos: boolean;
 }
 
-export interface Contacto { id?: string; nombre: string; celular: string; correo?: string | null; posicion?: number }
+/** El contacto 1 es el representante legal (SUNAT) y lleva DNI. "celular" es el teléfono: celular o fijo con código. */
+export interface Contacto { id?: string; nombre: string; celular: string; correo?: string | null; dni?: string | null; posicion?: number }
 
 export interface EmpresaDetalle extends EmpresaResumen {
   libre: boolean;
   contactos: Contacto[] | null; // null = no tiene permiso para verlos
   historial: { motivo: string; fecha: string; asesorAnterior: string | null; asesorNuevo: string | null; hechoPor: string }[] | null;
   /** Contrato con su operador actual (null = no tiene permiso para verlo) */
-  contratoActual?: { operadorId: number | null; operador: string | null; fin: string | null; dias: number | null } | null;
+  contratoActual?: { operadorId: number | null; operador: string | null; fin: string | null; dias: number | null; lineas: number | null } | null;
   puedeEditar: boolean;
   /** Ya usó "Mantener 24 h más" desde su última gestión */
   prorrogada?: boolean;
@@ -42,7 +48,10 @@ export interface EmpresaDetalle extends EmpresaResumen {
 
 export interface Pagina<T> { total: number; pagina: number; porPagina: number; paginas: number; filas: T[] }
 
-export interface FiltrosEmpresas { q?: string; filtro?: 'todas' | 'libres' | 'asignadas' | 'por_vencer'; estado?: 'PROSPECTO' | 'VENTA'; pagina?: number }
+export interface FiltrosEmpresas {
+  q?: string; filtro?: 'todas' | 'libres' | 'asignadas' | 'por_vencer'; estado?: 'PROSPECTO' | 'VENTA'; pagina?: number;
+  operadorId?: number; lineasMin?: number;
+}
 
 const query = (f: FiltrosEmpresas) => {
   const p = new URLSearchParams();
@@ -68,8 +77,8 @@ export const empresasApi = {
   /** Gerencia y admin: asesores activos para reasignar */
   asesores: () => api<{ id: string; nombre: string; equipo: string | null }[]>('/empresas/asesores'),
   reasignar: (id: string, asesorId: string) => api<EmpresaDetalle>(`/empresas/${id}/reasignar`, { metodo: 'POST', cuerpo: { asesorId } }),
-  guardarContratoActual: (id: string, operadorId: number | null, finContrato: string | null) =>
-    api<EmpresaDetalle>(`/empresas/${id}/contrato-actual`, { metodo: 'PUT', cuerpo: { operadorId, finContrato } }),
+  guardarContratoActual: (id: string, operadorId: number | null, finContrato: string | null, lineas: number | null) =>
+    api<EmpresaDetalle>(`/empresas/${id}/contrato-actual`, { metodo: 'PUT', cuerpo: { operadorId, finContrato, lineas } }),
   /** Suma 24 h al plazo (una vez hasta la siguiente gestión) */
   mantener: (id: string) => api<{ retencionHasta: string }>(`/empresas/${id}/mantener`, { metodo: 'POST' }),
   /** Devuelve la empresa al repositorio */

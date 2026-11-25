@@ -76,7 +76,8 @@ export function Bases() {
             {archivo ? (
               <><b>{archivo.name}</b><span>{(archivo.size / 1024).toFixed(0)} KB · toca para cambiarlo</span></>
             ) : (
-              <><b>Arrastra tu Excel aquí o toca para elegirlo</b><span>.xlsx o .csv · máximo 5 MB y 5000 filas</span></>
+              <><b>Arrastra tu Excel aquí o toca para elegirlo</b><span>.xlsx o .csv · máximo 5 MB y 5000 filas</span>
+                <span>Columnas: RUC, razón social, representante legal SUNAT, DNI, teléfono, correo, departamento, provincia, distrito, cantidad de líneas y operador</span></>
             )}
           </label>
 
