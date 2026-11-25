@@ -6,6 +6,7 @@ import {
 } from '../../api/negociaciones';
 import { useSesion } from '../../sesion/SesionContext';
 import './negociaciones.css';
+import { recortarRuc } from '../../utilidades/validacion';
 
 type Servicio = '' | 'MOVIL' | 'FIJA' | 'AMBOS';
 type Grupo = 'NEGOCIACION' | 'CIERRE' | 'GANADA' | 'PERDIDA';
@@ -68,7 +69,7 @@ export function Negociaciones() {
         <div className="fila-acciones">
           <div style={{ flex: '1 1 280px', maxWidth: 420 }}>
             <label htmlFor="q" className="oculto-visual">Buscar</label>
-            <input id="q" className="entrada" type="search" value={q} onChange={(e) => setQ(e.target.value)}
+            <input id="q" className="entrada" type="search" value={q} maxLength={100} onChange={(e) => setQ(recortarRuc(e.target.value))}
               placeholder={esAsesor ? 'Buscar empresa, RUC o código' : 'Buscar empresa, RUC, código o asesor'} />
           </div>
           <div className="pestanas" role="group" aria-label="Filtrar por servicio">

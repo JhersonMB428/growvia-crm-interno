@@ -7,6 +7,7 @@ import {
 } from '../../api/gestiones';
 import { FormGestion } from '../../componentes/FormGestion';
 import '../../componentes/gestiones.css';
+import { problemaFechaHora } from '../../utilidades/validacion';
 
 const DIAS = ['L', 'M', 'M', 'J', 'V', 'S', 'D'];
 const mayuscula = (t: string) => t.charAt(0).toUpperCase() + t.slice(1);
@@ -129,7 +130,9 @@ function ItemAgenda({ g, conDia, onCambio }: { g: Gestion; conDia?: boolean; onC
   const [error, setError] = useState('');
   const [ocupado, setOcupado] = useState(false);
 
+  const errFecha = problemaFechaHora(fecha, hora);
   async function reprogramar() {
+    if (errFecha) { setError(errFecha); return; }
     setOcupado(true); setError('');
     try {
       const r = await gestionesApi.reprogramar(g.id, unirFechaHora(fecha, hora), canal);
@@ -169,28 +172,30 @@ function ItemAgenda({ g, conDia, onCambio }: { g: Gestion; conDia?: boolean; onC
       {panel === 'reprogramar' && (
         <div className="bloque" style={{ gridColumn: '1 / -1' }}>
           <b>Reprogramar</b>
+          <span className="leyenda-obligatorio">Campos obligatorios</span>
           <div className="rejilla-3">
             <div className="campo">
-              <label className="etiqueta" htmlFor={`f-${g.id}`}>Día</label>
-              <input id={`f-${g.id}`} type="date" className="entrada" min={fechaISO(new Date())} value={fecha} onChange={(e) => setFecha(e.target.value)} />
+              <label className="etiqueta obligatorio" htmlFor={`f-${g.id}`}>Día</label>
+              <input id={`f-${g.id}`} type="date" className="entrada" min={fechaISO(new Date())} value={fecha} required aria-invalid={!!errFecha}
+                onChange={(e) => { setFecha(e.target.value); setError(''); }} />
             </div>
             <div className="campo">
-              <label className="etiqueta" htmlFor={`h-${g.id}`}>Hora</label>
+              <label className="etiqueta obligatorio" htmlFor={`h-${g.id}`}>Hora</label>
               <select id={`h-${g.id}`} className="entrada" value={hora} onChange={(e) => setHora(e.target.value)}>
-                {HORAS.map((h) => <option key={h} value={h}>{h}</option>)}
+                {HORAS.map((h) => <option key={h} value={h} disabled={fecha === fechaISO(new Date()) && new Date(`${fecha}T${h}:00`) <= new Date()}>{h}</option>)}
               </select>
             </div>
             <div className="campo">
-              <label className="etiqueta" htmlFor={`c-${g.id}`}>Cómo</label>
+              <label className="etiqueta obligatorio" htmlFor={`c-${g.id}`}>Cómo</label>
               <select id={`c-${g.id}`} className="entrada" value={canal} onChange={(e) => setCanal(e.target.value as Canal)}>
                 {CANALES.map((c) => <option key={c.valor} value={c.valor}>{c.texto}</option>)}
               </select>
             </div>
           </div>
-          {error && <div className="alerta" role="alert">{error}</div>}
+          {errFecha ? <span className="campo-error">{errFecha}</span> : error && <div className="alerta" role="alert">{error}</div>}
           <div className="fila-acciones" style={{ justifyContent: 'flex-end' }}>
             <button type="button" className="boton-secundario" onClick={() => setPanel('')}>Cancelar</button>
-            <button type="button" className="boton" disabled={ocupado || !fecha} onClick={reprogramar}>{ocupado ? 'Guardando…' : 'Guardar'}</button>
+            <button type="button" className="boton" disabled={ocupado} onClick={reprogramar}>{ocupado ? 'Guardando…' : 'Guardar'}</button>
           </div>
         </div>
       )}

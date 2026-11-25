@@ -4,6 +4,7 @@ import { Readable } from 'stream';
 import { DataSource } from 'typeorm';
 import { SesionUsuario } from '../auth/decorators/usuario-actual.decorator';
 import { RetencionService } from '../empresas/retencion';
+import { errorRuc } from '../empresas/ruc';
 import { NotificacionesService } from '../notificaciones/notificaciones.service';
 
 const MAX_FILAS = 5000;
@@ -362,7 +363,8 @@ export class BasesService {
       const err = (motivo: Motivo, detalle: string, ruc: string | null = null) => errores.push({ fila, ruc, motivo, detalle, datos });
       const ruc = (datos.ruc ?? '').replace(/\D/g, '');
       if (!ruc) { err('DATO_FALTANTE', 'Falta el RUC'); continue; }
-      if (!/^(10|20)\d{9}$/.test(ruc)) { err('RUC_INVALIDO', 'El RUC debe tener 11 dígitos y empezar con 10 o 20', ruc.slice(0, 20)); continue; }
+      const problemaRuc = errorRuc(ruc);
+      if (problemaRuc) { err('RUC_INVALIDO', problemaRuc, ruc.slice(0, 20)); continue; }
       if (vistos.has(ruc)) { err('RUC_DUPLICADO', `Repetido en el archivo (también en la fila ${vistos.get(ruc)})`, ruc); continue; }
       vistos.set(ruc, fila);
       if (enCrm.has(ruc)) { err('RUC_DUPLICADO', `Ya está en el CRM${enCrm.get(ruc) ? ` (lo tiene ${enCrm.get(ruc)})` : ' (libre en el repositorio)'}`, ruc); continue; }

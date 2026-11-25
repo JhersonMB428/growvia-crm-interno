@@ -76,7 +76,8 @@ button.etapa:hover:not(:disabled) { border-color: var(--acento); color: var(--te
 .comentarios__meta { font-size: 13px; color: var(--texto-suave); }
 
 @media (max-width: 1100px) {
-  .neg-maestro { grid-template-columns: 1fr; }
+  .neg-maestro { grid-template-columns: minmax(0, 1fr); }
+  .neg-maestro > * { min-width: 0; }
   .neg-lista { max-height: 360px; }
   .neg-resumen { min-height: 0; }
 }

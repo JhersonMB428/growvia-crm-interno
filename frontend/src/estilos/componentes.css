@@ -66,7 +66,7 @@
 .lista__fila .tenue { color: var(--texto-suave); }
 .lista__empresa { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
 .lista__detalle { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; font-size: 13px; color: var(--texto-suave); }
-.lista__incompleta { font-size: 11px; font-weight: 700; padding: 2px 8px; border-radius: 999px; color: var(--salir); background: color-mix(in srgb, var(--salir) 14%, transparent); }
+.lista__incompleta { font-size: 11px; font-weight: 700; padding: 2px 8px; border-radius: 10px; line-height: 1.4; white-space: normal; color: var(--salir); background: color-mix(in srgb, var(--salir) 14%, transparent); }
 .lista__vacia { padding: 32px; text-align: center; color: var(--texto-suave); }
 .recortar { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .numeros { font-variant-numeric: tabular-nums; }
@@ -88,4 +88,27 @@
   .lista__fila { grid-template-columns: 1fr auto; }
   .lista__fila > :nth-child(1), .lista__fila > :nth-child(3) { display: none; }
   .rejilla-2, .rejilla-3, .rejilla-contacto { grid-template-columns: 1fr; }
+}
+/* ===== Validación de formularios: qué falta y qué está mal ===== */
+.obligatorio::after { content: ' *'; color: var(--salir); font-weight: 700; }
+.leyenda-obligatorio { font-size: 13px; color: var(--texto-suave); }
+.leyenda-obligatorio::before { content: '* '; color: var(--salir); font-weight: 700; }
+.campo-error { font-size: 13px; color: var(--salir); font-weight: 600; line-height: 1.4; }
+.campo-ayuda { font-size: 13px; color: var(--texto-tenue); line-height: 1.4; }
+.entrada[aria-invalid='true'] { border-color: var(--salir) !important; box-shadow: 0 0 0 1px var(--salir) inset; }
+.faltantes {
+  padding: 12px 16px; border-radius: 14px; font-size: 14px; line-height: 1.5;
+  border: 1px solid color-mix(in srgb, var(--salir) 45%, transparent); background: color-mix(in srgb, var(--salir) 9%, transparent);
+}
+.faltantes b { color: var(--salir); }
+.faltantes ul { margin: 6px 0 0; padding-left: 20px; }
+
+/* Chips de estado largos (ej. "No interesada · libre el 23-feb.") hacen salto de línea en vez de salirse de la columna */
+.chip--gris { white-space: normal; line-height: 1.3; text-align: center; max-width: 180px; }
+
+/* En celular los filtros en píldora se desplazan de lado en vez de partirse en varias filas */
+@media (max-width: 700px) {
+  .pestanas { flex-wrap: nowrap; overflow-x: auto; max-width: 100%; scrollbar-width: none; -webkit-overflow-scrolling: touch; }
+  .pestanas::-webkit-scrollbar { display: none; }
+  .pestana { flex: 0 0 auto; white-space: nowrap; }
 }

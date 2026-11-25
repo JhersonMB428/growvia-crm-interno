@@ -6,6 +6,7 @@ import '../../componentes/llamada.css';
 import { ListaEmpresas } from '../../componentes/ListaEmpresas';
 import { FiltrosComerciales } from '../../componentes/FiltrosComerciales';
 import { useDebounce } from '../../hooks/useDebounce';
+import { recortarRuc } from '../../utilidades/validacion';
 
 type Estado = '' | 'PROSPECTO' | 'VENTA' | 'por_vencer';
 
@@ -73,7 +74,7 @@ export function MisEmpresas() {
         <div className="fila-acciones">
           <div style={{ flex: '1 1 280px', maxWidth: 420 }}>
             <label htmlFor="q" className="oculto-visual">Buscar</label>
-            <input id="q" className="entrada" type="search" placeholder="Buscar por RUC o razón social" value={q} onChange={(e) => setQ(e.target.value)} />
+            <input id="q" className="entrada" type="search" placeholder="Buscar por RUC o razón social" value={q} maxLength={100} onChange={(e) => setQ(recortarRuc(e.target.value))} />
           </div>
           <FiltrosComerciales {...comercial} onCambio={setComercial} />
           <div className="pestanas" role="group" aria-label="Filtrar por estado">

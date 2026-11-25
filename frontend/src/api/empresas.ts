@@ -28,6 +28,8 @@ export interface EmpresaResumen {
   operadorActual: string | null;
   /** Tiene la estructura completa: representante con DNI, teléfono y correo, ubicación, líneas y operador */
   datosCompletos: boolean;
+  /** Qué le falta para tener la estructura completa (vacío = completa) */
+  datosFaltantes?: string[];
 }
 
 /** El contacto 1 es el representante legal (SUNAT) y lleva DNI. "celular" es el teléfono: celular o fijo con código. */
