@@ -53,6 +53,14 @@ JWT_EXPIRES_IN=8h
 FRONTEND_URL=http://localhost:5173
 ```
 
+Opcional: para probar **"Ver el CRM como otro usuario"** (en Mi perfil), agrega los correos de administrador que pueden usarlo, separados por comas:
+
+```
+CORREOS_SOPORTE=admin@growvia.global
+```
+
+En Azure, esta variable lleva los correos reales de soporte (Jherson y Samuel).
+
 Para generar la clave de `JWT_SECRET`, ejecuta esto y pega el resultado:
 
 ```powershell

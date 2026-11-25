@@ -5,6 +5,7 @@ import { SesionUsuario, UsuarioActual } from './decorators/usuario-actual.decora
 import { LoginDto } from './dto/login.dto';
 import { ReenviarDto } from './dto/reenviar.dto';
 import { VerificarDto } from './dto/verificar.dto';
+import { VerComoDto } from './dto/ver-como.dto';
 
 @Controller('auth')
 export class AuthController {
@@ -37,6 +38,26 @@ export class AuthController {
   /** Datos del usuario con sesión: nombre, rol, equipo y permisos */
   @Get('yo')
   yo(@UsuarioActual() usuario: SesionUsuario) {
-    return this.auth.perfil(usuario.sub);
+    return this.auth.yo(usuario);
+  }
+
+  /** Soporte (CORREOS_SOPORTE): usuarios que se pueden mirar */
+  @Get('ver-como')
+  usuariosParaVer(@UsuarioActual() s: SesionUsuario) {
+    return this.auth.usuariosParaVer(s);
+  }
+
+  /** Soporte: ver el CRM como otro usuario, en solo lectura */
+  @Post('ver-como')
+  @HttpCode(200)
+  verComo(@Body() dto: VerComoDto, @UsuarioActual() s: SesionUsuario, @Ip() ip: string) {
+    return this.auth.verComo(s, dto.usuarioId, ip);
+  }
+
+  /** Soporte: volver a la cuenta propia */
+  @Post('salir-vista')
+  @HttpCode(200)
+  salirDeVista(@UsuarioActual() s: SesionUsuario, @Ip() ip: string) {
+    return this.auth.salirDeVista(s, ip);
   }
 }

@@ -1,3 +1,4 @@
+import { VerComo } from '../../componentes/VerComo';
 import { useEffect, useState, type FormEvent } from 'react';
 import { accesosMovilApi, DURACIONES, ultimoDia, type AccesoMovil } from '../../api/accesosMovil';
 import { ErrorApi } from '../../api/cliente';
@@ -37,6 +38,7 @@ export function Perfil() {
       {usuario?.debeCambiarClave && (
         <div className="aviso" role="status"><b>Bienvenido/a.</b> Entraste con una contraseña temporal: elige una propia para empezar a usar el CRM.</div>
       )}
+      {usuario?.puedeVerComo && <VerComo />}
       <div className="perfil-rejilla">
         <div className="perfil-columna">
           <section className="panel vidrio perfil-panel">
