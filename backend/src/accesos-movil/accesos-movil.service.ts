@@ -5,6 +5,7 @@ import { DataSource, EntityManager } from 'typeorm';
 import { SesionUsuario } from '../auth/decorators/usuario-actual.decorator';
 import { BitacoraService } from '../bitacora/bitacora.service';
 import { CorreoService } from '../correo/correo.service';
+import { escapar, plantillaCorreo, urlCrm } from '../correo/plantilla';
 import { NotificacionesService } from '../notificaciones/notificaciones.service';
 
 const Z = `'America/Lima'`;
@@ -252,6 +253,11 @@ export class AccesosMovilService {
   private async avisar(usuarioId: string, titulo: string, mensaje: string) {
     await this.notificaciones.crear(usuarioId, { tipo: 'ACCESO_MOVIL', titulo, mensaje });
     const [u] = await this.db.query(`SELECT email, nombres FROM usuarios WHERE id = $1`, [usuarioId]);
-    if (u) await this.correo.enviar(u.email, titulo, `Hola ${u.nombres}:\n\n${mensaje}\n\nGrowvia CRM`).catch(() => undefined);
+    if (u) {
+      await this.correo.enviar(u.email, titulo, `Hola ${u.nombres}:\n\n${mensaje}\n\nGrowvia CRM`, plantillaCorreo({
+        resumen: mensaje, titulo: escapar(titulo), saludo: `Hola ${escapar(u.nombres)}:`, parrafos: [escapar(mensaje)],
+        boton: { texto: 'Abrir el CRM', url: urlCrm() },
+      })).catch(() => undefined);
+    }
   }
 }

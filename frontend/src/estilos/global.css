@@ -97,7 +97,7 @@ p { margin: 0; }
   --vidrio-fondo: rgba(255, 255, 255, 0.08);
   --vidrio-borde: rgba(255, 255, 255, 0.16);
   --vidrio-sombra: inset 0 1px 0 rgba(255, 255, 255, 0.22), 0 24px 60px rgba(0, 0, 0, 0.28);
-  --vidrio-abierto: rgba(3, 40, 36, 0.86);
+  --vidrio-abierto: #032824;
   --campo-fondo: rgba(255, 255, 255, 0.06);
   --campo-borde: rgba(255, 255, 255, 0.16);
   --linea: rgba(255, 255, 255, 0.12);
@@ -120,7 +120,7 @@ p { margin: 0; }
   --vidrio-fondo: rgba(255, 255, 255, 0.55);
   --vidrio-borde: rgba(255, 255, 255, 0.8);
   --vidrio-sombra: inset 0 1px 0 rgba(255, 255, 255, 0.9), 0 20px 50px rgba(1, 57, 54, 0.12);
-  --vidrio-abierto: rgba(255, 255, 255, 0.94);
+  --vidrio-abierto: #ffffff;
   --campo-fondo: rgba(255, 255, 255, 0.7);
   --campo-borde: rgba(1, 57, 54, 0.14);
   --linea: rgba(1, 57, 54, 0.12);

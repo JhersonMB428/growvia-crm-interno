@@ -15,6 +15,7 @@ import { LoginDto } from './dto/login.dto';
 import { VerificarDto } from './dto/verificar.dto';
 import { AccesoMovil } from './entities/acceso-movil.entity';
 import { CodigoVerificacion } from './entities/codigo-verificacion.entity';
+import { escapar, plantillaCorreo } from '../correo/plantilla';
 import { DispositivoConfiable } from './entities/dispositivo-confiable.entity';
 
 const ES_CELULAR = /Android|iPhone|iPad|iPod|Mobile|Windows Phone/i;
@@ -184,9 +185,14 @@ export class AuthService {
       `${codigo} es tu código de Growvia CRM`,
       `Hola ${usuario.nombres}:\n\nTu código para ingresar al CRM es ${codigo}. Vence en ${minutos} minutos.\n` +
         `Si no intentaste ingresar, avisa a tu supervisor.`,
-      `<p>Hola ${usuario.nombres}:</p><p>Tu código para ingresar al CRM es</p>` +
-        `<p style="font-size:28px;font-weight:700;letter-spacing:6px">${codigo}</p>` +
-        `<p>Vence en ${minutos} minutos. Si no intentaste ingresar, avisa a tu supervisor.</p>`,
+      plantillaCorreo({
+        resumen: `Tu código es ${codigo}. Vence en ${minutos} minutos.`,
+        titulo: 'Tu código para ingresar',
+        saludo: `Hola ${escapar(usuario.nombres)}:`,
+        parrafos: ['Escribe este código en la pantalla de ingreso del CRM para terminar de iniciar sesión.'],
+        destacado: { etiqueta: 'Código de ingreso', valor: codigo, nota: `Vence en ${minutos} minutos` },
+        aviso: 'Si no intentaste ingresar, no compartas este código y avisa a tu supervisor.',
+      }),
     );
   }
 
