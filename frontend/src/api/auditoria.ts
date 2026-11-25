@@ -53,6 +53,8 @@ export const TEXTO_ACCION: Record<string, string> = {
   LOGIN_BLOQUEADO: 'Ingreso bloqueado', ACCESO_DENEGADO: 'Intentó entrar sin permiso',
   VISTA_INICIAR: 'Vio el CRM como otro usuario (soporte)', VISTA_SALIR: 'Volvió a su cuenta (soporte)',
   EMPRESA_CREAR: 'Registró una empresa', EMPRESA_TOMAR: 'Tomó una empresa', EMPRESA_REASIGNAR: 'Reasignó una empresa',
+  EMPRESA_MANTENER: 'Mantuvo una empresa 24 h más', EMPRESA_LIBERAR: 'Devolvió una empresa al repositorio',
+  ROL_ELEGIR: 'Eligió con qué rol usar el CRM (soporte)',
   EMPRESA_CORREGIR: 'Corrigió datos de la empresa', CONTACTOS_EDITAR: 'Editó contactos', EMPRESA_CONTRATO: 'Registró su contrato actual',
   GESTION_REGISTRAR: 'Registró una gestión', GESTION_REPROGRAMAR: 'Reprogramó una gestión',
   NEGOCIACION_CREAR: 'Abrió una negociación', NEGOCIACION_EDITAR: 'Editó los servicios', NEGOCIACION_ETAPA: 'Cambió la etapa',
