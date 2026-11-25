@@ -1,4 +1,4 @@
-import { Injectable, Logger, NotFoundException, ServiceUnavailableException } from '@nestjs/common';
+import { HttpException, Injectable, Logger, NotFoundException, ServiceUnavailableException } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { Cron } from '@nestjs/schedule';
 import { DataSource } from 'typeorm';
@@ -14,6 +14,21 @@ export interface DatosSunat {
   alerta: string | null;
 }
 
+/** Texto limpio aunque la API mande números, null u otra cosa */
+const txt = (v: unknown): string => (v === null || v === undefined || typeof v === 'object' ? '' : String(v).replace(/\s+/g, ' ').trim());
+/** La API puede devolver un objeto, una lista o el objeto dentro de otra clave */
+const primero = (d: unknown): Record<string, unknown> => {
+  const x = Array.isArray(d) ? d[0] : d;
+  return x && typeof x === 'object' ? x as Record<string, unknown> : {};
+};
+const lista = (d: unknown): Record<string, unknown>[] => {
+  if (Array.isArray(d)) return d.filter((x) => x && typeof x === 'object');
+  if (d && typeof d === 'object') {
+    const dentro = Object.values(d).find(Array.isArray);
+    if (dentro) return (dentro as unknown[]).filter((x) => x && typeof x === 'object') as Record<string, unknown>[];
+  }
+  return [];
+};
 const sinTildes = (t: unknown) => String(t ?? '').normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/\s+/g, ' ').trim().toUpperCase();
 
 /**
@@ -37,6 +52,17 @@ export class SunatService {
 
   /** Datos de SUNAT de un RUC: empresa y representantes legales */
   async consultar(ruc: string): Promise<DatosSunat> {
+    try {
+      return await this.consultarSinControl(ruc);
+    } catch (e) {
+      if (e instanceof HttpException) throw e;
+      // Algo inesperado en la respuesta: se registra para revisarlo y la ejecutiva ve un mensaje claro
+      this.log.error(`Error al leer la respuesta de SUNAT para ${ruc}: ${(e as Error)?.stack ?? e}`);
+      throw new ServiceUnavailableException('No se pudo leer la respuesta de SUNAT. Completa los datos a mano y avisa a soporte.');
+    }
+  }
+
+  private async consultarSinControl(ruc: string): Promise<DatosSunat> {
     // Solo el formato: las empresas antiguas del CRM pueden tener RUC sin dígito verificador válido (SUNAT dirá si existe)
     if (!/^(10|20)\d{9}$/.test(ruc)) throw new NotFoundException(errorRuc(ruc) ?? 'RUC no válido');
     if (!this.activo) throw new ServiceUnavailableException('La consulta a SUNAT no está configurada en este CRM');
@@ -48,25 +74,25 @@ export class SunatService {
 
     const dia = this.diaLima();
     this.hoy = { dia, n: (this.hoy.dia === dia ? this.hoy.n : 0) + 1 };
-    const [empresa, reps] = await Promise.all([this.llamar('/ruc', ruc), this.llamar('/ruc-representantes', ruc).catch(() => [])]);
-    const e = (empresa ?? {}) as Record<string, string | undefined>;
-    const ubic = await this.ubicar(e);
-    const estado = e.estado?.trim().toUpperCase() || null;
-    const condicion = e.condicion?.trim().toUpperCase() || null;
+    const [empresa, reps] = await Promise.all([this.llamar('/ruc', ruc), this.llamar('/ruc-representantes', ruc).catch((err) => { this.log.warn(`Representantes de ${ruc}: ${(err as Error)?.message}`); return []; })]);
+    const e = primero(empresa);
+    const ubic = await this.ubicar({ ubigeo: txt(e.ubigeo), departamento: txt(e.departamento), provincia: txt(e.provincia), distrito: txt(e.distrito) });
+    const estado = txt(e.estado).toUpperCase() || null;
+    const condicion = txt(e.condicion).toUpperCase() || null;
     const datos: DatosSunat = {
       ruc,
-      razonSocial: (e.nombre_o_razon_social ?? e.razon_social)?.trim() || null,
+      razonSocial: txt(e.nombre_o_razon_social ?? e.razon_social ?? e.nombre) || null,
       estado, condicion,
-      direccion: e.direccion?.trim() || null,
+      direccion: txt(e.direccion) || null,
       distritoId: ubic?.id ?? null, ubicacion: ubic?.texto ?? null,
-      representantes: (Array.isArray(reps) ? reps : []).map((r: Record<string, string | undefined>) => {
-        const doc = (r.numero_de_documento ?? '').replace(/\D/g, '');
-        const tipo = r.tipo_de_documento?.trim().toUpperCase() || null;
+      representantes: lista(reps).map((r) => {
+        const doc = txt(r.numero_de_documento ?? r.numero_documento ?? r.documento).replace(/\D/g, '');
+        const tipo = txt(r.tipo_de_documento ?? r.tipo_documento).toUpperCase() || null;
         return {
-          nombre: (r.nombre ?? '').replace(/\s+/g, ' ').trim(),
+          nombre: txt(r.nombre ?? r.nombres),
           tipoDocumento: tipo, documento: doc || null,
-          dni: tipo === 'DNI' && /^\d{8}$/.test(doc) ? doc : null,
-          cargo: r.cargo?.trim() || null, desde: r.fecha_desde ?? null,
+          dni: (tipo === null || tipo.includes('DNI') || tipo.includes('IDENTIDAD')) && /^\d{8}$/.test(doc) ? doc : null,
+          cargo: txt(r.cargo) || null, desde: txt(r.fecha_desde ?? r.desde) || null,
         };
       }).filter((r) => r.nombre),
       alerta: estado && estado !== 'ACTIVO' ? `En SUNAT figura como ${estado.toLowerCase()}: probablemente ya no opera`
@@ -172,7 +198,10 @@ export class SunatService {
     } catch {
       throw new ServiceUnavailableException('SUNAT no responde en este momento. Intenta de nuevo en unos segundos.');
     }
-    const cuerpo = await r.json().catch(() => null) as { success?: boolean; data?: unknown; message?: string; code?: string } | null;
+    const texto = await r.text();
+    let cuerpo: { success?: boolean; data?: unknown; message?: string; code?: string } | null = null;
+    try { cuerpo = JSON.parse(texto); } catch { /* no es JSON */ }
+    if (!cuerpo) this.log.warn(`apiconsulta ${ruta} respondió ${r.status} sin JSON: ${texto.slice(0, 200)}`);
     if (r.ok && cuerpo?.success !== false) return cuerpo?.data ?? null;
     if (r.status === 404 || cuerpo?.code === 'document_not_found') throw new NotFoundException('SUNAT no tiene registrado ese RUC');
     if (r.status === 401 || r.status === 403) {
@@ -185,7 +214,7 @@ export class SunatService {
   }
 
   /** Ubigeo si viene; si no, departamento/provincia/distrito por nombre */
-  private async ubicar(e: Record<string, string | undefined>): Promise<{ id: string; texto: string } | null> {
+  private async ubicar(e: { ubigeo: string; departamento: string; provincia: string; distrito: string }): Promise<{ id: string; texto: string } | null> {
     const filas: { id: string; texto: string }[] = await this.db.query(
       `SELECT di.id, di.nombre || ' · ' || pr.nombre || ' · ' || de.nombre AS texto
        FROM distritos di JOIN provincias pr ON pr.id = di.provincia_id JOIN departamentos de ON de.id = pr.departamento_id
@@ -193,7 +222,7 @@ export class SunatService {
           OR (upper(translate(di.nombre, 'áéíóúÁÉÍÓÚñÑ', 'aeiouAEIOUnN')) = $2 AND upper(translate(pr.nombre, 'áéíóúÁÉÍÓÚñÑ', 'aeiouAEIOUnN')) = $3
               AND upper(translate(de.nombre, 'áéíóúÁÉÍÓÚñÑ', 'aeiouAEIOUnN')) = $4)
        LIMIT 2`,
-      [(e.ubigeo ?? '').replace(/\D/g, '').padStart(6, '0'), sinTildes(e.distrito), sinTildes(e.provincia), sinTildes(e.departamento)],
+      [e.ubigeo.replace(/\D/g, '').padStart(6, '0'), sinTildes(e.distrito), sinTildes(e.provincia), sinTildes(e.departamento)],
     );
     return filas.length === 1 ? filas[0] : null;
   }
