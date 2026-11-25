@@ -67,16 +67,6 @@ export function FranjaVista() {
   const { usuario, iniciar } = useSesion();
   const navegar = useNavigate();
   const [ocupado, setOcupado] = useState(false);
-  if (usuario?.soporte && usuario.rolElegido && !usuario.vista) {
-    return (
-      <div className="franja-vista franja-vista--rol" role="status">
-        <span>
-          Cuenta de soporte · usando el CRM como <b>{usuario.rol.nombre}</b>{usuario.equipo && ['ASESOR', 'SUPERVISOR'].includes(usuario.rol.codigo) ? ` · ${usuario.equipo.nombre}` : ''}
-        </span>
-        <button type="button" className="boton" onClick={() => navegar('/elegir-rol')}>Cambiar de rol</button>
-      </div>
-    );
-  }
   if (!usuario?.vista) return null;
 
   async function salir() {

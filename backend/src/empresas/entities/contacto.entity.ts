@@ -16,8 +16,8 @@ export class Contacto {
   @Column({ length: 100 })
   nombre: string;
 
-  @Column({ type: 'char', length: 9 })
-  celular: string;
+  @Column({ type: 'char', length: 9, nullable: true })
+  celular: string | null;
 
   @Column({ type: 'varchar', length: 150, nullable: true })
   correo: string | null;

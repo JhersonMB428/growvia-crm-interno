@@ -8,6 +8,7 @@ import { ContactoDto } from './dto/contacto.dto';
 import { CrearEmpresaDto } from './dto/crear-empresa.dto';
 import { ListarEmpresasDto } from './dto/listar.dto';
 import { errorRuc } from './ruc';
+import { SunatService } from '../sunat/sunat.service';
 import { RetencionService } from './retencion';
 
 /** Columnas generales de una empresa (lo que cualquier rol puede ver en el repositorio) */
@@ -23,10 +24,12 @@ const COLUMNAS_GENERALES = `
   CASE WHEN c.bloqueo_hasta > now() THEN c.bloqueo_hasta END AS "bloqueoHasta",
   c.ultimo_asesor_id AS "ultimoAsesorId",
   c.lineas_actuales AS "lineasActuales", opx.nombre AS "operadorActual",
+  c.sunat_estado AS "sunatEstado", c.sunat_condicion AS "sunatCondicion", c.sunat_consultado_at AS "sunatConsultadoAt",
   -- Estructura completa (Ann): qué le falta a la empresa (vacío = completa)
   (SELECT ARRAY_REMOVE(ARRAY[
      CASE WHEN rep.id IS NULL THEN 'representante legal' END,
      CASE WHEN rep.id IS NOT NULL AND rep.dni IS NULL THEN 'DNI del representante' END,
+     CASE WHEN rep.id IS NOT NULL AND rep.celular IS NULL THEN 'teléfono' END,
      CASE WHEN rep.id IS NOT NULL AND rep.correo IS NULL THEN 'correo' END,
      CASE WHEN c.distrito_id IS NULL THEN 'ubicación' END,
      CASE WHEN c.lineas_actuales IS NULL THEN 'cantidad de líneas' END,
@@ -65,6 +68,7 @@ export class EmpresasService {
     private readonly db: DataSource,
     private readonly parametros: ParametrosService,
     private readonly retencion: RetencionService,
+    private readonly sunat: SunatService,
   ) {}
 
   // ───────────── ¿El RUC ya existe? (para la alerta roja antes de guardar) ─────────────
@@ -97,6 +101,12 @@ export class EmpresasService {
          VALUES ($1, $2, $3, $4, 'PROSPECCION', now(), now(), $4, $5) RETURNING id`,
         [dto.ruc, dto.razonSocial.trim(), dto.distritoId, sesion.sub, retencion],
       );
+      // Si la ejecutiva usó "Traer de SUNAT", se guarda lo que dijo SUNAT (sin gastar otra consulta)
+      const sunat = this.sunat.enCache(dto.ruc);
+      if (sunat) {
+        await tx.query(`UPDATE clientes SET sunat_estado = $2, sunat_condicion = $3, sunat_consultado_at = now() WHERE id = $1`,
+          [c.id, sunat.estado, sunat.condicion]);
+      }
       await this.reemplazarContactos(tx, c.id, dto.contactos);
       await tx.query(
         `INSERT INTO asignaciones (cliente_id, asesor_nuevo, motivo, asignado_por) VALUES ($1, $2, 'CREACION', $2)`,
@@ -343,12 +353,13 @@ export class EmpresasService {
   }
 
   private async reemplazarContactos(tx: EntityManager, clienteId: string, contactos: ContactoDto[]) {
+    if (contactos.slice(1, 2).some((c) => !c.celular)) throw new BadRequestException('Falta el teléfono del otro contacto');
     await tx.query(`DELETE FROM contactos WHERE cliente_id = $1`, [clienteId]);
     for (const [i, c] of contactos.slice(0, 2).entries()) {
       await tx.query(
         `INSERT INTO contactos (cliente_id, nombre, celular, correo, dni, posicion) VALUES ($1, $2, $3, $4, $5, $6)`,
         // Solo el contacto 1 (representante legal) lleva DNI
-        [clienteId, c.nombre.trim(), c.celular, c.correo?.trim() || null, i === 0 ? c.dni || null : null, i + 1],
+        [clienteId, c.nombre.trim(), c.celular || null, c.correo?.trim() || null, i === 0 ? c.dni || null : null, i + 1],
       );
     }
   }

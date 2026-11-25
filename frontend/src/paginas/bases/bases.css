@@ -8,3 +8,9 @@
 .zona-archivo b { font-size: 16px; }
 .zona-archivo span { font-size: 13px; color: var(--texto-suave); }
 .zona-archivo--lista { border-style: solid; border-color: var(--acento); }
+/* Empresas que ya están en el CRM: qué agrega la base y qué difiere */
+.cambios { margin: 0; padding-left: 16px; font-size: 13px; line-height: 1.5; }
+.cambios--agrega li::marker { color: var(--acento); }
+.cambios--agrega { color: var(--texto); }
+.cambios--difiere li::marker { color: var(--salir); }
+.cambios--difiere b { color: var(--salir); }

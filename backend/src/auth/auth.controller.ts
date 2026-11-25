@@ -42,6 +42,12 @@ export class AuthController {
   }
 
   /** Soporte (CORREOS_SOPORTE): usuarios que se pueden mirar */
+  /** Minutos sin actividad para cerrar la sesión (parámetro editable en Administración) */
+  @Get('inactividad')
+  async inactividad() {
+    return { minutos: await this.auth.minutosInactividad() };
+  }
+
   @Get('ver-como')
   usuariosParaVer(@UsuarioActual() s: SesionUsuario) {
     return this.auth.usuariosParaVer(s);

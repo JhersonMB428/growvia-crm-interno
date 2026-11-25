@@ -7,6 +7,8 @@ import { LlamadaRapida } from '../../componentes/LlamadaRapida';
 import { useVisitaFicha } from '../../hooks/useVisitaFicha';
 import { contactosCompletos, EditorContactos, limpiarContactos, problemasContactos } from '../../componentes/EditorContactos';
 import { Faltantes } from '../../componentes/Faltantes';
+import { nombrePropio, sunatApi, textoSunat, type DatosSunat } from '../../api/sunat';
+import { PanelSunat } from '../../componentes/PanelSunat';
 import { GestionesEmpresa } from '../../componentes/GestionesEmpresa';
 import { negociacionesApi, type Operador } from '../../api/negociaciones';
 import { NegociacionesEmpresa } from '../../componentes/NegociacionesEmpresa';
@@ -32,6 +34,21 @@ export function FichaEmpresa() {
   const [error, setError] = useState('');
   const [editando, setEditando] = useState<Contacto[] | null>(null);
   const [intentoContactos, setIntentoContactos] = useState(false);
+  const [sunatActivo, setSunatActivo] = useState(false);
+  const [sunat, setSunat] = useState<DatosSunat | null>(null);
+  const [consultandoSunat, setConsultandoSunat] = useState(false);
+  useEffect(() => { sunatApi.activo().then(setSunatActivo); }, []);
+
+  async function traerSunat() {
+    if (!e) return;
+    setConsultandoSunat(true); setError('');
+    try {
+      const d = await sunatApi.consultar(e.ruc);
+      setSunat(d);
+      setE({ ...e, sunatEstado: d.estado, sunatCondicion: d.condicion, sunatConsultadoAt: new Date().toISOString() });
+    } catch (err) { setError(err instanceof ErrorApi ? err.message : 'No se pudo consultar SUNAT'); }
+    finally { setConsultandoSunat(false); }
+  }
   const [ocupado, setOcupado] = useState(false);
   const [corrigiendo, setCorrigiendo] = useState<{ razonSocial: string; distritoId: string } | null>(null);
   const [reasignando, setReasignando] = useState(false);
@@ -106,6 +123,10 @@ export function FichaEmpresa() {
         <div style={{ display: 'flex', gap: 10, alignItems: 'center', flexWrap: 'wrap' }}>
           <span className={`chip ${e.estado === 'VENTA' ? 'chip--lima' : 'chip--gris'}`}>{e.estado === 'VENTA' ? 'Venta' : 'Prospecto'}</span>
           {e.libre && <span className="chip chip--crema">Libre</span>}
+          {e.sunatEstado && (
+            <span className={`chip ${e.sunatEstado === 'ACTIVO' && (!e.sunatCondicion || e.sunatCondicion === 'HABIDO') ? 'chip--lima' : 'chip--alerta'}`}
+              title={`Consultado en SUNAT el ${fecha(e.sunatConsultadoAt ?? null)}`}>SUNAT: {textoSunat(e.sunatEstado, e.sunatCondicion)}</span>
+          )}
           {e.libre && e.bloqueadaParaMi && <span className="chip chip--gris" title="Por ahora no se puede tomar">{textoBloqueo(e)}</span>}
           {e.libre && !e.bloqueadaParaMi && puede('EMPRESA_TOMAR') && <button type="button" className="boton" onClick={tomar} disabled={ocupado}>{ocupado ? 'Tomando…' : 'Tomar empresa'}</button>}
           {puede('EMPRESA_REASIGNAR') && !reasignando && (
@@ -167,7 +188,10 @@ export function FichaEmpresa() {
           <div className="fila-acciones">
             <h2 className="h2">Representante y contactos</h2>
             {(e.puedeEditar || e.puedeCorregirDatos) && !editando && e.contactos && (
-              <button type="button" className="boton-secundario" onClick={() => setEditando(e.contactos!.map((c) => ({ nombre: c.nombre, celular: c.celular, correo: c.correo ?? '', dni: c.dni ?? '' })))}>Editar</button>
+              <button type="button" className="boton-secundario" onClick={() => setEditando(e.contactos!.map((c) => ({ nombre: c.nombre, celular: c.celular ?? '', correo: c.correo ?? '', dni: c.dni ?? '' })))}>Editar</button>
+            )}
+            {(e.puedeEditar || e.puedeCorregirDatos) && !editando && e.contactos && sunatActivo && (
+              <button type="button" className="boton-secundario" onClick={traerSunat} disabled={consultandoSunat}>{consultandoSunat ? 'Consultando…' : 'Traer de SUNAT'}</button>
             )}
           </div>
 
@@ -183,20 +207,34 @@ export function FichaEmpresa() {
                   <span style={{ fontSize: 12, fontWeight: 700, color: 'var(--texto-tenue)', textTransform: 'uppercase', letterSpacing: '.05em' }}>{c.posicion === 1 ? 'Representante legal (SUNAT)' : 'Otro contacto'}</span>
                   <b>{c.nombre}</b>
                   {c.posicion === 1 && <span className="numeros" style={{ fontSize: 14, color: 'var(--texto-suave)' }}>{c.dni ? `DNI ${c.dni}` : 'DNI sin registrar'}</span>}
-                  <a href={`tel:${c.celular}`} className="numeros" style={{ textDecoration: 'none' }}>{c.celular.replace(/(\d{3})(\d{3})(\d{3})/, '$1 $2 $3')}</a>
+                  {c.celular
+                    ? <a href={`tel:${c.celular}`} className="numeros" style={{ textDecoration: 'none' }}>{c.celular.replace(/(\d{3})(\d{3})(\d{3})/, '$1 $2 $3')}</a>
+                    : <span style={{ fontSize: 14, color: 'var(--salir)' }}>Teléfono sin registrar</span>}
                   {c.correo && <a href={`mailto:${c.correo}`} style={{ textDecoration: 'none' }}>{c.correo}</a>}
                 </div>
               ))}
             </div>
           )}
+          {sunat && !editando && (
+            <PanelSunat datos={sunat} onCerrar={() => setSunat(null)}
+              onUsar={(r) => {
+                // Si es el mismo representante, se conservan su teléfono y correo; si es otra persona, se escriben de nuevo
+                const actual = e.contactos?.find((c) => c.posicion === 1);
+                const mismo = !!actual && ((actual.dni && actual.dni === r.dni) || mismoNombre(actual.nombre, r.nombre));
+                const otro = e.contactos?.filter((c) => c.posicion === 2).map((c) => ({ nombre: c.nombre, celular: c.celular ?? '', correo: c.correo ?? '', dni: '' })) ?? [];
+                setEditando([{ nombre: nombrePropio(r.nombre), dni: r.dni ?? '', celular: mismo ? actual!.celular ?? '' : '', correo: mismo ? actual!.correo ?? '' : '' }, ...otro]);
+                setSunat(null);
+                setAviso(mismo ? 'Revisa y guarda: se completó el DNI del representante.' : 'Revisa y guarda: el representante cambió, escribe su teléfono y correo si los tienes.');
+              }} />
+          )}
           {editando && (
             <>
-              <EditorContactos contactos={editando} onChange={setEditando} mostrarErrores={intentoContactos} />
-              {intentoContactos && <Faltantes items={problemasContactos(editando)} />}
+              <EditorContactos contactos={editando} onChange={setEditando} mostrarErrores={intentoContactos} telefonoRepOpcional />
+              {intentoContactos && <Faltantes items={problemasContactos(editando, true)} />}
               <div className="fila-acciones">
                 <button type="button" className="boton-secundario" onClick={() => { setEditando(null); setIntentoContactos(false); }}>Cancelar</button>
                 <button type="button" className="boton" disabled={ocupado}
-                  onClick={() => { setIntentoContactos(true); if (contactosCompletos(editando)) { setIntentoContactos(false); guardarContactos(); } }}>Guardar contactos</button>
+                  onClick={() => { setIntentoContactos(true); if (contactosCompletos(editando, true)) { setIntentoContactos(false); guardarContactos(); } }}>Guardar contactos</button>
               </div>
             </>
           )}
@@ -282,6 +320,7 @@ function OperadorLineas({ e, editable, onGuardado }: { e: EmpresaDetalle; editab
           <p style={{ margin: 0, color: 'var(--texto-suave)', lineHeight: 1.5 }}>¿Con qué operador está y cuántas líneas tiene hoy? Regístralo para priorizar esta empresa.</p>
         )
       )}
+      {editable && <RevisarLineas ruc={e.ruc} />}
       {editando && (
         <div className="bloque">
           <div className="rejilla-2">
@@ -346,5 +385,27 @@ function Reasignar({ e, onCancelar, onHecho }: { e: EmpresaDetalle; onCancelar: 
         <button type="button" className="boton" disabled={!destino || ocupado} onClick={confirmar}>{ocupado ? 'Guardando…' : 'Confirmar'}</button>
       </div>
     </section>
+  );
+}
+
+const sinTildes = (t: string) => t.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toUpperCase().replace(/[^A-Z ]/g, ' ').split(' ').filter((x) => x.length > 1).sort().join(' ');
+/** "PEREZ ROJAS JUAN" y "Juan Pérez Rojas" son la misma persona */
+const mismoNombre = (a: string, b: string) => !!a && sinTildes(a) === sinTildes(b);
+
+/** Enlace a la consulta oficial de OSIPTEL, con el RUC listo para copiar */
+function RevisarLineas({ ruc }: { ruc: string }) {
+  const [copiado, setCopiado] = useState(false);
+  return (
+    <div className="revisar-lineas">
+      <span>
+        <b>¿No sabes cuántas líneas tiene?</b> Revisa las líneas asociadas al RUC en OSIPTEL: elige <b>RUC</b>, pega el número y consulta.
+      </span>
+      <span className="revisar-lineas__acciones">
+        <button type="button" className="boton-secundario" onClick={() => navigator.clipboard?.writeText(ruc).then(() => { setCopiado(true); setTimeout(() => setCopiado(false), 2000); })}>
+          {copiado ? '✓ RUC copiado' : `Copiar RUC ${ruc}`}
+        </button>
+        <a className="boton" href="https://checatuslineas.osiptel.gob.pe/" target="_blank" rel="noopener noreferrer">Abrir Checa tus líneas ↗</a>
+      </span>
+    </div>
   );
 }

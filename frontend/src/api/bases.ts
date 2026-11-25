@@ -6,7 +6,14 @@ export type MotivoError = 'RUC_INVALIDO' | 'RUC_DUPLICADO' | 'UBIGEO_INVALIDO' |
 export interface CargaResumen {
   id: string; archivo: string; total: number; validas: number; conError: number; estado: EstadoCarga;
   fecha: string; subidoPor: string; asignarA: string | null;
+  /** Base propia o comprada (con el nombre del proveedor) */
+  origen: 'INTERNA' | 'COMPRADA'; proveedor: string | null;
+  /** Filas de empresas que ya están en el CRM y que completan datos / filas sin nada nuevo */
+  actualizar: number; iguales: number;
+  /** Resultado al aprobar */
+  creadas: number; actualizadas: number;
 }
+export interface Diferencia { campo: string; crm: string; base: string }
 export interface CargaDetalle extends CargaResumen {
   revisadoAt: string | null; revisadoPor: string | null; motivoRechazo: string | null;
   errores: { fila: number; ruc: string | null; motivo: MotivoError; detalle: string; datos: Record<string, string> }[];
@@ -14,6 +21,11 @@ export interface CargaDetalle extends CargaResumen {
     representante: string | null; lineas: number | null; operador: string | null }[];
   /** Filas válidas a las que les falta algún dato de la estructura completa */
   incompletas: number;
+  nuevas: number;
+  /** Empresas que ya están en el CRM: qué completa la base y en qué difiere (las que difieren, primero) */
+  existentes: { fila: number; ruc: string; razonSocial: string; asesor: string | null; completa: string[]; diferencias: Diferencia[] }[];
+  conDiferencias: number;
+  enDiferencias: 'CRM' | 'BASE' | null;
   puedeRevisar: boolean;
 }
 
@@ -37,13 +49,16 @@ export const basesApi = {
   listar: () => api<{ filas: CargaResumen[] }>('/bases'),
   detalle: (id: string) => api<CargaDetalle>(`/bases/${id}`),
   destinos: () => api<{ repositorio: boolean; asesores: { id: string; nombre: string; equipo: string | null }[] }>('/bases/destinos'),
-  subir: (archivo: File, asignarA?: string) => {
+  subir: (archivo: File, opciones: { asignarA?: string; origen: 'INTERNA' | 'COMPRADA'; proveedor?: string }) => {
     const datos = new FormData();
-    if (asignarA) datos.append('asignarA', asignarA);
+    if (opciones.asignarA) datos.append('asignarA', opciones.asignarA);
+    datos.append('origen', opciones.origen);
+    if (opciones.proveedor) datos.append('proveedor', opciones.proveedor);
     datos.append('archivo', archivo);
     return enviarArchivo<CargaDetalle>('/bases', datos);
   },
-  aprobar: (id: string) => api<{ creadas: number; yaExistian: number; carga: CargaDetalle }>(`/bases/${id}/aprobar`, { metodo: 'POST' }),
+  aprobar: (id: string, enDiferencias: 'CRM' | 'BASE') =>
+    api<{ creadas: number; actualizadas: number; iguales: number; completaSunat: boolean; carga: CargaDetalle }>(`/bases/${id}/aprobar`, { metodo: 'POST', cuerpo: { enDiferencias } }),
   rechazar: (id: string, motivo: string) => api<CargaDetalle>(`/bases/${id}/rechazar`, { metodo: 'POST', cuerpo: { motivo } }),
   /** Descarga la plantilla vacía */
   async plantilla() {

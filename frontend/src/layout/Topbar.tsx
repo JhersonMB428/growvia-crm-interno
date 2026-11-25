@@ -3,6 +3,7 @@ import { Link, useLocation } from 'react-router-dom';
 import { notificacionesApi } from '../api/gestiones';
 import { Avatar } from '../componentes/Avatar';
 import { BuscadorEmpresas } from '../componentes/BuscadorEmpresas';
+import { MenuRol } from '../componentes/MenuRol';
 import '../componentes/gestiones.css';
 import { useSesion } from '../sesion/SesionContext';
 import { useTema } from '../tema/TemaContext';
@@ -44,6 +45,7 @@ export function Topbar() {
       <BuscadorEmpresas />
 
       <div className="topbar__acciones">
+        <MenuRol />
         <button type="button" className="topbar__circulo" onClick={alternar}
           aria-label={tema === 'oscuro' ? 'Cambiar a modo claro' : 'Cambiar a modo oscuro'}
           title={tema === 'oscuro' ? 'Modo claro' : 'Modo oscuro'}>

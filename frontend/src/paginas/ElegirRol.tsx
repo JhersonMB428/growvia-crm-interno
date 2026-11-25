@@ -53,7 +53,7 @@ export function ElegirRol() {
     <>
       <div className="encabezado">
         <h1>¿Con qué rol quieres entrar?</h1>
-        <p>Cuenta de soporte: usas el CRM con tu propio usuario y el rol que elijas. Puedes cambiarlo cuando quieras desde la franja de arriba.</p>
+        <p>Cuenta de soporte: usas el CRM con tu propio usuario y el rol que elijas. Puedes cambiarlo cuando quieras con el icono de flechas de la barra superior.</p>
       </div>
       <section className="panel vidrio" style={{ display: 'flex', flexDirection: 'column', gap: 18 }}>
         <div className="elegir-rol" role="radiogroup" aria-label="Rol">

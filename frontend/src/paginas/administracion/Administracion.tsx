@@ -6,6 +6,7 @@ import { useSesion } from '../../sesion/SesionContext';
 import { Equipos } from './Equipos';
 import { Parametros, PlanesOperadores } from './Sistema';
 import './administracion.css';
+import { ultimoIngreso } from '../../utilidades/validacion';
 
 type Pestana = 'usuarios' | 'equipos' | 'planes' | 'parametros';
 
@@ -153,7 +154,10 @@ function Usuarios() {
                     <td>{u.rolNombre}</td>
                     <td>{u.equipo ?? <span className="tenue">—</span>}{u.esSupervisorDelEquipo && <span className="tenue admin-tabla__correo">Supervisa</span>}</td>
                     <td className="num">{u.empresas || <span className="tenue">—</span>}</td>
-                    <td>{hace(u.ultimoIngreso)}</td>
+                    <td style={{ whiteSpace: 'nowrap' }} title={u.ultimoIngreso ? new Date(u.ultimoIngreso).toLocaleString('es-PE') : 'Nunca ha ingresado'}>
+                      {ultimoIngreso(u.ultimoIngreso)}
+                      {hace(u.ultimoIngreso).startsWith('Hace') && <span className="tenue admin-tabla__correo">{hace(u.ultimoIngreso)}</span>}
+                    </td>
                     <td>
                       {!u.activo ? <span className="chip chip--gris">Desactivado</span>
                         : u.claveTemporal ? <span className="chip chip--crema">Clave temporal</span> : <span className="chip chip--lima">Activo</span>}

@@ -30,10 +30,15 @@ export interface EmpresaResumen {
   datosCompletos: boolean;
   /** Qué le falta para tener la estructura completa (vacío = completa) */
   datosFaltantes?: string[];
+  /** Lo último que dijo SUNAT (estado: ACTIVO, BAJA…; condición: HABIDO, NO HABIDO…) */
+  sunatEstado?: string | null;
+  sunatCondicion?: string | null;
+  sunatConsultadoAt?: string | null;
 }
 
-/** El contacto 1 es el representante legal (SUNAT) y lleva DNI. "celular" es el teléfono: celular o fijo con código. */
-export interface Contacto { id?: string; nombre: string; celular: string; correo?: string | null; dni?: string | null; posicion?: number }
+/** El contacto 1 es el representante legal (SUNAT) y lleva DNI. "celular" es el teléfono: celular o fijo con código.
+ *  El representante puede no tener teléfono (si llegó desde SUNAT): en ese caso viene vacío. */
+export interface Contacto { id?: string; nombre: string; celular?: string | null; correo?: string | null; dni?: string | null; posicion?: number }
 
 export interface EmpresaDetalle extends EmpresaResumen {
   libre: boolean;

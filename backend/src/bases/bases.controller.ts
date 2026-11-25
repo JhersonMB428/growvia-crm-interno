@@ -2,7 +2,7 @@ import {
   Body, Controller, Get, Param, ParseUUIDPipe, Post, Res, UploadedFile, UseInterceptors,
 } from '@nestjs/common';
 import { FileInterceptor } from '@nestjs/platform-express';
-import { IsOptional, IsString, Length } from 'class-validator';
+import { IsIn, IsOptional, IsString, Length } from 'class-validator';
 import type { Response } from 'express';
 import { RequierePermisos } from '../auth/decorators/requiere-permisos.decorator';
 import { SesionUsuario, UsuarioActual } from '../auth/decorators/usuario-actual.decorator';
@@ -13,6 +13,23 @@ class SubirBaseDto {
   @IsOptional()
   @IsString()
   asignarA?: string;
+
+  /** Base propia (INTERNA) o comprada a un proveedor (COMPRADA) */
+  @IsOptional()
+  @IsIn(['INTERNA', 'COMPRADA'], { message: 'Origen de la base no válido' })
+  origen?: 'INTERNA' | 'COMPRADA';
+
+  @IsOptional()
+  @IsString()
+  @Length(0, 100, { message: 'El nombre del proveedor es muy largo' })
+  proveedor?: string;
+}
+
+class AprobarDto {
+  /** Cuando un dato de la base es distinto al del CRM: se queda el del CRM (por defecto) o se usa el de la base */
+  @IsOptional()
+  @IsIn(['CRM', 'BASE'], { message: 'Elige qué dato se queda cuando hay diferencias' })
+  enDiferencias?: 'CRM' | 'BASE';
 }
 
 class RechazarDto {
@@ -52,7 +69,7 @@ export class BasesController {
   @RequierePermisos('BASE_CARGAR')
   @UseInterceptors(FileInterceptor('archivo', { limits: { fileSize: 5 * 1024 * 1024, files: 1 } }))
   subir(@UploadedFile() archivo: ArchivoSubido, @Body() dto: SubirBaseDto, @UsuarioActual() s: SesionUsuario) {
-    return this.bases.subir(archivo, dto.asignarA, s);
+    return this.bases.subir(archivo, dto, s);
   }
 
   @Get(':id')
@@ -63,8 +80,8 @@ export class BasesController {
 
   @Post(':id/aprobar')
   @RequierePermisos('BASE_APROBAR')
-  aprobar(@Param('id', ParseUUIDPipe) id: string, @UsuarioActual() s: SesionUsuario) {
-    return this.bases.aprobar(id, s);
+  aprobar(@Param('id', ParseUUIDPipe) id: string, @Body() dto: AprobarDto, @UsuarioActual() s: SesionUsuario) {
+    return this.bases.aprobar(id, dto.enDiferencias ?? 'CRM', s);
   }
 
   @Post(':id/rechazar')

@@ -268,6 +268,10 @@ export class AuthService {
     return this.sesionConRol(s.vistaDe, 'ADMIN');
   }
 
+  async minutosInactividad() {
+    return Math.max(0, await this.parametros.numero('minutos_inactividad_sesion', 7));
+  }
+
   // ───────────────────────── Ayudantes ─────────────────────────
   /** También lo usa el perfil para dar un token nuevo al cambiar la contraseña */
   async emitirSesion(usuarioId: string) {
