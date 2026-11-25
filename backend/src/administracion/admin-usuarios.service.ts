@@ -6,6 +6,7 @@ import { DataSource, EntityManager } from 'typeorm';
 import { SesionUsuario } from '../auth/decorators/usuario-actual.decorator';
 import { CorreoService } from '../correo/correo.service';
 import { RetencionService } from '../empresas/retencion';
+import { escapar, plantillaCorreo } from '../correo/plantilla';
 import { ParametrosService } from '../sistema/parametros.service';
 
 /** Back office solo administra asesores y supervisores; administración, todos los roles */
@@ -330,6 +331,18 @@ export class AdminUsuariosService {
       `Hola ${nombres}:\n\n${nuevo ? 'Ya tienes usuario en el CRM de Growvia.' : 'Restablecieron tu contraseña del CRM.'}\n\n` +
       `Ingresa en ${url} con tu correo y esta contraseña temporal:\n\n${clave}\n\n` +
       `Al entrar, el CRM te pedirá elegir una contraseña propia. No la compartas con nadie.\n\nGrowvia CRM`,
+      plantillaCorreo({
+        resumen: nuevo ? 'Ya tienes usuario en el CRM de Growvia.' : 'Tu contraseña del CRM fue restablecida.',
+        titulo: nuevo ? 'Bienvenido/a al CRM de Growvia' : 'Restablecimos tu contraseña',
+        saludo: `Hola ${escapar(nombres)}:`,
+        parrafos: [
+          nuevo ? 'Ya tienes usuario en el CRM de Growvia.' : 'Restablecieron tu contraseña del CRM.',
+          `Ingresa con tu correo <b>${escapar(email)}</b> y esta contraseña temporal:`,
+        ],
+        destacado: { etiqueta: 'Contraseña temporal', valor: escapar(clave), nota: 'Al entrar, el CRM te pedirá elegir una propia' },
+        boton: { texto: 'Ingresar al CRM', url },
+        aviso: 'No compartas tu contraseña con nadie. Growvia nunca te la pedirá por teléfono ni por chat.',
+      }),
     ).catch(() => undefined);
   }
 }

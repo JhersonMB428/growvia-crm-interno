@@ -3,6 +3,7 @@ import { Cron } from '@nestjs/schedule';
 import { DataSource } from 'typeorm';
 import { CorreoService } from '../correo/correo.service';
 import { NotificacionesService } from '../notificaciones/notificaciones.service';
+import { escapar, plantillaCorreo, urlCrm } from '../correo/plantilla';
 import { ParametrosService } from '../sistema/parametros.service';
 
 const ZONA = 'America/Lima';
@@ -101,7 +102,15 @@ export class RecordatoriosService {
           + lista.map((g) => `• ${hora(g.proxima_accion)} · ${VERBO[g.proximo_canal] ?? 'contactar a'} ${g.razon_social}`).join('\n')
           + '\n\nRegístralas en el CRM cuando las hagas.';
         try {
-          await this.correo.enviar(a.email, `Growvia CRM · ${a.n} ${a.n === 1 ? 'gestión' : 'gestiones'} para hoy`, texto);
+          const html = plantillaCorreo({
+            resumen: `Tienes ${a.n} ${a.n === 1 ? 'gestión agendada' : 'gestiones agendadas'} para hoy.`,
+            titulo: `Tus gestiones de hoy (${a.n})`,
+            saludo: `Hola ${escapar(a.nombres)}:`,
+            parrafos: ['Esta es tu agenda del día. Regístralas en el CRM cuando las hagas: cada gestión renueva el plazo de la empresa.'],
+            lista: lista.map((g) => ({ principal: `${hora(g.proxima_accion)} · ${escapar(g.razon_social)}`, detalle: `Toca ${VERBO[g.proximo_canal] ?? 'contactar a'} la empresa` })),
+            boton: { texto: 'Ver mi agenda', url: `${urlCrm()}/agenda` },
+          });
+          await this.correo.enviar(a.email, `Growvia CRM · ${a.n} ${a.n === 1 ? 'gestión' : 'gestiones'} para hoy`, texto, html);
           await this.db.query(`UPDATE notificaciones SET enviada_correo = true WHERE id = $1`, [idNotif]);
         } catch (e) {
           this.logger.error(`No se pudo enviar el resumen a ${a.email}: ${(e as Error).message}`);

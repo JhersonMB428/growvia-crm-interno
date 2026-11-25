@@ -7,6 +7,7 @@ import { validarClave } from '../auth/clave';
 import { SesionUsuario } from '../auth/decorators/usuario-actual.decorator';
 import { BitacoraService } from '../bitacora/bitacora.service';
 import { CorreoService } from '../correo/correo.service';
+import { escapar, plantillaCorreo } from '../correo/plantilla';
 import { ParametrosService } from '../sistema/parametros.service';
 
 const hash = (v: string) => createHash('sha256').update(v).digest('hex');
@@ -69,7 +70,14 @@ export class PerfilService {
     });
     await this.correo.enviar(u.email, 'Tu contraseña del CRM cambió',
       `Hola ${u.nombres}:\n\nTu contraseña del CRM de Growvia acaba de cambiar. Se cerraron las sesiones en tus otros equipos.\n\n` +
-      `Si no fuiste tú, avisa de inmediato a tu supervisor.\n\nGrowvia CRM`).catch(() => undefined);
+      `Si no fuiste tú, avisa de inmediato a tu supervisor.\n\nGrowvia CRM`,
+      plantillaCorreo({
+        resumen: 'Tu contraseña del CRM acaba de cambiar.',
+        titulo: 'Tu contraseña cambió',
+        saludo: `Hola ${escapar(u.nombres)}:`,
+        parrafos: ['Tu contraseña del CRM de Growvia acaba de cambiar. Por seguridad, se cerraron las sesiones en tus otros equipos.'],
+        aviso: 'Si no fuiste tú, avisa de inmediato a tu supervisor.',
+      })).catch(() => undefined);
     // Esta sesión sigue: se entrega un token nuevo (los anteriores dejan de valer)
     return this.auth.emitirSesion(s.sub);
   }
