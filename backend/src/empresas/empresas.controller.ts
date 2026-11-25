@@ -69,7 +69,7 @@ export class EmpresasController {
   @Put(':id/contrato-actual')
   @RequierePermisos('INFO_COMERCIAL_VER')
   contratoActual(@Param('id', ParseUUIDPipe) id: string, @Body() dto: ContratoActualDto, @UsuarioActual() s: SesionUsuario) {
-    return this.empresas.guardarContratoActual(id, dto.operadorId ?? null, dto.finContrato ?? null, s);
+    return this.empresas.guardarContratoActual(id, dto.operadorId ?? null, dto.finContrato ?? null, dto.lineas ?? null, s);
   }
 
   @Put(':id')

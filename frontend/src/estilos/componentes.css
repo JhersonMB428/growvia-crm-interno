@@ -64,6 +64,9 @@
 .lista__enlace::after { content: ''; position: absolute; inset: 0; border-radius: 18px; }
 .lista__accion { position: relative; z-index: 1; }
 .lista__fila .tenue { color: var(--texto-suave); }
+.lista__empresa { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.lista__detalle { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; font-size: 13px; color: var(--texto-suave); }
+.lista__incompleta { font-size: 11px; font-weight: 700; padding: 2px 8px; border-radius: 999px; color: var(--salir); background: color-mix(in srgb, var(--salir) 14%, transparent); }
 .lista__vacia { padding: 32px; text-align: center; color: var(--texto-suave); }
 .recortar { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .numeros { font-variant-numeric: tabular-nums; }
@@ -73,6 +76,8 @@
 /* Formularios del CRM */
 .rejilla-2 { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 14px; }
 .rejilla-3 { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 14px; }
+/* Representante legal: nombre, DNI, teléfono, correo */
+.rejilla-contacto { display: grid; grid-template-columns: minmax(0, 1.6fr) minmax(120px, 0.9fr) minmax(140px, 1fr) minmax(0, 1.6fr); gap: 14px; }
 .bloque { padding: 18px; border-radius: 22px; background: var(--campo-fondo); border: 1px solid var(--campo-borde); display: flex; flex-direction: column; gap: 14px; }
 .h2 { font-family: var(--fuente-titulos); font-weight: 600; font-size: 20px; margin: 0; }
 .dato { display: flex; flex-direction: column; gap: 4px; }
@@ -82,5 +87,5 @@
   .lista__cabecera { display: none; }
   .lista__fila { grid-template-columns: 1fr auto; }
   .lista__fila > :nth-child(1), .lista__fila > :nth-child(3) { display: none; }
-  .rejilla-2, .rejilla-3 { grid-template-columns: 1fr; }
+  .rejilla-2, .rejilla-3, .rejilla-contacto { grid-template-columns: 1fr; }
 }

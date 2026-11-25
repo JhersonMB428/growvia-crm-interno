@@ -19,21 +19,34 @@ const COLUMNAS: Record<string, string[]> = {
   departamento: ['departamento', 'dpto', 'region'],
   provincia: ['provincia'],
   distrito: ['distrito'],
-  nombre1: ['contacto 1', 'contacto', 'nombre contacto', 'contacto 1 nombre', 'nombre del contacto'],
-  celular1: ['celular 1', 'celular', 'telefono', 'contacto 1 celular', 'movil'],
-  correo1: ['correo 1', 'correo', 'email', 'contacto 1 correo', 'e-mail'],
+  // El contacto 1 es el representante legal (SUNAT)
+  nombre1: ['representantel legal sunat', 'representante legal sunat', 'representante legal', 'representante', 'contacto 1', 'contacto', 'nombre contacto', 'contacto 1 nombre', 'nombre del contacto'],
+  dni1: ['dni', 'dni representante', 'dni del representante', 'documento'],
+  celular1: ['telefono', 'celular 1', 'celular', 'telefono 1', 'contacto 1 celular', 'movil'],
+  correo1: ['correo', 'correo 1', 'email', 'contacto 1 correo', 'e-mail'],
+  lineas: ['cantidad de lineas', 'lineas', 'n lineas', 'nro lineas', 'numero de lineas', 'cantidad lineas'],
+  operador: ['operador', 'operador actual'],
   nombre2: ['contacto 2', 'contacto 2 nombre'],
   celular2: ['celular 2', 'contacto 2 celular', 'telefono 2'],
   correo2: ['correo 2', 'contacto 2 correo', 'email 2'],
 };
-const PLANTILLA = ['RUC', 'Razón social', 'Departamento', 'Provincia', 'Distrito', 'Contacto 1', 'Celular 1', 'Correo 1', 'Contacto 2', 'Celular 2', 'Correo 2'];
+/** Estructura pedida por Ann (nov 2026). "Contacto 2", "Celular 2" y "Correo 2" se siguen aceptando si vienen. */
+const PLANTILLA = ['RUC', 'Razón social', 'Representante legal SUNAT', 'DNI', 'Teléfono', 'Correo', 'Departamento', 'Provincia', 'Distrito', 'Cantidad de líneas', 'Operador'];
 
 /** "Lima Metropolitana " → "LIMA METROPOLITANA" sin tildes */
 const normal = (t: unknown) => String(t ?? '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/\s+/g, ' ').trim().toUpperCase();
 const correoValido = (c: string) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(c);
 
 type Motivo = 'RUC_INVALIDO' | 'RUC_DUPLICADO' | 'UBIGEO_INVALIDO' | 'DATO_FALTANTE' | 'DATO_INVALIDO';
-interface FilaValida { fila: number; ruc: string; razon: string; distritoId: string | null; contactos: { nombre: string; celular: string; correo: string | null }[] }
+interface FilaValida {
+  fila: number; ruc: string; razon: string; distritoId: string | null; lineas: number | null; operadorId: number | null;
+  contactos: { nombre: string; celular: string; correo: string | null; dni: string | null }[];
+}
+/** Teléfono a 9 dígitos: celular 9…, fijo con código 0… (un fijo de Lima de 7 dígitos se completa con 01) */
+function telefono(t: string): string {
+  const d = t.replace(/\D/g, '').replace(/^51(?=\d{9}$)/, '');
+  return /^[2-7]\d{6}$/.test(d) ? `01${d}` : d;
+}
 interface FilaError { fila: number; ruc: string | null; motivo: Motivo; detalle: string; datos: Record<string, string> }
 
 /**
@@ -54,12 +67,11 @@ export class BasesService {
     const libro = new ExcelJS.Workbook();
     const hoja = libro.addWorksheet('Empresas');
     hoja.addRow(PLANTILLA);
-    hoja.addRow(['20601234567', 'Ejemplo S.A.C.', 'Lima', 'Lima', 'Miraflores', 'Juan Pérez', '987654321', 'jperez@ejemplo.pe', '', '', '']);
+    hoja.addRow(['20601234567', 'Ejemplo S.A.C.', 'Juan Pérez Rojas', '41234567', '987654321', 'jperez@ejemplo.pe', 'Lima', 'Lima', 'Miraflores', 25, 'Movistar']);
     hoja.getRow(1).font = { bold: true };
-    hoja.columns.forEach((c, i) => { c.width = i === 1 ? 34 : 16; });
-    hoja.getColumn(1).numFmt = '@';
-    hoja.getColumn(7).numFmt = '@';
-    hoja.getColumn(10).numFmt = '@';
+    hoja.columns.forEach((c, i) => { c.width = [14, 34, 30, 12, 13, 28, 14, 14, 18, 18, 14][i] ?? 16; });
+    // RUC, DNI y teléfono como texto (que Excel no les quite los ceros ni los vuelva notación científica)
+    for (const col of [1, 4, 5]) hoja.getColumn(col).numFmt = '@';
     return Buffer.from(await libro.xlsx.writeBuffer());
   }
 
@@ -83,10 +95,12 @@ export class BasesService {
       for (let i = 0; i < validas.length; i += 500) {
         const bloque = validas.slice(i, i + 500);
         await tx.query(
-          `INSERT INTO lote_filas (lote_id, fila, ruc, razon_social, distrito_id, contactos)
-           SELECT $1, x.fila, x.ruc, x.razon, x.distrito, x.contactos FROM jsonb_to_recordset($2::jsonb)
-             AS x(fila int, ruc text, razon text, distrito text, contactos jsonb)`,
-          [lote.id, JSON.stringify(bloque.map((v) => ({ fila: v.fila, ruc: v.ruc, razon: v.razon, distrito: v.distritoId, contactos: v.contactos })))],
+          `INSERT INTO lote_filas (lote_id, fila, ruc, razon_social, distrito_id, contactos, lineas, operador_id)
+           SELECT $1, x.fila, x.ruc, x.razon, x.distrito, x.contactos, x.lineas, x.operador FROM jsonb_to_recordset($2::jsonb)
+             AS x(fila int, ruc text, razon text, distrito text, contactos jsonb, lineas smallint, operador smallint)`,
+          [lote.id, JSON.stringify(bloque.map((v) => ({
+            fila: v.fila, ruc: v.ruc, razon: v.razon, distrito: v.distritoId, contactos: v.contactos, lineas: v.lineas, operador: v.operadorId,
+          })))],
         );
       }
       for (let i = 0; i < errores.length; i += 500) {
@@ -148,12 +162,20 @@ export class BasesService {
     );
     const muestra = await this.db.query(
       `SELECT f.fila, f.ruc, f.razon_social AS "razonSocial", di.nombre AS distrito, pr.nombre AS provincia,
-              jsonb_array_length(f.contactos) AS contactos
+              jsonb_array_length(f.contactos) AS contactos, f.contactos->0->>'nombre' AS representante,
+              f.lineas, op.nombre AS operador
        FROM lote_filas f LEFT JOIN distritos di ON di.id = f.distrito_id LEFT JOIN provincias pr ON pr.id = di.provincia_id
+       LEFT JOIN operadores op ON op.id = f.operador_id
        WHERE f.lote_id = $1 ORDER BY f.fila LIMIT 20`, [id],
     );
+    // Filas válidas a las que les falta algo de la estructura completa (representante con DNI, teléfono y correo, ubicación, líneas, operador)
+    const [{ incompletas }] = await this.db.query(
+      `SELECT count(*) FILTER (WHERE f.distrito_id IS NULL OR f.lineas IS NULL OR f.operador_id IS NULL
+                                 OR f.contactos->0->>'dni' IS NULL OR f.contactos->0->>'correo' IS NULL)::int AS incompletas
+       FROM lote_filas f WHERE f.lote_id = $1`, [id],
+    );
     const { subidoPorId: _a, equipoId: _b, asignarAId: _c, ...datos } = l;
-    return { ...datos, errores, muestra, puedeRevisar: l.estado === 'PENDIENTE_APROBACION' && this.puedeRevisar(l, s) };
+    return { ...datos, errores, muestra, incompletas, puedeRevisar: l.estado === 'PENDIENTE_APROBACION' && this.puedeRevisar(l, s) };
   }
 
   // ───────────── Aprobar: crea las empresas ─────────────
@@ -178,17 +200,18 @@ export class BasesService {
 
       const creadas = await tx.query(
         `WITH nuevas AS (
-           INSERT INTO clientes (ruc, razon_social, distrito_id, asesor_id, origen, lote_id, asignado_at, creado_por, retencion_hasta)
+           INSERT INTO clientes (ruc, razon_social, distrito_id, asesor_id, origen, lote_id, asignado_at, creado_por, retencion_hasta,
+                                 lineas_actuales, operador_actual_id)
            SELECT f.ruc, f.razon_social, f.distrito_id, $2, 'BASE', $1, CASE WHEN $2::uuid IS NULL THEN NULL ELSE now() END, $3,
-                  CASE WHEN $2::uuid IS NULL THEN NULL ELSE $4::timestamptz END
+                  CASE WHEN $2::uuid IS NULL THEN NULL ELSE $4::timestamptz END, f.lineas, f.operador_id
            FROM lote_filas f WHERE f.lote_id = $1 AND NOT EXISTS (SELECT 1 FROM clientes c WHERE c.ruc = f.ruc)
            ON CONFLICT (ruc) DO NOTHING
            RETURNING id, ruc
          ), contactos AS (
-           INSERT INTO contactos (cliente_id, nombre, celular, correo, posicion)
-           SELECT n.id, x.nombre, x.celular, x.correo, x.ord::smallint
+           INSERT INTO contactos (cliente_id, nombre, celular, correo, dni, posicion)
+           SELECT n.id, x.nombre, x.celular, x.correo, CASE WHEN x.ord = 1 THEN x.dni END, x.ord::smallint
            FROM nuevas n JOIN lote_filas f ON f.lote_id = $1 AND f.ruc = n.ruc
-           CROSS JOIN LATERAL ROWS FROM (jsonb_to_recordset(f.contactos) AS (nombre text, celular text, correo text)) WITH ORDINALITY AS x(nombre, celular, correo, ord)
+           CROSS JOIN LATERAL ROWS FROM (jsonb_to_recordset(f.contactos) AS (nombre text, celular text, correo text, dni text)) WITH ORDINALITY AS x(nombre, celular, correo, dni, ord)
            WHERE x.ord <= 2
          ), historial AS (
            INSERT INTO asignaciones (cliente_id, asesor_nuevo, motivo, asignado_por)
@@ -322,6 +345,9 @@ export class BasesService {
   /** Revisa cada fila: RUC, razón social, ubigeo, contactos y repetidos (en el archivo y en el CRM) */
   private async revisar(filas: { fila: number; datos: Record<string, string> }[]) {
     const ubigeo = await this.cargarUbigeo();
+    const operadores = new Map<string, number>(
+      (await this.db.query(`SELECT id, nombre FROM operadores WHERE activo`) as { id: number; nombre: string }[]).map((o) => [normal(o.nombre), o.id]),
+    );
     const rucs = filas.map((f) => f.datos.ruc?.replace(/\D/g, '')).filter((r) => /^\d{11}$/.test(r));
     const existentes: { ruc: string; asesor: string | null }[] = rucs.length ? await this.db.query(
       `SELECT c.ruc, u.nombres || ' ' || u.apellidos AS asesor FROM clientes c LEFT JOIN usuarios u ON u.id = c.asesor_id WHERE c.ruc = ANY($1)`,
@@ -350,17 +376,35 @@ export class BasesService {
       const contactos: FilaValida['contactos'] = [];
       let malo = '';
       for (const k of ['1', '2']) {
+        const quien = k === '1' ? 'del representante legal' : 'del contacto 2';
         const nombre = (datos[`nombre${k}`] ?? '').trim();
-        const celular = (datos[`celular${k}`] ?? '').replace(/\D/g, '').replace(/^51(?=9\d{8}$)/, '');
+        const celular = telefono(datos[`celular${k}`] ?? '');
         const correo = (datos[`correo${k}`] ?? '').trim();
-        if (!nombre && !celular && !correo) continue;
-        if (!/^9\d{8}$/.test(celular)) { malo = `Celular del contacto ${k} no válido (9 dígitos y empieza con 9)`; break; }
-        if (correo && !correoValido(correo)) { malo = `Correo del contacto ${k} no válido`; break; }
-        contactos.push({ nombre: (nombre || 'Sin nombre').slice(0, 100), celular, correo: correo ? correo.slice(0, 150) : null });
+        // Excel suele quitar el 0 inicial del DNI: 7 dígitos → se completa
+        const digitosDni = k === '1' ? (datos.dni1 ?? '').replace(/\D/g, '') : '';
+        const dni = digitosDni.length === 7 ? `0${digitosDni}` : digitosDni;
+        if (!nombre && !celular && !correo && !dni) continue;
+        if (!celular) { malo = `Falta el teléfono ${quien}`; break; }
+        if (!/^[90]\d{8}$/.test(celular)) { malo = `Teléfono ${quien} no válido (celular de 9 dígitos o fijo con código de ciudad)`; break; }
+        if (dni && !/^\d{8}$/.test(dni)) { malo = 'El DNI del representante debe tener 8 dígitos'; break; }
+        if (correo && !correoValido(correo)) { malo = `Correo ${quien} no válido`; break; }
+        contactos.push({ nombre: (nombre || 'Sin nombre').slice(0, 100), celular, correo: correo ? correo.slice(0, 150) : null, dni: dni || null });
       }
       if (malo) { err('DATO_INVALIDO', malo, ruc); continue; }
 
-      validas.push({ fila, ruc, razon: razon.slice(0, 200), distritoId: distrito, contactos });
+      // Cantidad de líneas que tiene hoy y con qué operador (opcionales)
+      const textoLineas = (datos.lineas ?? '').replace(/[\s,.]/g, '');
+      const lineas = textoLineas ? Number(textoLineas) : null;
+      if (lineas !== null && (!Number.isInteger(lineas) || lineas < 0 || lineas > 10000)) {
+        err('DATO_INVALIDO', 'La cantidad de líneas debe ser un número entero entre 0 y 10 000', ruc); continue;
+      }
+      const textoOperador = normal(datos.operador);
+      const operadorId = textoOperador ? operadores.get(textoOperador) ?? null : null;
+      if (textoOperador && !operadorId) {
+        err('DATO_INVALIDO', `Operador no reconocido: "${datos.operador}". Usa ${[...operadores.keys()].map((o) => o.charAt(0) + o.slice(1).toLowerCase()).join(', ')} o déjalo vacío`, ruc); continue;
+      }
+
+      validas.push({ fila, ruc, razon: razon.slice(0, 200), distritoId: distrito, contactos, lineas, operadorId });
     }
     return { validas, errores };
   }

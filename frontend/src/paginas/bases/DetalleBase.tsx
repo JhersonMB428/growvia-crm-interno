@@ -133,17 +133,25 @@ export function DetalleBase() {
       {pendiente && c.muestra.length > 0 && (
         <section className="panel vidrio" style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
           <h2 className="h2">Vista previa · primeras {c.muestra.length} de {c.validas}</h2>
+          {c.incompletas > 0 && (
+            <div className="alerta" role="note">
+              {c.incompletas} de {c.validas} empresas llegan con datos incompletos (falta representante con DNI y correo, ubicación, cantidad de líneas u operador).
+              Se pueden cargar igual, pero las ejecutivas tendrán que completarlos.
+            </div>
+          )}
           <div className="tabla-scroll">
             <table className="tabla">
-              <thead><tr><th className="num">Fila</th><th>RUC</th><th>Razón social</th><th>Ubicación</th><th className="num">Contactos</th></tr></thead>
+              <thead><tr><th className="num">Fila</th><th>RUC</th><th>Razón social</th><th>Representante legal</th><th>Ubicación</th><th className="num">Líneas</th><th>Operador</th></tr></thead>
               <tbody>
                 {c.muestra.map((m) => (
                   <tr key={m.fila}>
                     <td className="num">{m.fila}</td>
                     <td className="numeros">{m.ruc}</td>
                     <td>{m.razonSocial}</td>
+                    <td>{m.representante ?? <span className="tenue">Sin representante</span>}</td>
                     <td>{m.distrito ? `${m.distrito} · ${m.provincia}` : <span className="tenue">Sin ubicación</span>}</td>
-                    <td className="num">{m.contactos}</td>
+                    <td className="num">{m.lineas ?? '—'}</td>
+                    <td>{m.operador ?? <span className="tenue">—</span>}</td>
                   </tr>
                 ))}
               </tbody>

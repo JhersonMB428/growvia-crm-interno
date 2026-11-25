@@ -4,6 +4,7 @@ import { ErrorApi } from '../../api/cliente';
 import { empresasApi, plazo, type EmpresaResumen, type Pagina } from '../../api/empresas';
 import '../../componentes/llamada.css';
 import { ListaEmpresas } from '../../componentes/ListaEmpresas';
+import { FiltrosComerciales } from '../../componentes/FiltrosComerciales';
 import { useDebounce } from '../../hooks/useDebounce';
 
 type Estado = '' | 'PROSPECTO' | 'VENTA' | 'por_vencer';
@@ -21,22 +22,24 @@ export function MisEmpresas() {
   const [q, setQ] = useState('');
   const [estado, setEstado] = useState<Estado>('');
   const [pagina, setPagina] = useState(1);
+  const [comercial, setComercial] = useState<{ operadorId: number | ''; lineasMin: number | '' }>({ operadorId: '', lineasMin: '' });
   const [datos, setDatos] = useState<(Pagina<EmpresaResumen> & { porVencer: number }) | null>(null);
   const [cargando, setCargando] = useState(true);
   const [error, setError] = useState('');
   const busqueda = useDebounce(q);
 
-  useEffect(() => { setPagina(1); }, [busqueda, estado]);
+  useEffect(() => { setPagina(1); }, [busqueda, estado, comercial]);
   useEffect(() => {
     setCargando(true);
     empresasApi.mias({
       q: busqueda, pagina,
+      operadorId: comercial.operadorId || undefined, lineasMin: comercial.lineasMin || undefined,
       ...(estado === 'por_vencer' ? { filtro: 'por_vencer' as const } : { estado: estado || undefined }),
     })
       .then((d) => { setDatos(d); setError(''); })
       .catch((e) => setError(e instanceof ErrorApi ? e.message : 'No se pudo cargar tu cartera'))
       .finally(() => setCargando(false));
-  }, [busqueda, estado, pagina]);
+  }, [busqueda, estado, pagina, comercial]);
 
   return (
     <>
@@ -72,6 +75,7 @@ export function MisEmpresas() {
             <label htmlFor="q" className="oculto-visual">Buscar</label>
             <input id="q" className="entrada" type="search" placeholder="Buscar por RUC o razón social" value={q} onChange={(e) => setQ(e.target.value)} />
           </div>
+          <FiltrosComerciales {...comercial} onCambio={setComercial} />
           <div className="pestanas" role="group" aria-label="Filtrar por estado">
             {([['', 'Todas'], ['por_vencer', 'Por vencer'], ['PROSPECTO', 'Prospectos'], ['VENTA', 'Ventas']] as [Estado, string][]).map(([v, t]) => (
               <button key={v} type="button" className={`pestana${estado === v ? ' pestana--activa' : ''}`} aria-pressed={estado === v} onClick={() => setEstado(v)}>{t}</button>

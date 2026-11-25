@@ -20,6 +20,21 @@ export class ListarEmpresasDto {
   @Matches(/^\d{6}$/)
   distritoId?: string;
 
+  /** Operador actual de la empresa */
+  @IsOptional()
+  @Type(() => Number)
+  @IsInt()
+  @Min(1)
+  operadorId?: number;
+
+  /** Empresas con al menos esta cantidad de líneas */
+  @IsOptional()
+  @Type(() => Number)
+  @IsInt()
+  @Min(1)
+  @Max(10000)
+  lineasMin?: number;
+
   @IsOptional()
   @Type(() => Number)
   @IsInt()

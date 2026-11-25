@@ -121,8 +121,10 @@ export class ExportacionService {
         { titulo: 'Estado', clave: 'estado', ancho: 11 }, { titulo: 'Origen', clave: 'origen', ancho: 14 }, { titulo: 'Asesor a cargo', clave: 'asesor', ancho: 24 },
         { titulo: 'Equipo', clave: 'equipo', ancho: 14 }, { titulo: 'Asignada desde', clave: 'asignada', formato: 'fecha', ancho: 14 },
         { titulo: 'Última gestión', clave: 'ultimaGestion', formato: 'fecha', ancho: 14 },
+        { titulo: 'Cantidad de líneas', clave: 'lineas', formato: 'numero', ancho: 12 }, { titulo: 'Operador', clave: 'operador', ancho: 12 },
         ...(f.contactos ? [
-          { titulo: 'Contacto principal', clave: 'c1', ancho: 24 }, { titulo: 'Celular', clave: 'c1cel', ancho: 12 }, { titulo: 'Correo', clave: 'c1correo', ancho: 26 },
+          { titulo: 'Representante legal SUNAT', clave: 'c1', ancho: 28 }, { titulo: 'DNI', clave: 'c1dni', ancho: 10 },
+          { titulo: 'Teléfono', clave: 'c1cel', ancho: 12 }, { titulo: 'Correo', clave: 'c1correo', ancho: 26 },
           { titulo: 'Contacto secundario', clave: 'c2', ancho: 24 }, { titulo: 'Celular 2', clave: 'c2cel', ancho: 12 }, { titulo: 'Correo 2', clave: 'c2correo', ancho: 26 },
         ] as Columna[] : []),
       ];
@@ -131,11 +133,13 @@ export class ExportacionService {
                 CASE c.estado WHEN 'VENTA' THEN 'Cliente' ELSE 'Prospecto' END AS estado,
                 CASE c.origen WHEN 'BASE' THEN 'Base cargada' ELSE 'Prospección' END AS origen,
                 u.nombres || ' ' || u.apellidos AS asesor, eq.nombre AS equipo,
-                to_char(c.asignado_at AT TIME ZONE ${Z}, 'YYYY-MM-DD') AS asignada, to_char(c.ultima_gestion_at AT TIME ZONE ${Z}, 'YYYY-MM-DD') AS "ultimaGestion"
-                ${f.contactos ? `, k1.nombre AS c1, k1.celular AS c1cel, k1.correo AS c1correo, k2.nombre AS c2, k2.celular AS c2cel, k2.correo AS c2correo` : ''}
+                to_char(c.asignado_at AT TIME ZONE ${Z}, 'YYYY-MM-DD') AS asignada, to_char(c.ultima_gestion_at AT TIME ZONE ${Z}, 'YYYY-MM-DD') AS "ultimaGestion",
+                c.lineas_actuales AS lineas, opx.nombre AS operador
+                ${f.contactos ? `, k1.nombre AS c1, k1.dni AS c1dni, k1.celular AS c1cel, k1.correo AS c1correo, k2.nombre AS c2, k2.celular AS c2cel, k2.correo AS c2correo` : ''}
          FROM clientes c
          LEFT JOIN distritos d ON d.id = c.distrito_id LEFT JOIN provincias pr ON pr.id = d.provincia_id LEFT JOIN departamentos dep ON dep.id = pr.departamento_id
          LEFT JOIN usuarios u ON u.id = c.asesor_id LEFT JOIN equipos eq ON eq.id = u.equipo_id
+         LEFT JOIN operadores opx ON opx.id = c.operador_actual_id
          ${f.contactos ? `LEFT JOIN contactos k1 ON k1.cliente_id = c.id AND k1.posicion = 1 LEFT JOIN contactos k2 ON k2.cliente_id = c.id AND k2.posicion = 2` : ''}
          ORDER BY c.razon_social`,
       );
