@@ -7,7 +7,8 @@ const cache = new Map<string, Promise<string | null>>();
 function urlFoto(id: string, version: number) {
   const clave = `${id}:${version}`;
   if (!cache.has(clave)) {
-    cache.set(clave, fetch(`/api/usuarios/${id}/foto`, { headers: { Authorization: `Bearer ${token.leer() ?? ''}` } })
+    // ?v= cambia con cada foto nueva: así el navegador no muestra la anterior que tenía guardada
+    cache.set(clave, fetch(`/api/usuarios/${id}/foto?v=${version}`, { headers: { Authorization: `Bearer ${token.leer() ?? ''}` } })
       .then((r) => (r.ok ? r.blob().then((b) => URL.createObjectURL(b)) : null))
       .catch(() => null));
   }
