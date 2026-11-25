@@ -54,3 +54,16 @@ export function problemaFechaHora(fecha: string, hora: string): string {
 
 /** Para los buscadores: si escriben solo números, no más de 11 (el largo de un RUC) */
 export const recortarRuc = (texto: string) => (/^\d+$/.test(texto) ? texto.slice(0, 11) : texto);
+
+/** Último ingreso legible: "Hoy 09:42", "Ayer 18:10", "lun 23-nov 10:05" o "Nunca" */
+export function ultimoIngreso(iso: string | null): string {
+  if (!iso) return 'Nunca';
+  const d = new Date(iso);
+  const hora = d.toLocaleTimeString('es-PE', { hour: '2-digit', minute: '2-digit', hour12: false });
+  const dia = (x: Date) => x.toLocaleDateString('en-CA');
+  const hoy = new Date();
+  const ayer = new Date(Date.now() - 86_400_000);
+  if (dia(d) === dia(hoy)) return `Hoy ${hora}`;
+  if (dia(d) === dia(ayer)) return `Ayer ${hora}`;
+  return `${d.toLocaleDateString('es-PE', { weekday: 'short', day: '2-digit', month: 'short' })} ${hora}`;
+}

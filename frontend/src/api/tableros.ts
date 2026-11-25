@@ -23,7 +23,7 @@ export interface TableroAsesor {
 
 export interface AsesorEquipo {
   id: string; nombre: string; metaLineas: number | null; lineas: number; ventas: number; cargo: number;
-  porActivar: number; abiertas: number; gestionesHoy: number; noRealizadas: number;
+  porActivar: number; abiertas: number; gestionesHoy: number; noRealizadas: number; ultimoIngreso: string | null;
   ganadas: number; perdidas: number; observadas: number;
 }
 

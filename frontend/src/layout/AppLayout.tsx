@@ -3,6 +3,7 @@ import { useTema } from '../tema/TemaContext';
 import { Recorrido } from '../componentes/Recorrido';
 import { SugerenciaLigero } from '../componentes/SugerenciaLigero';
 import { FranjaVista } from '../componentes/VerComo';
+import { Inactividad } from '../componentes/Inactividad';
 import { useSesion } from '../sesion/SesionContext';
 import { Rail } from './Rail';
 import { Topbar } from './Topbar';
@@ -27,6 +28,7 @@ export function AppLayout() {
         </div>
       </div>
       {!mirando && <Recorrido />}
+      <Inactividad />
     </div>
   );
 }

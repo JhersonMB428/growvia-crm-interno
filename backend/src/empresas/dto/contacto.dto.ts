@@ -5,9 +5,11 @@ export class ContactoDto {
   @Length(2, 100, { message: 'El nombre del contacto debe tener entre 2 y 100 caracteres' })
   nombre: string;
 
-  /** Celular (9…) o fijo con código de ciudad (01…, 044…): siempre 9 dígitos */
+  /** Celular (9…) o fijo con código de ciudad (01…, 044…): siempre 9 dígitos.
+   *  Opcional solo en el representante legal (SUNAT da su nombre y DNI, no su teléfono). */
+  @IsOptional()
   @Matches(/^[90]\d{8}$/, { message: 'El teléfono debe tener 9 dígitos: celular (9…) o fijo con código de ciudad (01…, 044…)' })
-  celular: string;
+  celular?: string;
 
   /** DNI del representante legal (solo en el contacto 1) */
   @IsOptional()

@@ -1,11 +1,12 @@
 import { BadRequestException, ForbiddenException, Injectable, NotFoundException } from '@nestjs/common';
 import * as ExcelJS from 'exceljs';
 import { Readable } from 'stream';
-import { DataSource } from 'typeorm';
+import { DataSource, EntityManager } from 'typeorm';
 import { SesionUsuario } from '../auth/decorators/usuario-actual.decorator';
 import { RetencionService } from '../empresas/retencion';
 import { errorRuc } from '../empresas/ruc';
 import { NotificacionesService } from '../notificaciones/notificaciones.service';
+import { SunatService } from '../sunat/sunat.service';
 
 const MAX_FILAS = 5000;
 
@@ -39,10 +40,71 @@ const normal = (t: unknown) => String(t ?? '').normalize('NFD').replace(/[\u0300
 const correoValido = (c: string) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(c);
 
 type Motivo = 'RUC_INVALIDO' | 'RUC_DUPLICADO' | 'UBIGEO_INVALIDO' | 'DATO_FALTANTE' | 'DATO_INVALIDO';
+type ContactoBase = { nombre: string; celular: string | null; correo: string | null; dni: string | null };
 interface FilaValida {
   fila: number; ruc: string; razon: string; distritoId: string | null; lineas: number | null; operadorId: number | null;
-  contactos: { nombre: string; celular: string; correo: string | null; dni: string | null }[];
+  contactos: ContactoBase[];
+  /** Empresa que ya está en el CRM con ese RUC: la fila no crea otra, completa (o corrige) sus datos */
+  clienteId: string | null;
+  cambios: Cambios | null;
 }
+/** Qué aporta una fila a una empresa que ya existe */
+interface Cambios { completa: string[]; diferencias: { campo: string; crm: string; base: string }[] }
+/** Datos actuales de una empresa del CRM, para comparar con la base */
+interface FotoCrm {
+  id: string; ruc: string; razon: string; distritoId: string | null; lineas: number | null; operadorId: number | null; asesor: string | null;
+  contactos: (ContactoBase & { posicion: number })[];
+}
+type Nombres = { distrito: (id: string) => string; operador: (id: number) => string };
+
+/** Sin tildes, signos ni orden: "Pérez Rojas, Juan" = "JUAN PEREZ ROJAS" */
+const mismoTexto = (a: string | null, b: string | null) => {
+  // Los puntos no separan palabras ("S.A.C." = "SAC"); el resto de signos, sí
+  const n = (t: string | null) => normal(t).replace(/\./g, '').replace(/[^A-Z0-9 ]/g, ' ').split(' ').filter(Boolean).sort().join(' ');
+  return n(a) === n(b);
+};
+
+/**
+ * Compara una fila de la base con la empresa del CRM:
+ *  - completa: datos que el CRM no tiene y la base sí (se agregan siempre).
+ *  - diferencias: el CRM y la base tienen valores distintos (al aprobar se elige cuál se queda).
+ */
+function comparar(f: Pick<FilaValida, 'razon' | 'distritoId' | 'lineas' | 'operadorId' | 'contactos'>, c: FotoCrm, n: Nombres): Cambios {
+  const completa: string[] = [];
+  const diferencias: Cambios['diferencias'] = [];
+  const campo = <T>(nombre: string, base: T | null, crm: T | null, texto: (v: T) => string, igual = (a: T, b: T) => a === b) => {
+    if (base === null || base === undefined) return;
+    if (crm === null || crm === undefined) completa.push(`${nombre}: ${texto(base)}`);
+    else if (!igual(base, crm)) diferencias.push({ campo: nombre, crm: texto(crm), base: texto(base) });
+  };
+  campo('Razón social', f.razon, c.razon, (v) => v, (a, b) => mismoTexto(a, b));
+  campo('Ubicación', f.distritoId, c.distritoId, n.distrito);
+  campo('Cantidad de líneas', f.lineas, c.lineas, (v) => String(v));
+  campo('Operador', f.operadorId, c.operadorId, n.operador);
+
+  const [rb, ob] = f.contactos;
+  const rc = c.contactos.find((k) => k.posicion === 1);
+  const oc = c.contactos.find((k) => k.posicion === 2);
+  if (rb) {
+    if (!rc) completa.push(`Representante legal: ${rb.nombre}`);
+    else if (mismaPersona(rb, rc)) {
+      campo('DNI del representante', rb.dni, rc.dni, (v) => v);
+      campo('Teléfono', rb.celular, rc.celular, (v) => v);
+      campo('Correo', rb.correo, rc.correo, (v) => v, (a, b) => a.toLowerCase() === b.toLowerCase());
+    } else {
+      diferencias.push({ campo: 'Representante legal', crm: detalleContacto(rc), base: detalleContacto(rb) });
+    }
+  }
+  if (ob) {
+    if (!oc) completa.push(`Otro contacto: ${ob.nombre}`);
+    else if (ob.celular !== oc.celular) diferencias.push({ campo: 'Otro contacto', crm: detalleContacto(oc), base: detalleContacto(ob) });
+  }
+  return { completa, diferencias };
+}
+/** Mismo representante si coincide el DNI, o el nombre cuando falta el DNI en alguno */
+const mismaPersona = (a: ContactoBase, b: ContactoBase) =>
+  a.dni && b.dni ? a.dni === b.dni : mismoTexto(a.nombre, b.nombre) || a.nombre === 'Sin nombre';
+const detalleContacto = (k: ContactoBase) => [k.nombre, k.dni && `DNI ${k.dni}`, k.celular, k.correo].filter(Boolean).join(' · ');
 /** Teléfono a 9 dígitos: celular 9…, fijo con código 0… (un fijo de Lima de 7 dígitos se completa con 01) */
 function telefono(t: string): string {
   const d = t.replace(/\D/g, '').replace(/^51(?=\d{9}$)/, '');
@@ -61,6 +123,7 @@ export class BasesService {
     private readonly db: DataSource,
     private readonly notificaciones: NotificacionesService,
     private readonly retencion: RetencionService,
+    private readonly sunat: SunatService,
   ) {}
 
   // ───────────── Plantilla vacía (no contiene datos) ─────────────
@@ -77,30 +140,36 @@ export class BasesService {
   }
 
   // ───────────── Subir y revisar ─────────────
-  async subir(archivo: ArchivoSubido | undefined, asignarA: string | undefined, s: SesionUsuario) {
+  async subir(archivo: ArchivoSubido | undefined, opciones: { asignarA?: string; origen?: 'INTERNA' | 'COMPRADA'; proveedor?: string }, s: SesionUsuario) {
     if (!archivo) throw new BadRequestException('Adjunta el archivo Excel');
-    const destino = await this.resolverDestino(asignarA, s);
+    const destino = await this.resolverDestino(opciones.asignarA, s);
+    const origen = opciones.origen ?? 'INTERNA';
+    const proveedor = origen === 'COMPRADA' ? opciones.proveedor?.trim() || null : null;
+    if (origen === 'COMPRADA' && !proveedor) throw new BadRequestException('Escribe a quién se compró la base (proveedor)');
     const filas = await this.leer(archivo);
     if (!filas.length) throw new BadRequestException('El archivo no tiene filas con datos');
     if (filas.length > MAX_FILAS) throw new BadRequestException(`El archivo tiene ${filas.length} filas; el máximo por carga es ${MAX_FILAS}`);
 
-    const { validas, errores } = await this.revisar(filas);
+    const { validas, errores, iguales } = await this.revisar(filas);
+    const actualizar = validas.filter((v) => v.clienteId).length;
 
     const id = await this.db.transaction(async (tx) => {
       const [lote] = await tx.query(
-        `INSERT INTO lotes_importacion (subido_por, archivo_nombre, total_filas, filas_ok, filas_error, estado, asignar_a)
-         VALUES ($1, $2, $3, $4, $5, 'PENDIENTE_APROBACION', $6) RETURNING id`,
-        [s.sub, archivo.originalname.slice(0, 200), filas.length, validas.length, errores.length, destino],
+        `INSERT INTO lotes_importacion (subido_por, archivo_nombre, total_filas, filas_ok, filas_error, estado, asignar_a,
+                                        origen, proveedor, filas_actualizar, filas_iguales)
+         VALUES ($1, $2, $3, $4, $5, 'PENDIENTE_APROBACION', $6, $7, $8, $9, $10) RETURNING id`,
+        [s.sub, archivo.originalname.slice(0, 200), filas.length, validas.length, errores.length, destino, origen, proveedor, actualizar, iguales],
       );
       // Inserción por bloques para que 1000+ filas no sean 1000 consultas
       for (let i = 0; i < validas.length; i += 500) {
         const bloque = validas.slice(i, i + 500);
         await tx.query(
-          `INSERT INTO lote_filas (lote_id, fila, ruc, razon_social, distrito_id, contactos, lineas, operador_id)
-           SELECT $1, x.fila, x.ruc, x.razon, x.distrito, x.contactos, x.lineas, x.operador FROM jsonb_to_recordset($2::jsonb)
-             AS x(fila int, ruc text, razon text, distrito text, contactos jsonb, lineas smallint, operador smallint)`,
+          `INSERT INTO lote_filas (lote_id, fila, ruc, razon_social, distrito_id, contactos, lineas, operador_id, cliente_id, cambios)
+           SELECT $1, x.fila, x.ruc, x.razon, x.distrito, x.contactos, x.lineas, x.operador, x.cliente, x.cambios FROM jsonb_to_recordset($2::jsonb)
+             AS x(fila int, ruc text, razon text, distrito text, contactos jsonb, lineas smallint, operador smallint, cliente uuid, cambios jsonb)`,
           [lote.id, JSON.stringify(bloque.map((v) => ({
             fila: v.fila, ruc: v.ruc, razon: v.razon, distrito: v.distritoId, contactos: v.contactos, lineas: v.lineas, operador: v.operadorId,
+            cliente: v.clienteId, cambios: v.cambios,
           })))],
         );
       }
@@ -121,7 +190,7 @@ export class BasesService {
       if (eq?.supervisorId) {
         await this.notificaciones.crear(eq.supervisorId, {
           tipo: 'BASE_APROBADA', titulo: 'Base por aprobar',
-          mensaje: `Un asesor de tu equipo subió "${archivo.originalname}" con ${validas.length} empresas válidas.`, entidad: 'LOTE', entidadId: id,
+          mensaje: `Un asesor de tu equipo subió "${archivo.originalname}" con ${validas.length - actualizar} empresas nuevas${actualizar ? ` y ${actualizar} que completan datos` : ''}.`, entidad: 'LOTE', entidadId: id,
         });
       }
     }
@@ -136,6 +205,8 @@ export class BasesService {
     else if (s.rol === 'SUPERVISOR') { params.push(s.sub, s.equipoId); filtro = '(l.subido_por = $1 OR us.equipo_id = $2)'; }
     const filas = await this.db.query(
       `SELECT l.id, l.archivo_nombre AS archivo, l.total_filas AS total, l.filas_ok AS validas, l.filas_error AS "conError", l.estado,
+              l.origen, l.proveedor, l.filas_actualizar AS "actualizar", l.filas_iguales AS iguales,
+              l.empresas_creadas AS creadas, l.empresas_actualizadas AS actualizadas,
               l.created_at AS fecha, us.nombres || ' ' || us.apellidos AS "subidoPor",
               CASE WHEN l.asignar_a IS NULL THEN NULL ELSE ua.nombres || ' ' || ua.apellidos END AS "asignarA"
        FROM lotes_importacion l JOIN usuarios us ON us.id = l.subido_por LEFT JOIN usuarios ua ON ua.id = l.asignar_a
@@ -149,6 +220,8 @@ export class BasesService {
     const [l] = await this.db.query(
       `SELECT l.id, l.archivo_nombre AS archivo, l.total_filas AS total, l.filas_ok AS validas, l.filas_error AS "conError", l.estado,
               l.created_at AS fecha, l.revisado_at AS "revisadoAt", l.motivo_rechazo AS "motivoRechazo",
+              l.origen, l.proveedor, l.filas_actualizar AS "actualizar", l.filas_iguales AS iguales, l.en_diferencias AS "enDiferencias",
+              l.empresas_creadas AS creadas, l.empresas_actualizadas AS actualizadas,
               l.subido_por AS "subidoPorId", us.nombres || ' ' || us.apellidos AS "subidoPor", us.equipo_id AS "equipoId",
               l.asignar_a AS "asignarAId", CASE WHEN l.asignar_a IS NULL THEN NULL ELSE ua.nombres || ' ' || ua.apellidos END AS "asignarA",
               CASE WHEN l.aprobado_por IS NULL THEN NULL ELSE ap.nombres || ' ' || ap.apellidos END AS "revisadoPor"
@@ -167,45 +240,56 @@ export class BasesService {
               f.lineas, op.nombre AS operador
        FROM lote_filas f LEFT JOIN distritos di ON di.id = f.distrito_id LEFT JOIN provincias pr ON pr.id = di.provincia_id
        LEFT JOIN operadores op ON op.id = f.operador_id
-       WHERE f.lote_id = $1 ORDER BY f.fila LIMIT 20`, [id],
+       WHERE f.lote_id = $1 AND f.cliente_id IS NULL ORDER BY f.fila LIMIT 20`, [id],
+    );
+    // Empresas que ya están en el CRM: qué completa la base y en qué difiere
+    const existentes = await this.db.query(
+      `SELECT f.fila, f.ruc, c.razon_social AS "razonSocial", CASE WHEN u.id IS NULL THEN NULL ELSE u.nombres || ' ' || u.apellidos END AS asesor,
+              f.cambios->'completa' AS completa, f.cambios->'diferencias' AS diferencias
+       FROM lote_filas f JOIN clientes c ON c.id = f.cliente_id LEFT JOIN usuarios u ON u.id = c.asesor_id
+       WHERE f.lote_id = $1
+       ORDER BY jsonb_array_length(COALESCE(f.cambios->'diferencias', '[]')) DESC, f.fila LIMIT 300`, [id],
+    );
+    const [{ conDiferencias }] = await this.db.query(
+      `SELECT count(*) FILTER (WHERE jsonb_array_length(COALESCE(cambios->'diferencias', '[]')) > 0)::int AS "conDiferencias"
+       FROM lote_filas WHERE lote_id = $1 AND cliente_id IS NOT NULL`, [id],
     );
     // Filas válidas a las que les falta algo de la estructura completa (representante con DNI, teléfono y correo, ubicación, líneas, operador)
     const [{ incompletas }] = await this.db.query(
       `SELECT count(*) FILTER (WHERE f.distrito_id IS NULL OR f.lineas IS NULL OR f.operador_id IS NULL
                                  OR f.contactos->0->>'dni' IS NULL OR f.contactos->0->>'correo' IS NULL)::int AS incompletas
-       FROM lote_filas f WHERE f.lote_id = $1`, [id],
+       FROM lote_filas f WHERE f.lote_id = $1 AND f.cliente_id IS NULL`, [id],
     );
     const { subidoPorId: _a, equipoId: _b, asignarAId: _c, ...datos } = l;
-    return { ...datos, errores, muestra, incompletas, puedeRevisar: l.estado === 'PENDIENTE_APROBACION' && this.puedeRevisar(l, s) };
+    return { ...datos, nuevas: l.validas - l.actualizar, errores, muestra, existentes, conDiferencias, incompletas, puedeRevisar: l.estado === 'PENDIENTE_APROBACION' && this.puedeRevisar(l, s) };
   }
 
-  // ───────────── Aprobar: crea las empresas ─────────────
-  async aprobar(id: string, s: SesionUsuario) {
+  // ───────────── Aprobar: crea las empresas nuevas y completa las que ya existen ─────────────
+  async aprobar(id: string, enDiferencias: 'CRM' | 'BASE', s: SesionUsuario) {
     const resultado = await this.db.transaction(async (tx) => {
       const [l] = await tx.query(
-        `SELECT l.id, l.estado, l.asignar_a AS "asignarA", l.subido_por AS "subidoPorId", l.archivo_nombre AS archivo, us.equipo_id AS "equipoId"
+        `SELECT l.id, l.estado, l.asignar_a AS "asignarA", l.subido_por AS "subidoPorId", l.archivo_nombre AS archivo, us.equipo_id AS "equipoId",
+                l.filas_iguales AS iguales
          FROM lotes_importacion l JOIN usuarios us ON us.id = l.subido_por WHERE l.id = $1 FOR UPDATE OF l`, [id],
       );
       if (!l) throw new NotFoundException('La carga no existe');
       if (!this.puedeRevisar(l, s)) throw new ForbiddenException('No puedes aprobar esta carga');
       if (l.estado !== 'PENDIENTE_APROBACION') throw new BadRequestException('Esta carga ya fue revisada');
 
-      // RUC que se registraron después de subir el archivo: pasan a errores
-      const ocupados = await tx.query(
-        `INSERT INTO lote_errores (lote_id, fila, ruc, motivo, detalle, datos)
-         SELECT f.lote_id, f.fila, f.ruc, 'RUC_DUPLICADO', 'Se registró en el CRM mientras la carga esperaba aprobación',
-                jsonb_build_object('razonSocial', f.razon_social)
-         FROM lote_filas f JOIN clientes c ON c.ruc = f.ruc WHERE f.lote_id = $1 RETURNING fila`, [id],
+      // RUC que se registraron mientras la carga esperaba: tampoco se repiten, se completan
+      await tx.query(
+        `UPDATE lote_filas f SET cliente_id = c.id FROM clientes c WHERE f.lote_id = $1 AND f.cliente_id IS NULL AND c.ruc = f.ruc`, [id],
       );
-      const nOcupados = (Array.isArray(ocupados[0]) ? ocupados[0] : ocupados).length;
 
       const creadas = await tx.query(
         `WITH nuevas AS (
            INSERT INTO clientes (ruc, razon_social, distrito_id, asesor_id, origen, lote_id, asignado_at, creado_por, retencion_hasta,
-                                 lineas_actuales, operador_actual_id)
+                                 lineas_actuales, operador_actual_id, sunat_pendiente)
            SELECT f.ruc, f.razon_social, f.distrito_id, $2, 'BASE', $1, CASE WHEN $2::uuid IS NULL THEN NULL ELSE now() END, $3,
-                  CASE WHEN $2::uuid IS NULL THEN NULL ELSE $4::timestamptz END, f.lineas, f.operador_id
-           FROM lote_filas f WHERE f.lote_id = $1 AND NOT EXISTS (SELECT 1 FROM clientes c WHERE c.ruc = f.ruc)
+                  CASE WHEN $2::uuid IS NULL THEN NULL ELSE $4::timestamptz END, f.lineas, f.operador_id,
+                  -- Sin representante o sin su DNI: se completa después desde SUNAT
+                  (f.contactos->0->>'dni') IS NULL
+           FROM lote_filas f WHERE f.lote_id = $1 AND f.cliente_id IS NULL
            ON CONFLICT (ruc) DO NOTHING
            RETURNING id, ruc
          ), contactos AS (
@@ -222,24 +306,99 @@ export class BasesService {
         [id, l.asignarA, s.sub, await this.retencion.inicial(true)],
       );
       const n = creadas[0].n as number;
+
+      // Empresas que ya estaban: se comparan otra vez con sus datos de este momento
+      const existentes: { ruc: string; razon: string; distritoId: string | null; lineas: number | null; operadorId: number | null; contactos: ContactoBase[] }[] =
+        await tx.query(
+          `SELECT f.ruc, f.razon_social AS razon, f.distrito_id AS "distritoId", f.lineas, f.operador_id AS "operadorId", f.contactos
+           FROM lote_filas f WHERE f.lote_id = $1 AND f.cliente_id IS NOT NULL ORDER BY f.fila`, [id],
+        );
+      const fotos = await this.fotos(tx, existentes.map((e) => e.ruc), true);
+      let actualizadas = 0;
+      for (const f of existentes) {
+        const c = fotos.get(f.ruc);
+        if (c && await this.fusionar(tx, f, c, enDiferencias)) actualizadas++;
+      }
+
+      // Las que ya estaban y no cambiaron (solo tenían diferencias y se mantuvo el CRM) cuentan como "sin datos nuevos"
+      const sinCambio = existentes.length - actualizadas;
+      const procesadas = n + existentes.length + l.iguales;
       await tx.query(
-        `UPDATE lotes_importacion SET estado = 'LISTO', aprobado_por = $2, revisado_at = now(), procesado_at = now(),
-                filas_ok = $3, filas_error = total_filas - $3 WHERE id = $1`, [id, s.sub, n],
+        `UPDATE lotes_importacion SET estado = 'LISTO', aprobado_por = $2, revisado_at = now(), procesado_at = now(), en_diferencias = $5,
+                empresas_creadas = $3, empresas_actualizadas = $4, filas_iguales = filas_iguales + $7, filas_ok = $6, filas_error = total_filas - $6 WHERE id = $1`,
+        [id, s.sub, n, actualizadas, enDiferencias, procesadas, sinCambio],
       );
       await tx.query(`DELETE FROM lote_filas WHERE lote_id = $1`, [id]);
 
-      const mensaje = `Se crearon ${n} empresas de "${l.archivo}"${nOcupados ? ` (${nOcupados} ya existían)` : ''}.`;
+      const mensaje = `De "${l.archivo}": ${n} empresas nuevas${actualizadas ? ` y ${actualizadas} que ya estaban en el CRM con datos completados` : ''}.`;
       if (l.subidoPorId !== s.sub) {
         await this.notificaciones.crear(l.subidoPorId, { tipo: 'BASE_APROBADA', titulo: 'Base aprobada', mensaje, entidad: 'LOTE', entidadId: id }, tx);
       }
-      if (l.asignarA && l.asignarA !== l.subidoPorId && l.asignarA !== s.sub) {
+      if (n && l.asignarA && l.asignarA !== l.subidoPorId && l.asignarA !== s.sub) {
         await this.notificaciones.crear(l.asignarA, {
           tipo: 'EMPRESA_ASIGNADA', titulo: 'Nuevas empresas asignadas', mensaje: `Se te asignaron ${n} empresas de una base cargada.`, entidad: 'LOTE', entidadId: id,
         }, tx);
       }
-      return { creadas: n, yaExistian: nOcupados };
+      return { creadas: n, actualizadas, iguales: (l.iguales as number) + sinCambio };
     });
-    return { ...resultado, carga: await this.detalle(id, s) };
+    // Si la consulta a SUNAT está activa, los representantes que faltan se completan solos en los próximos minutos
+    return { ...resultado, completaSunat: this.sunat.activo, carga: await this.detalle(id, s) };
+  }
+
+  /**
+   * Junta una fila de la base con la empresa que ya existe, sin crear otra:
+   *  - lo que el CRM no tiene, se agrega;
+   *  - lo que es distinto, se queda como está ('CRM') o se reemplaza ('BASE').
+   * No cambia al asesor a cargo. Devuelve si hubo algún cambio.
+   */
+  private async fusionar(tx: EntityManager, f: Pick<FilaValida, 'razon' | 'distritoId' | 'lineas' | 'operadorId' | 'contactos'>, c: FotoCrm, regla: 'CRM' | 'BASE') {
+    const usarBase = regla === 'BASE';
+    const elegir = <T>(base: T | null, crm: T | null) => (base === null || base === undefined ? crm : crm === null || crm === undefined || usarBase ? base : crm);
+    let cambio = false;
+
+    const razon = usarBase && !mismoTexto(f.razon, c.razon) ? f.razon : c.razon;
+    const distritoId = elegir(f.distritoId, c.distritoId);
+    const lineas = elegir(f.lineas, c.lineas);
+    const operadorId = elegir(f.operadorId, c.operadorId);
+    if (razon !== c.razon || distritoId !== c.distritoId || lineas !== c.lineas || operadorId !== c.operadorId) {
+      await tx.query(
+        `UPDATE clientes SET razon_social = $2, distrito_id = $3, lineas_actuales = $4, operador_actual_id = $5, updated_at = now() WHERE id = $1`,
+        [c.id, razon, distritoId, lineas, operadorId],
+      );
+      cambio = true;
+    }
+
+    const guardar = async (k: ContactoBase, posicion: 1 | 2, actual?: ContactoBase) => {
+      let final: ContactoBase;
+      if (!actual) final = k;
+      else if (posicion === 1 && !mismaPersona(k, actual)) final = usarBase ? k : actual;   // otro representante
+      else if (posicion === 2 && k.celular !== actual.celular) final = usarBase ? k : actual;
+      else {
+        final = {
+          nombre: actual.nombre === 'Sin nombre' ? k.nombre : actual.nombre,
+          dni: elegir(k.dni, actual.dni), celular: elegir(k.celular, actual.celular),
+          correo: elegir(k.correo, actual.correo),
+        };
+      }
+      if (actual && final.nombre === actual.nombre && final.dni === actual.dni && final.celular === actual.celular && final.correo === actual.correo) return;
+      if (posicion === 2 && !final.celular) return;
+      await tx.query(
+        `INSERT INTO contactos (cliente_id, nombre, celular, correo, dni, posicion) VALUES ($1, $2, $3, $4, $5, $6)
+         ON CONFLICT (cliente_id, posicion) DO UPDATE SET nombre = EXCLUDED.nombre, celular = EXCLUDED.celular, correo = EXCLUDED.correo, dni = EXCLUDED.dni`,
+        [c.id, final.nombre.slice(0, 100), final.celular, final.correo, posicion === 1 ? final.dni : null, posicion],
+      );
+      cambio = true;
+    };
+    const [rb, ob] = f.contactos;
+    if (rb) await guardar(rb, 1, c.contactos.find((k) => k.posicion === 1));
+    if (ob) await guardar(ob, 2, c.contactos.find((k) => k.posicion === 2));
+
+    // Sigue sin representante con DNI: que lo complete SUNAT
+    await tx.query(
+      `UPDATE clientes SET sunat_pendiente = true WHERE id = $1 AND sunat_consultado_at IS NULL
+         AND NOT EXISTS (SELECT 1 FROM contactos k WHERE k.cliente_id = $1 AND k.posicion = 1 AND k.dni IS NOT NULL)`, [c.id],
+    );
+    return cambio;
   }
 
   // ───────────── Rechazar ─────────────
@@ -346,28 +505,25 @@ export class BasesService {
   /** Revisa cada fila: RUC, razón social, ubigeo, contactos y repetidos (en el archivo y en el CRM) */
   private async revisar(filas: { fila: number; datos: Record<string, string> }[]) {
     const ubigeo = await this.cargarUbigeo();
-    const operadores = new Map<string, number>(
-      (await this.db.query(`SELECT id, nombre FROM operadores WHERE activo`) as { id: number; nombre: string }[]).map((o) => [normal(o.nombre), o.id]),
-    );
+    const listaOperadores: { id: number; nombre: string }[] = await this.db.query(`SELECT id, nombre FROM operadores WHERE activo`);
+    const operadores = new Map<string, number>(listaOperadores.map((o) => [normal(o.nombre), o.id]));
+    const nombres = await this.nombres(ubigeo);
     const rucs = filas.map((f) => f.datos.ruc?.replace(/\D/g, '')).filter((r) => /^\d{11}$/.test(r));
-    const existentes: { ruc: string; asesor: string | null }[] = rucs.length ? await this.db.query(
-      `SELECT c.ruc, u.nombres || ' ' || u.apellidos AS asesor FROM clientes c LEFT JOIN usuarios u ON u.id = c.asesor_id WHERE c.ruc = ANY($1)`,
-      [rucs],
-    ) : [];
-    const enCrm = new Map(existentes.map((e) => [e.ruc, e.asesor]));
+    const enCrm = await this.fotos(this.db, rucs);
     const vistos = new Map<string, number>();
     const validas: FilaValida[] = [];
     const errores: FilaError[] = [];
+    let iguales = 0;
 
     for (const { fila, datos } of filas) {
       const err = (motivo: Motivo, detalle: string, ruc: string | null = null) => errores.push({ fila, ruc, motivo, detalle, datos });
       const ruc = (datos.ruc ?? '').replace(/\D/g, '');
       if (!ruc) { err('DATO_FALTANTE', 'Falta el RUC'); continue; }
-      const problemaRuc = errorRuc(ruc);
+      // Si el RUC ya está en el CRM se acepta tal cual (empresas registradas antes de validar el dígito verificador)
+      const problemaRuc = enCrm.has(ruc) ? null : errorRuc(ruc);
       if (problemaRuc) { err('RUC_INVALIDO', problemaRuc, ruc.slice(0, 20)); continue; }
       if (vistos.has(ruc)) { err('RUC_DUPLICADO', `Repetido en el archivo (también en la fila ${vistos.get(ruc)})`, ruc); continue; }
       vistos.set(ruc, fila);
-      if (enCrm.has(ruc)) { err('RUC_DUPLICADO', `Ya está en el CRM${enCrm.get(ruc) ? ` (lo tiene ${enCrm.get(ruc)})` : ' (libre en el repositorio)'}`, ruc); continue; }
       const razon = (datos.razon ?? '').replace(/\s+/g, ' ').trim();
       if (razon.length < 3) { err('DATO_FALTANTE', 'Falta la razón social', ruc); continue; }
 
@@ -386,11 +542,12 @@ export class BasesService {
         const digitosDni = k === '1' ? (datos.dni1 ?? '').replace(/\D/g, '') : '';
         const dni = digitosDni.length === 7 ? `0${digitosDni}` : digitosDni;
         if (!nombre && !celular && !correo && !dni) continue;
-        if (!celular) { malo = `Falta el teléfono ${quien}`; break; }
-        if (!/^[90]\d{8}$/.test(celular)) { malo = `Teléfono ${quien} no válido (celular de 9 dígitos o fijo con código de ciudad)`; break; }
+        // El representante puede venir sin teléfono (nombre y DNI de SUNAT); el otro contacto, no
+        if (!celular && k === '2') { malo = `Falta el teléfono ${quien}`; break; }
+        if (celular && !/^[90]\d{8}$/.test(celular)) { malo = `Teléfono ${quien} no válido (celular de 9 dígitos o fijo con código de ciudad)`; break; }
         if (dni && !/^\d{8}$/.test(dni)) { malo = 'El DNI del representante debe tener 8 dígitos'; break; }
         if (correo && !correoValido(correo)) { malo = `Correo ${quien} no válido`; break; }
-        contactos.push({ nombre: (nombre || 'Sin nombre').slice(0, 100), celular, correo: correo ? correo.slice(0, 150) : null, dni: dni || null });
+        contactos.push({ nombre: (nombre || 'Sin nombre').slice(0, 100), celular: celular || null, correo: correo ? correo.slice(0, 150) : null, dni: dni || null });
       }
       if (malo) { err('DATO_INVALIDO', malo, ruc); continue; }
 
@@ -406,9 +563,38 @@ export class BasesService {
         err('DATO_INVALIDO', `Operador no reconocido: "${datos.operador}". Usa ${[...operadores.keys()].map((o) => o.charAt(0) + o.slice(1).toLowerCase()).join(', ')} o déjalo vacío`, ruc); continue;
       }
 
-      validas.push({ fila, ruc, razon: razon.slice(0, 200), distritoId: distrito, contactos, lineas, operadorId });
+      const nueva: FilaValida = { fila, ruc, razon: razon.slice(0, 200), distritoId: distrito, contactos, lineas, operadorId, clienteId: null, cambios: null };
+      // Ya está en el CRM: no se repite; se ve qué datos completa y en cuáles difiere
+      const foto = enCrm.get(ruc);
+      if (foto) {
+        const cambios = comparar(nueva, foto, nombres);
+        if (!cambios.completa.length && !cambios.diferencias.length) { iguales++; continue; }
+        nueva.clienteId = foto.id;
+        nueva.cambios = cambios;
+      }
+      validas.push(nueva);
     }
-    return { validas, errores };
+    return { validas, errores, iguales };
+  }
+
+  /** Datos actuales de las empresas del CRM con esos RUC */
+  private async fotos(db: DataSource | EntityManager, rucs: string[], bloquear = false): Promise<Map<string, FotoCrm>> {
+    if (!rucs.length) return new Map();
+    const filas: FotoCrm[] = await db.query(
+      `SELECT c.id, c.ruc, c.razon_social AS razon, c.distrito_id AS "distritoId", c.lineas_actuales AS lineas, c.operador_actual_id AS "operadorId",
+              CASE WHEN u.id IS NULL THEN NULL ELSE u.nombres || ' ' || u.apellidos END AS asesor,
+              COALESCE((SELECT jsonb_agg(jsonb_build_object('nombre', k.nombre, 'celular', k.celular, 'correo', k.correo, 'dni', k.dni, 'posicion', k.posicion)
+                                          ORDER BY k.posicion) FROM contactos k WHERE k.cliente_id = c.id), '[]') AS contactos
+       FROM clientes c LEFT JOIN usuarios u ON u.id = c.asesor_id WHERE c.ruc = ANY($1)${bloquear ? ' FOR UPDATE OF c' : ''}`, [rucs],
+    );
+    return new Map(filas.map((f) => [f.ruc.trim(), f]));
+  }
+
+  /** Nombres legibles de distritos y operadores (para mostrar las diferencias) */
+  private async nombres(ubigeo?: Awaited<ReturnType<BasesService['cargarUbigeo']>>): Promise<Nombres> {
+    const u = ubigeo ?? await this.cargarUbigeo();
+    const ops = new Map<number, string>((await this.db.query(`SELECT id, nombre FROM operadores`) as { id: number; nombre: string }[]).map((o) => [o.id, o.nombre]));
+    return { distrito: (id) => u.textos.get(id) ?? id, operador: (id) => ops.get(id) ?? String(id) };
   }
 
   private async cargarUbigeo() {
@@ -417,6 +603,7 @@ export class BasesService {
        FROM distritos di JOIN provincias pr ON pr.id = di.provincia_id JOIN departamentos de ON de.id = pr.departamento_id`,
     );
     const ids = new Set(filas.map((f) => f.id));
+    const textos = new Map(filas.map((f) => [f.id, `${f.dist} (${f.prov}, ${f.dep})`]));
     const completo = new Map<string, string>();
     const porProv = new Map<string, string[]>();
     const porDist = new Map<string, string[]>();
@@ -426,7 +613,7 @@ export class BasesService {
       porProv.set(kp, [...(porProv.get(kp) ?? []), f.id]);
       porDist.set(normal(f.dist), [...(porDist.get(normal(f.dist)) ?? []), f.id]);
     }
-    return { ids, completo, porProv, porDist };
+    return { ids, completo, porProv, porDist, textos };
   }
 
   /** Código ubigeo, o departamento/provincia/distrito por nombre. Sin datos de ubicación → null (se permite). */

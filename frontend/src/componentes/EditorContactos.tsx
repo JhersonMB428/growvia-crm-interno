@@ -3,11 +3,13 @@ import { problemaCorreo, problemaDni, problemaTelefono } from '../utilidades/val
 import { AyudaCampo } from './Faltantes';
 
 /** Problemas de un contacto, campo por campo ('' = bien) */
-function problemasDe(c: Contacto, i: number) {
+function problemasDe(c: Contacto, i: number, telefonoRepOpcional = false) {
+  const tel = c.celular ?? '';
   return {
     nombre: c.nombre.trim().length >= 2 ? '' : c.nombre.trim() ? 'El nombre es muy corto' : 'Escribe el nombre',
     dni: i === 0 ? problemaDni(c.dni ?? '') : '',
-    celular: problemaTelefono(c.celular),
+    // El representante puede quedar sin teléfono al editar (llegó desde SUNAT); aparece como "Falta: teléfono"
+    celular: i === 0 && telefonoRepOpcional && !tel ? '' : problemaTelefono(tel),
     correo: problemaCorreo(c.correo ?? ''),
   };
 }
@@ -15,23 +17,28 @@ function problemasDe(c: Contacto, i: number) {
 const NOMBRE_CAMPO = { nombre: 'nombre', dni: 'DNI', celular: 'teléfono', correo: 'correo' } as const;
 
 /** Lista legible de lo que falta o está mal en los contactos */
-export function problemasContactos(cs: Contacto[]): string[] {
+export function problemasContactos(cs: Contacto[], telefonoRepOpcional = false): string[] {
   if (!cs.length) return ['Agrega al representante legal'];
   return cs.flatMap((c, i) => {
     const quien = i === 0 ? 'Representante legal' : 'Otro contacto';
-    return Object.entries(problemasDe(c, i)).filter(([, p]) => p).map(([k, p]) => `${quien} – ${NOMBRE_CAMPO[k as keyof typeof NOMBRE_CAMPO]}: ${p}`);
+    return Object.entries(problemasDe(c, i, telefonoRepOpcional)).filter(([, p]) => p).map(([k, p]) => `${quien} – ${NOMBRE_CAMPO[k as keyof typeof NOMBRE_CAMPO]}: ${p}`);
   });
 }
 
 /** Hasta 2 contactos: el 1 es el representante legal (SUNAT) y el 2 es opcional */
-export function EditorContactos({ contactos, onChange, mostrarErrores = false }: { contactos: Contacto[]; onChange: (c: Contacto[]) => void; mostrarErrores?: boolean }) {
+export function EditorContactos({ contactos, onChange, mostrarErrores = false, telefonoRepOpcional = false }: {
+  contactos: Contacto[]; onChange: (c: Contacto[]) => void; mostrarErrores?: boolean;
+  /** Al editar una empresa que ya existe, el teléfono del representante es opcional */
+  telefonoRepOpcional?: boolean;
+}) {
   const cambiar = (i: number, campo: keyof Contacto, valor: string) =>
     onChange(contactos.map((c, k) => (k === i ? { ...c, [campo]: valor } : c)));
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
       {contactos.map((c, i) => {
-        const p = problemasDe(c, i);
+        const p = problemasDe(c, i, telefonoRepOpcional);
+        const celular = c.celular ?? '';
         // Se avisa al intentar guardar, o apenas el campo tiene algo escrito y está mal
         const ver = (campo: keyof typeof p, valor: string) => (mostrarErrores || (valor.length > 0 && campo !== 'nombre' && (campo !== 'celular' || valor.length >= 9 || !/^[90]/.test(valor)) && (campo !== 'dni' || valor.length >= 8)) ? p[campo] : '');
         return (
@@ -56,10 +63,10 @@ export function EditorContactos({ contactos, onChange, mostrarErrores = false }:
               </div>
             )}
             <div className="campo">
-              <label htmlFor={`cc${i}`} className="etiqueta obligatorio">Teléfono</label>
-              <input id={`cc${i}`} className="entrada numeros" inputMode="numeric" maxLength={9} value={c.celular} placeholder="Celular o fijo con código (01…)"
-                onChange={(e) => cambiar(i, 'celular', e.target.value.replace(/\D/g, '').slice(0, 9))} aria-invalid={!!ver('celular', c.celular)} />
-              <AyudaCampo id={`cc${i}-a`} problema={ver('celular', c.celular)} />
+              <label htmlFor={`cc${i}`} className={`etiqueta${i === 0 && telefonoRepOpcional ? '' : ' obligatorio'}`}>Teléfono</label>
+              <input id={`cc${i}`} className="entrada numeros" inputMode="numeric" maxLength={9} value={celular} placeholder="Celular o fijo con código (01…)"
+                onChange={(e) => cambiar(i, 'celular', e.target.value.replace(/\D/g, '').slice(0, 9))} aria-invalid={!!ver('celular', celular)} />
+              <AyudaCampo id={`cc${i}-a`} problema={ver('celular', celular)} />
             </div>
             <div className="campo">
               <label htmlFor={`ce${i}`} className="etiqueta">Correo (opcional)</label>
@@ -84,9 +91,10 @@ export function EditorContactos({ contactos, onChange, mostrarErrores = false }:
 /** Quita los campos vacíos opcionales antes de enviar */
 export const limpiarContactos = (cs: Contacto[]) =>
   cs.map((c, i) => ({
-    nombre: c.nombre.trim(), celular: c.celular,
+    nombre: c.nombre.trim(),
+    ...(c.celular ? { celular: c.celular } : {}),
     ...(c.correo?.trim() ? { correo: c.correo.trim() } : {}),
     ...(i === 0 && c.dni ? { dni: c.dni } : {}),
   }));
 
-export const contactosCompletos = (cs: Contacto[]) => problemasContactos(cs).length === 0;
+export const contactosCompletos = (cs: Contacto[], telefonoRepOpcional = false) => problemasContactos(cs, telefonoRepOpcional).length === 0;

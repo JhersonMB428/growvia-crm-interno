@@ -319,6 +319,7 @@ export class TablerosService {
               COALESCE(p.lineas, 0)::int AS "porActivar",
               COALESCE(cv.ganadas, 0)::int AS ganadas, COALESCE(cv.perdidas, 0)::int AS perdidas, COALESCE(cv.observadas, 0)::int AS observadas,
               (SELECT count(*)::int FROM oportunidades o WHERE o.asesor_id = u.id AND o.resultado = 'EN_CURSO') AS abiertas,
+              (SELECT max(b.created_at) FROM bitacora b WHERE b.usuario_id = u.id AND b.accion = 'LOGIN') AS "ultimoIngreso",
               (SELECT count(*)::int FROM gestiones g WHERE g.usuario_id = u.id
                  AND (g.created_at AT TIME ZONE '${ZONA}')::date = (now() AT TIME ZONE '${ZONA}')::date) AS "gestionesHoy",
               (SELECT count(*)::int FROM gestiones g JOIN clientes c ON c.id = g.cliente_id

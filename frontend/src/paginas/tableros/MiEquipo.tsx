@@ -6,6 +6,7 @@ import { mesLargo, pct, tablerosApi, type TableroEquipo } from '../../api/tabler
 import { BarraMeta } from '../../componentes/graficos';
 import { useSesion } from '../../sesion/SesionContext';
 import './tableros.css';
+import { ultimoIngreso } from '../../utilidades/validacion';
 
 const fecha = (iso: string) => new Date(iso).toLocaleDateString('es-PE', { day: '2-digit', month: 'short' });
 
@@ -79,7 +80,7 @@ export function MiEquipo() {
           {t.asesores.length > 0 && (
             <div className="tabla-scroll">
               <table className="tabla">
-                <thead><tr><th>#</th><th>Asesor</th><th style={{ minWidth: 160 }}>Líneas / meta</th><th className="num" title="Líneas en negociaciones abiertas">Cantidad de líneas</th><th className="num">Cargo fijo</th><th className="num" title="Ganadas / cerradas en el mes">Conversión</th><th className="num">Abiertas</th><th className="num">Gestiones hoy</th></tr></thead>
+                <thead><tr><th>#</th><th>Asesor</th><th style={{ minWidth: 160 }}>Líneas / meta</th><th className="num" title="Líneas en negociaciones abiertas">Cantidad de líneas</th><th className="num">Cargo fijo</th><th className="num" title="Ganadas / cerradas en el mes">Conversión</th><th className="num">Abiertas</th><th className="num">Gestiones hoy</th><th>Último ingreso</th></tr></thead>
                 <tbody>
                   {t.asesores.map((a, i) => (
                     <tr key={a.id}>
@@ -101,6 +102,7 @@ export function MiEquipo() {
                       <td className="num">{a.ganadas + a.perdidas ? `${pct(a.ganadas, a.ganadas + a.perdidas)}%` : '—'}</td>
                       <td className="num">{a.abiertas}</td>
                       <td className="num">{a.gestionesHoy}</td>
+                      <td className="numeros" style={{ whiteSpace: 'nowrap' }} title={a.ultimoIngreso ? new Date(a.ultimoIngreso).toLocaleString('es-PE') : 'Nunca ha ingresado'}>{ultimoIngreso(a.ultimoIngreso)}</td>
                     </tr>
                   ))}
                 </tbody>
