@@ -174,9 +174,64 @@ export class AuthService {
     if (s.vistaDe) {
       const [admin] = await this.usuarios.query(`SELECT nombres || ' ' || apellidos AS nombre FROM usuarios WHERE id = $1`, [s.vistaDe]);
       // Mientras mira no se le pide cambiar contraseña ni se le muestra el recorrido al otro usuario
-      return { ...perfil, debeCambiarClave: false, guiaVista: true, vista: { de: admin?.nombre ?? 'Soporte' }, puedeVerComo: false };
+      return { ...perfil, debeCambiarClave: false, guiaVista: true, vista: { de: admin?.nombre ?? 'Soporte' }, puedeVerComo: false, soporte: false, rolElegido: false };
     }
-    return { ...perfil, vista: null, puedeVerComo: await this.esSoporte(s.sub) };
+    const soporte = await this.esSoporte(s.sub);
+    // Soporte con otro rol elegido: la pantalla usa el rol y los permisos de la sesión, no los de su cuenta
+    if (soporte && s.rolElegido && s.rol !== perfil.rol.codigo) {
+      const r = await this.datosRol(s.rol);
+      if (r) return { ...perfil, rol: { codigo: r.codigo, nombre: r.nombre }, permisos: r.permisos, guiaVista: true, vista: null, puedeVerComo: true, soporte, rolElegido: true };
+    }
+    return { ...perfil, vista: null, puedeVerComo: soporte, soporte, rolElegido: !!s.rolElegido };
+  }
+
+  // ───────────────────────── Soporte: elegir con qué rol entrar ─────────────────────────
+  private async datosRol(codigo: string): Promise<{ codigo: string; nombre: string; permisos: string[] } | undefined> {
+    const [r] = await this.usuarios.query(
+      `SELECT r.codigo, r.nombre, COALESCE(array_agg(p.codigo ORDER BY p.codigo) FILTER (WHERE p.codigo IS NOT NULL), '{}') AS permisos
+       FROM roles r LEFT JOIN rol_permisos rp ON rp.rol_id = r.id LEFT JOIN permisos p ON p.id = rp.permiso_id
+       WHERE r.codigo = $1 GROUP BY r.codigo, r.nombre`, [codigo],
+    );
+    return r;
+  }
+
+  /** Equipos para entrar como supervisor o asesor */
+  async equiposParaRol(s: SesionUsuario) {
+    if (s.vistaDe || !(await this.esSoporte(s.sub))) throw new ForbiddenException('Esta opción es solo para soporte del CRM');
+    return this.usuarios.query(`SELECT id, nombre FROM equipos WHERE activo ORDER BY nombre`);
+  }
+
+  /**
+   * La cuenta de soporte entra con el rol que elija, con su propio usuario (no es solo lectura).
+   * Supervisor y asesor necesitan un equipo: queda guardado en su cuenta. Su rol real sigue siendo administrador,
+   * así que no aparece en los rankings ni en las listas de asesores.
+   */
+  async entrarConRol(s: SesionUsuario, rol: string, equipoId: string | undefined, ip: string) {
+    if (s.vistaDe) throw new BadRequestException('Primero vuelve a tu cuenta');
+    if (!(await this.esSoporte(s.sub))) throw new ForbiddenException('Esta opción es solo para soporte del CRM');
+    const r = await this.datosRol(rol);
+    if (!r) throw new BadRequestException('Rol no válido');
+    const conEquipo = rol === 'SUPERVISOR' || rol === 'ASESOR';
+    if (conEquipo) {
+      if (!equipoId) throw new BadRequestException('Elige el equipo con el que vas a entrar');
+      const [eq] = await this.usuarios.query(`SELECT 1 FROM equipos WHERE id = $1 AND activo`, [equipoId]);
+      if (!eq) throw new BadRequestException('El equipo no existe');
+    }
+    await this.usuarios.query(`UPDATE usuarios SET equipo_id = $2 WHERE id = $1`, [s.sub, conEquipo ? equipoId : null]);
+    await this.bitacora.registrar(s.sub, 'ROL_ELEGIR', { ip, detalle: { rol, ...(conEquipo ? { equipoId } : {}) } });
+    return this.sesionConRol(s.sub, rol);
+  }
+
+  /** Token con el rol elegido (lo usan "entrar con rol" y "volver a mi cuenta") */
+  private async sesionConRol(usuarioId: string, rol: string) {
+    const perfil = await this.perfil(usuarioId);
+    const r = (await this.datosRol(rol))!;
+    const token = await this.jwt.signAsync(
+      { sub: usuarioId, tipo: 'acceso', rol: r.codigo, equipoId: perfil.equipo?.id ?? null, permisos: r.permisos, rolElegido: true },
+      { expiresIn: aSegundos(this.config.get('JWT_EXPIRES_IN'), 8 * 3600) },
+    );
+    const usuario = await this.yo({ sub: usuarioId, rol: r.codigo, equipoId: perfil.equipo?.id ?? null, permisos: r.permisos, rolElegido: true });
+    return { requiereCodigo: false, token, usuario };
   }
 
   /** Usuarios activos que se pueden mirar, agrupados por rol en la pantalla */
@@ -209,8 +264,8 @@ export class AuthService {
   async salirDeVista(s: SesionUsuario, ip: string) {
     if (!s.vistaDe) throw new BadRequestException('No estás viendo el CRM como otro usuario');
     await this.bitacora.registrar(s.vistaDe, 'VISTA_SALIR', { ip, entidad: 'USUARIO', entidadId: s.sub });
-    const sesion = await this.emitirSesion(s.vistaDe);
-    return { ...sesion, usuario: await this.yo({ ...s, sub: s.vistaDe, vistaDe: undefined }) };
+    // Vuelve como administrador, sin pasar otra vez por la elección de rol
+    return this.sesionConRol(s.vistaDe, 'ADMIN');
   }
 
   // ───────────────────────── Ayudantes ─────────────────────────
@@ -222,7 +277,8 @@ export class AuthService {
       { expiresIn: aSegundos(this.config.get('JWT_EXPIRES_IN'), 8 * 3600) },
     );
     // Igual que /auth/yo: así la opción "ver como" aparece apenas entra, sin recargar la página
-    return { requiereCodigo: false, token, usuario: { ...usuario, vista: null, puedeVerComo: await this.esSoporte(usuario.id) } };
+    const soporte = await this.esSoporte(usuario.id);
+    return { requiereCodigo: false, token, usuario: { ...usuario, vista: null, puedeVerComo: soporte, soporte, rolElegido: false } };
   }
 
   private async enviarCodigo(usuario: Usuario, ip: string) {

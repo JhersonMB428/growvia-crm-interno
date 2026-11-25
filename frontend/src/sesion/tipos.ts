@@ -16,6 +16,10 @@ export interface Usuario {
   vista?: { de: string } | null;
   /** Puede abrir el modo "ver como" (correos de soporte) */
   puedeVerComo?: boolean;
+  /** Cuenta de soporte (CORREOS_SOPORTE): elige con qué rol entrar */
+  soporte?: boolean;
+  /** Ya eligió el rol en esta sesión */
+  rolElegido?: boolean;
 }
 
 export type RespuestaLogin =

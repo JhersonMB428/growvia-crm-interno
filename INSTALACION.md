@@ -53,7 +53,7 @@ JWT_EXPIRES_IN=8h
 FRONTEND_URL=http://localhost:5173
 ```
 
-Opcional: para probar **"Ver el CRM como otro usuario"** (en Mi perfil), agrega los correos de administrador que pueden usarlo, separados por comas:
+Opcional: cuentas de soporte. Con estos correos de administrador, al entrar se elige con qué rol usar el CRM (administrador, gerente, supervisor, back office o asesor) y en Mi perfil aparece **"Ver el CRM como otro usuario"**. Separa los correos con comas:
 
 ```
 CORREOS_SOPORTE=admin@growvia.global

@@ -5,7 +5,7 @@ import { SesionUsuario, UsuarioActual } from './decorators/usuario-actual.decora
 import { LoginDto } from './dto/login.dto';
 import { ReenviarDto } from './dto/reenviar.dto';
 import { VerificarDto } from './dto/verificar.dto';
-import { VerComoDto } from './dto/ver-como.dto';
+import { ElegirRolDto, VerComoDto } from './dto/ver-como.dto';
 
 @Controller('auth')
 export class AuthController {
@@ -52,6 +52,19 @@ export class AuthController {
   @HttpCode(200)
   verComo(@Body() dto: VerComoDto, @UsuarioActual() s: SesionUsuario, @Ip() ip: string) {
     return this.auth.verComo(s, dto.usuarioId, ip);
+  }
+
+  /** Soporte: equipos para entrar como supervisor o asesor */
+  @Get('rol/equipos')
+  equiposParaRol(@UsuarioActual() s: SesionUsuario) {
+    return this.auth.equiposParaRol(s);
+  }
+
+  /** Soporte: elegir con qué rol usar el CRM (con su propia cuenta) */
+  @Post('rol')
+  @HttpCode(200)
+  entrarConRol(@Body() dto: ElegirRolDto, @UsuarioActual() s: SesionUsuario, @Ip() ip: string) {
+    return this.auth.entrarConRol(s, dto.rol, dto.equipoId, ip);
   }
 
   /** Soporte: volver a la cuenta propia */

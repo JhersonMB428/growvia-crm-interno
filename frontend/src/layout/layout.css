@@ -87,3 +87,14 @@
   background: #f7efd1; color: #013936; font-size: 15px; box-shadow: 0 8px 30px rgba(0, 0, 0, 0.25);
 }
 .app .franja-vista .boton { background: #013936; color: #c7e196 !important; height: 40px; }
+.franja-vista--rol { background: #c7e196; }
+/* Elegir rol (cuentas de soporte) */
+.elegir-rol { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 12px; }
+.elegir-rol__opcion {
+  display: flex; flex-direction: column; gap: 6px; text-align: left; padding: 18px; border-radius: 18px;
+  border: 1px solid var(--campo-borde); background: var(--campo-fondo); color: var(--texto); font: inherit; cursor: pointer;
+}
+.elegir-rol__opcion b { font-size: 16px; }
+.elegir-rol__opcion span { font-size: 14px; color: var(--texto-suave); line-height: 1.45; }
+.elegir-rol__opcion:hover { border-color: var(--acento); }
+.elegir-rol__opcion--activa { border-color: var(--acento); box-shadow: 0 0 0 2px var(--acento) inset; }
