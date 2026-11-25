@@ -221,7 +221,8 @@ export class AuthService {
       { sub: usuario.id, tipo: 'acceso', rol: usuario.rol.codigo, equipoId: usuario.equipo?.id ?? null, permisos: usuario.permisos },
       { expiresIn: aSegundos(this.config.get('JWT_EXPIRES_IN'), 8 * 3600) },
     );
-    return { requiereCodigo: false, token, usuario };
+    // Igual que /auth/yo: así la opción "ver como" aparece apenas entra, sin recargar la página
+    return { requiereCodigo: false, token, usuario: { ...usuario, vista: null, puedeVerComo: await this.esSoporte(usuario.id) } };
   }
 
   private async enviarCodigo(usuario: Usuario, ip: string) {
