@@ -55,3 +55,59 @@ export function Barras({ datos, titulo, formato = String }: { datos: Dato[]; tit
     </div>
   );
 }
+/** Actividad por día: columnas finas con la fecha cada pocos días y el detalle al pasar el mouse */
+export function ActividadDiaria({ datos, titulo, unidad = 'acciones' }: { datos: { dia: string; total: number; usuarios?: number }[]; titulo: string; unidad?: string }) {
+  const max = Math.max(1, ...datos.map((d) => d.total));
+  const cada = datos.length > 45 ? 14 : datos.length > 14 ? 5 : 1;
+  const corto = (dia: string) => new Date(`${dia}T12:00:00`).toLocaleDateString('es-PE', { day: '2-digit', month: 'short' });
+  return (
+    <figure className="actividad" aria-label={titulo}>
+      <div className="actividad__area">
+        {datos.map((d) => (
+          <div key={d.dia} className="actividad__col" tabIndex={0}>
+            <span className="actividad__barra" style={{ height: `${(d.total / max) * 100}%` }} />
+            <span className="columnas__tip" role="tooltip">
+              <b>{corto(d.dia)}</b><span>{d.total} {unidad}</span>{d.usuarios !== undefined && <span>{d.usuarios} {d.usuarios === 1 ? 'usuario' : 'usuarios'}</span>}
+            </span>
+          </div>
+        ))}
+      </div>
+      <div className="actividad__ejes">
+        {datos.map((d, i) => <span key={d.dia}>{i % cada === 0 || i === datos.length - 1 ? corto(d.dia) : ''}</span>)}
+      </div>
+      <table className="oculto-visual"><caption>{titulo}</caption><tbody>
+        {datos.map((d) => <tr key={d.dia}><th>{d.dia}</th><td>{d.total}</td></tr>)}
+      </tbody></table>
+    </figure>
+  );
+}
+
+const DIAS_SEMANA = ['Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb', 'Dom'];
+/** Mapa de calor día × hora: cuándo se trabaja en el CRM (más intenso = más acciones) */
+export function MapaCalor({ datos, titulo }: { datos: { dia: number; hora: number; n: number }[]; titulo: string }) {
+  const horasConDatos = datos.map((d) => d.hora);
+  const desde = Math.min(7, ...horasConDatos);
+  const hasta = Math.max(20, ...horasConDatos);
+  const horas = Array.from({ length: hasta - desde + 1 }, (_, i) => desde + i);
+  const valor = new Map(datos.map((d) => [`${d.dia}-${d.hora}`, d.n]));
+  const max = Math.max(1, ...datos.map((d) => d.n));
+  return (
+    <figure className="calor" aria-label={titulo} style={{ ['--horas' as string]: horas.length }}>
+      <div className="calor__fila calor__fila--ejes"><span />{horas.map((h) => <span key={h}>{h % 2 === 0 ? `${h}h` : ''}</span>)}</div>
+      {DIAS_SEMANA.map((nombre, i) => (
+        <div key={nombre} className="calor__fila">
+          <span className="calor__dia">{nombre}</span>
+          {horas.map((h) => {
+            const n = valor.get(`${i + 1}-${h}`) ?? 0;
+            return (
+              <span key={h} className="calor__celda" tabIndex={n ? 0 : -1}
+                style={{ opacity: n ? 0.18 + 0.82 * (n / max) : 1, background: n ? 'var(--acento)' : 'var(--linea)' }}
+                title={`${nombre} ${h}:00–${h + 1}:00 · ${n} ${n === 1 ? 'acción' : 'acciones'}`} />
+            );
+          })}
+        </div>
+      ))}
+      <figcaption className="calor__leyenda"><span>Menos</span><i style={{ opacity: 0.25 }} /><i style={{ opacity: 0.55 }} /><i /><span>Más</span></figcaption>
+    </figure>
+  );
+}

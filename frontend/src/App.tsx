@@ -20,6 +20,7 @@ import { AccesosCelular } from './paginas/accesos/AccesosCelular';
 import { Administracion } from './paginas/administracion/Administracion';
 import { Bitacora } from './paginas/auditoria/Bitacora';
 import { Exportar } from './paginas/auditoria/Exportar';
+import { Trazabilidad } from './paginas/auditoria/Trazabilidad';
 import { Ayuda } from './paginas/ayuda/Ayuda';
 import { Embudo } from './paginas/embudo/Embudo';
 import { Perfil } from './paginas/perfil/Perfil';
@@ -64,6 +65,7 @@ export default function App() {
               <Route path="/embudo" element={<RutaPrivada roles={['SUPERVISOR', 'GERENTE']}><Embudo /></RutaPrivada>} />
               <Route path="/exportar" element={<RutaPrivada roles={['GERENTE']}><Exportar /></RutaPrivada>} />
               <Route path="/bitacora" element={<RutaPrivada roles={['GERENTE', 'ADMIN']}><Bitacora /></RutaPrivada>} />
+              <Route path="/trazabilidad" element={<RutaPrivada roles={['GERENTE', 'ADMIN']}><Trazabilidad /></RutaPrivada>} />
               <Route path="/accesos-celular" element={<RutaPrivada roles={['GERENTE']}><AccesosCelular /></RutaPrivada>} />
               {/* Back office y administración */}
               <Route path="/usuarios" element={<RutaPrivada roles={['BACKOFFICE', 'ADMIN']}><Administracion /></RutaPrivada>} />

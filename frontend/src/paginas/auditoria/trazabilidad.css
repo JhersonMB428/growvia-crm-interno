@@ -1,0 +1,62 @@
+/* ===== Trazabilidad ===== */
+.traza-panel { display: flex; flex-direction: column; gap: 14px; }
+.traza-ayuda { margin: -6px 0 0; font-size: 14px; color: var(--texto-suave); }
+.traza-sub { margin: 8px 0 0; font-size: 15px; }
+.traza-hoy { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 14px; }
+.traza-hoy > div { display: flex; flex-direction: column; gap: 4px; padding: 14px; border-radius: 16px; background: var(--campo-fondo); font-size: 14px; }
+.traza-hoy .kpi__valor { font-size: 28px; }
+
+/* Quién hace más (clic = ver su trazabilidad) */
+.traza-usuarios { display: flex; flex-direction: column; gap: 4px; }
+.traza-usuario { display: grid; grid-template-columns: minmax(140px, 1.3fr) minmax(0, 1.5fr) 44px; gap: 12px; align-items: center; padding: 8px 10px;
+  border: 0; border-radius: 12px; background: transparent; color: var(--texto); font: inherit; text-align: left; cursor: pointer; }
+.traza-usuario:hover, .traza-usuario:focus-visible { background: var(--campo-fondo); }
+.traza-usuario__nombre { display: flex; flex-direction: column; font-size: 14px; min-width: 0; }
+.traza-usuario__nombre .tenue { font-size: 12px; }
+.traza-usuario .numeros { text-align: right; }
+
+.traza-alertas { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 10px; font-size: 14px; }
+.traza-alertas li { display: flex; gap: 10px; align-items: flex-start; }
+.traza-resultados { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 4px; }
+.traza-resultados button { width: 100%; display: flex; flex-direction: column; gap: 2px; padding: 10px 12px; border: 0; border-radius: 12px; background: var(--campo-fondo);
+  color: var(--texto); font: inherit; font-size: 14px; text-align: left; cursor: pointer; }
+.traza-resultados button:hover { outline: 1px solid var(--acento); }
+
+/* Diagrama de flujo de empresas */
+.flujo { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr) 22px) minmax(0, 1fr); gap: 10px 6px; align-items: center; }
+.flujo__etapa { display: flex; flex-direction: column; gap: 8px; }
+.flujo__paso { font-size: 12px; font-weight: 700; letter-spacing: .04em; text-transform: uppercase; color: var(--texto-tenue); }
+.flujo__flecha { text-align: center; font-size: 22px; color: var(--acento); }
+.flujo__caja { display: flex; flex-direction: column; gap: 2px; padding: 12px 14px; border-radius: 16px; background: var(--campo-fondo);
+  border: 1px solid var(--campo-borde); border-left: 4px solid var(--acento); }
+.flujo__caja--bien { border-left-color: var(--acento); background: color-mix(in srgb, var(--acento) 14%, transparent); }
+.flujo__caja--mal { border-left-color: var(--salir); }
+.flujo__caja--neutro { border-left-color: var(--texto-tenue); }
+.flujo__n { font-family: var(--fuente-titulos); font-size: 26px; font-weight: 600; line-height: 1.1; }
+.flujo__titulo { font-size: 14px; font-weight: 600; }
+.flujo__detalle { font-size: 12px; color: var(--texto-suave); }
+.flujo__salida { grid-column: 1 / -1; display: flex; flex-direction: column; gap: 8px; padding-top: 10px; border-top: 1px dashed var(--campo-borde); }
+.flujo__liberadas { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 10px; }
+
+/* Línea de tiempo */
+.traza-tiempo { list-style: none; margin: 0; padding: 0 0 0 4px; display: flex; flex-direction: column; }
+.traza-tiempo__item { position: relative; display: grid; grid-template-columns: 22px minmax(0, 1fr); gap: 10px; padding-bottom: 16px; --tono: var(--acento); }
+.traza-tiempo__item::before { content: ''; position: absolute; left: 6px; top: 16px; bottom: 0; width: 2px; background: var(--linea); }
+.traza-tiempo__item:last-child::before { display: none; }
+.traza-tiempo__punto { width: 14px; height: 14px; margin-top: 3px; border-radius: 50%; background: var(--tono); box-shadow: 0 0 0 4px color-mix(in srgb, var(--tono) 22%, transparent); }
+.traza-tiempo__contenido { display: flex; flex-direction: column; gap: 3px; font-size: 14px; min-width: 0; }
+.traza-tiempo__meta { font-size: 12px; color: var(--texto-suave); }
+.traza-tiempo__detalle { color: var(--texto-suave); overflow-wrap: anywhere; }
+.traza-tiempo__item--asignacion { --tono: #6fa8dc; }
+.traza-tiempo__item--gestion { --tono: var(--acento); }
+.traza-tiempo__item--negociacion { --tono: #e0b85a; }
+.traza-tiempo__item--validacion { --tono: #b48ead; }
+.traza-tiempo__item--ficha { --tono: var(--texto-tenue); }
+.traza-tiempo__item--accion { --tono: var(--texto-suave); }
+
+@media (max-width: 1100px) {
+  .flujo { grid-template-columns: 1fr; }
+  .flujo__flecha { transform: rotate(90deg); }
+  .flujo__liberadas { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+.traza-barra { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: center; gap: 12px; }

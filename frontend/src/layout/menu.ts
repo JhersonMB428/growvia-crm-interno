@@ -30,6 +30,7 @@ export const ICONOS = {
   sol: 'M12 8a4 4 0 1 1 0 8a4 4 0 1 1 0-8M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4',
   luna: 'M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8z',
   exportar: 'M12 3v12M7 10l5 5 5-5M4 17v2a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-2',
+  trazabilidad: 'M3 12h4l3-7 4 14 3-7h4',
   bitacora: 'M9 3h6v3H9zM7 4.5H5V21h14V4.5h-2M8.5 11h7M8.5 15h7M8.5 19h4',
   renovar: 'M20 11a8 8 0 0 0-14.9-4M4 3v4h4M4 13a8 8 0 0 0 14.9 4M20 21v-4h-4',
   embudo: 'M3 4h18M6 9h12M9 14h6M11 19h2',
@@ -63,6 +64,7 @@ export const MENU_POR_ROL: Record<Rol, ItemMenu[]> = {
     I('/negociaciones', 'Negociaciones', 'negociaciones'),
     I('/bases', 'Cargar base', 'base'),
     I('/exportar', 'Exportar', 'exportar'),
+    I('/trazabilidad', 'Trazabilidad', 'trazabilidad'),
     I('/bitacora', 'Bitácora', 'bitacora'),
     I('/accesos-celular', 'Acceso celular', 'celular'),
   ],
@@ -73,6 +75,7 @@ export const MENU_POR_ROL: Record<Rol, ItemMenu[]> = {
   ],
   ADMIN: [
     I('/usuarios', 'Administración', 'admin'),
+    I('/trazabilidad', 'Trazabilidad', 'trazabilidad'),
     I('/repositorio', 'Empresas', 'empresas'),
     I('/bitacora', 'Bitácora', 'bitacora'),
   ],
