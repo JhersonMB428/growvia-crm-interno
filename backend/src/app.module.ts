@@ -25,7 +25,6 @@ import { UsuariosModule } from './usuarios/usuarios.module';
 import { BasesModule } from './bases/bases.module';
 import { BitacoraModule } from './bitacora/bitacora.module';
 import { ValidacionModule } from './validacion/validacion.module';
-import { SunatModule } from './sunat/sunat.module';
 
 @Module({
   imports: [
@@ -55,7 +54,6 @@ import { SunatModule } from './sunat/sunat.module';
     NotificacionesModule,
     GestionesModule,
     ValidacionModule,
-    SunatModule,
     TablerosModule,
     BasesModule,
     AlmacenamientoModule,

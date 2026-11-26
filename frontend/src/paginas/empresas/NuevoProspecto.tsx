@@ -7,8 +7,6 @@ import { SelectorUbigeo } from '../../componentes/SelectorUbigeo';
 import { useDebounce } from '../../hooks/useDebounce';
 import { AyudaCampo, Faltantes } from '../../componentes/Faltantes';
 import { problemaRuc } from '../../utilidades/validacion';
-import { nombrePropio, sunatApi, type DatosSunat, type Representante } from '../../api/sunat';
-import { PanelSunat } from '../../componentes/PanelSunat';
 
 type Revision = { estado: 'nada' | 'revisando' | 'libre' } | { estado: 'existe'; mensaje: string; empresaId: string; tomable: boolean };
 
@@ -25,31 +23,6 @@ export function NuevoProspecto() {
   const errRuc = problemaRuc(ruc);
   const rucValido = !errRuc;
   const [intentado, setIntentado] = useState(false);
-  const [sunatActivo, setSunatActivo] = useState(false);
-  const [sunat, setSunat] = useState<DatosSunat | null>(null);
-  const [consultando, setConsultando] = useState(false);
-  const [ubigeoInicial, setUbigeoInicial] = useState<{ id: string | null; n: number }>({ id: null, n: 0 });
-  useEffect(() => { sunatApi.activo().then(setSunatActivo); }, []);
-
-  async function traerSunat() {
-    setConsultando(true); setError('');
-    try {
-      const d = await sunatApi.consultar(ruc);
-      setSunat(d);
-      if (d.razonSocial) setRazon(d.razonSocial);
-      if (d.distritoId) setUbigeoInicial((u) => ({ id: d.distritoId, n: u.n + 1 }));
-      // Un solo representante: se completa directo; si hay varios, la ejecutiva elige
-      if (d.representantes.length === 1) usarRepresentante(d.representantes[0]);
-    } catch (err) {
-      setError(err instanceof ErrorApi ? err.message : 'No se pudo consultar SUNAT');
-    } finally {
-      setConsultando(false);
-    }
-  }
-  function usarRepresentante(r: Representante) {
-    setContactos((cs) => [{ ...cs[0], nombre: nombrePropio(r.nombre), dni: r.dni ?? '' }, ...cs.slice(1)]);
-  }
-
   // Apenas el RUC está completo, se revisa si ya existe en el CRM
   useEffect(() => {
     if (problemaRuc(rucListo)) { setRevision({ estado: 'nada' }); return; }
@@ -102,7 +75,7 @@ export function NuevoProspecto() {
             <div className="campo">
               <label htmlFor="ruc" className="etiqueta obligatorio">RUC</label>
               <input id="ruc" className="entrada numeros" inputMode="numeric" maxLength={11} placeholder="20XXXXXXXXX" autoFocus
-                value={ruc} onChange={(e) => { setRuc(e.target.value.replace(/\D/g, '').slice(0, 11)); setSunat(null); }}
+                value={ruc} onChange={(e) => { setRuc(e.target.value.replace(/\D/g, '').slice(0, 11)) }}
                 aria-invalid={revision.estado === 'existe' || ((ruc.length === 11 || (intentado && !!ruc) || /^[^12]|^1[^0]|^2[^0]/.test(ruc)) && !rucValido)} aria-describedby="ruc-ayuda" />
               <AyudaCampo id="ruc-ayuda"
                 problema={(ruc.length === 11 || intentado || /^[^12]|^1[^0]|^2[^0]/.test(ruc)) && errRuc ? errRuc : ''}
@@ -116,15 +89,6 @@ export function NuevoProspecto() {
             </div>
           </div>
 
-          {revision.estado === 'libre' && sunatActivo && !sunat && (
-            <div className="fila-acciones" style={{ justifyContent: 'flex-start' }}>
-              <button type="button" className="boton-secundario" onClick={traerSunat} disabled={consultando}>{consultando ? 'Consultando SUNAT…' : 'Traer datos de SUNAT'}</button>
-              <span className="tenue" style={{ fontSize: 13 }}>Completa la razón social, la ubicación y el representante legal.</span>
-            </div>
-          )}
-          {sunat && (
-            <PanelSunat datos={sunat} onUsar={usarRepresentante} />
-          )}
           {revision.estado === 'existe' && (
             <div className="alerta" role="alert" style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', justifyContent: 'space-between', gap: 10 }}>
               <span><b>RUC repetido.</b> {revision.mensaje}</span>
@@ -132,7 +96,7 @@ export function NuevoProspecto() {
             </div>
           )}
 
-          <SelectorUbigeo key={ubigeoInicial.n} inicial={ubigeoInicial.id} onCambio={alCambiarDistrito} />
+          <SelectorUbigeo inicial={null} onCambio={alCambiarDistrito} />
         </section>
 
         <section style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>

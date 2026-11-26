@@ -6,7 +6,6 @@ import { SesionUsuario } from '../auth/decorators/usuario-actual.decorator';
 import { RetencionService } from '../empresas/retencion';
 import { errorRuc } from '../empresas/ruc';
 import { NotificacionesService } from '../notificaciones/notificaciones.service';
-import { SunatService } from '../sunat/sunat.service';
 
 const MAX_FILAS = 5000;
 
@@ -123,7 +122,6 @@ export class BasesService {
     private readonly db: DataSource,
     private readonly notificaciones: NotificacionesService,
     private readonly retencion: RetencionService,
-    private readonly sunat: SunatService,
   ) {}
 
   // ───────────── Plantilla vacía (no contiene datos) ─────────────
@@ -284,11 +282,9 @@ export class BasesService {
       const creadas = await tx.query(
         `WITH nuevas AS (
            INSERT INTO clientes (ruc, razon_social, distrito_id, asesor_id, origen, lote_id, asignado_at, creado_por, retencion_hasta,
-                                 lineas_actuales, operador_actual_id, sunat_pendiente)
+                                 lineas_actuales, operador_actual_id)
            SELECT f.ruc, f.razon_social, f.distrito_id, $2, 'BASE', $1, CASE WHEN $2::uuid IS NULL THEN NULL ELSE now() END, $3,
-                  CASE WHEN $2::uuid IS NULL THEN NULL ELSE $4::timestamptz END, f.lineas, f.operador_id,
-                  -- Sin representante o sin su DNI: se completa después desde SUNAT
-                  (f.contactos->0->>'dni') IS NULL
+                  CASE WHEN $2::uuid IS NULL THEN NULL ELSE $4::timestamptz END, f.lineas, f.operador_id
            FROM lote_filas f WHERE f.lote_id = $1 AND f.cliente_id IS NULL
            ON CONFLICT (ruc) DO NOTHING
            RETURNING id, ruc
@@ -341,8 +337,7 @@ export class BasesService {
       }
       return { creadas: n, actualizadas, iguales: (l.iguales as number) + sinCambio };
     });
-    // Si la consulta a SUNAT está activa, los representantes que faltan se completan solos en los próximos minutos
-    return { ...resultado, completaSunat: this.sunat.activo, carga: await this.detalle(id, s) };
+    return { ...resultado, carga: await this.detalle(id, s) };
   }
 
   /**
@@ -392,12 +387,6 @@ export class BasesService {
     const [rb, ob] = f.contactos;
     if (rb) await guardar(rb, 1, c.contactos.find((k) => k.posicion === 1));
     if (ob) await guardar(ob, 2, c.contactos.find((k) => k.posicion === 2));
-
-    // Sigue sin representante con DNI: que lo complete SUNAT
-    await tx.query(
-      `UPDATE clientes SET sunat_pendiente = true WHERE id = $1 AND sunat_consultado_at IS NULL
-         AND NOT EXISTS (SELECT 1 FROM contactos k WHERE k.cliente_id = $1 AND k.posicion = 1 AND k.dni IS NOT NULL)`, [c.id],
-    );
     return cambio;
   }
 

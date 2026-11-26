@@ -58,7 +58,7 @@ export const basesApi = {
     return enviarArchivo<CargaDetalle>('/bases', datos);
   },
   aprobar: (id: string, enDiferencias: 'CRM' | 'BASE') =>
-    api<{ creadas: number; actualizadas: number; iguales: number; completaSunat: boolean; carga: CargaDetalle }>(`/bases/${id}/aprobar`, { metodo: 'POST', cuerpo: { enDiferencias } }),
+    api<{ creadas: number; actualizadas: number; iguales: number; carga: CargaDetalle }>(`/bases/${id}/aprobar`, { metodo: 'POST', cuerpo: { enDiferencias } }),
   rechazar: (id: string, motivo: string) => api<CargaDetalle>(`/bases/${id}/rechazar`, { metodo: 'POST', cuerpo: { motivo } }),
   /** Descarga la plantilla vacía */
   async plantilla() {

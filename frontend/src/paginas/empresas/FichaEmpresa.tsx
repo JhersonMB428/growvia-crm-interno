@@ -7,8 +7,7 @@ import { LlamadaRapida } from '../../componentes/LlamadaRapida';
 import { useVisitaFicha } from '../../hooks/useVisitaFicha';
 import { contactosCompletos, EditorContactos, limpiarContactos, problemasContactos } from '../../componentes/EditorContactos';
 import { Faltantes } from '../../componentes/Faltantes';
-import { nombrePropio, sunatApi, textoSunat, type DatosSunat } from '../../api/sunat';
-import { PanelSunat } from '../../componentes/PanelSunat';
+import { textoSunat } from '../../utilidades/texto';
 import { GestionesEmpresa } from '../../componentes/GestionesEmpresa';
 import { negociacionesApi, type Operador } from '../../api/negociaciones';
 import { NegociacionesEmpresa } from '../../componentes/NegociacionesEmpresa';
@@ -34,21 +33,6 @@ export function FichaEmpresa() {
   const [error, setError] = useState('');
   const [editando, setEditando] = useState<Contacto[] | null>(null);
   const [intentoContactos, setIntentoContactos] = useState(false);
-  const [sunatActivo, setSunatActivo] = useState(false);
-  const [sunat, setSunat] = useState<DatosSunat | null>(null);
-  const [consultandoSunat, setConsultandoSunat] = useState(false);
-  useEffect(() => { sunatApi.activo().then(setSunatActivo); }, []);
-
-  async function traerSunat() {
-    if (!e) return;
-    setConsultandoSunat(true); setError('');
-    try {
-      const d = await sunatApi.consultar(e.ruc);
-      setSunat(d);
-      setE({ ...e, sunatEstado: d.estado, sunatCondicion: d.condicion, sunatConsultadoAt: new Date().toISOString() });
-    } catch (err) { setError(err instanceof ErrorApi ? err.message : 'No se pudo consultar SUNAT'); }
-    finally { setConsultandoSunat(false); }
-  }
   const [ocupado, setOcupado] = useState(false);
   const [corrigiendo, setCorrigiendo] = useState<{ razonSocial: string; distritoId: string } | null>(null);
   const [reasignando, setReasignando] = useState(false);
@@ -190,9 +174,6 @@ export function FichaEmpresa() {
             {(e.puedeEditar || e.puedeCorregirDatos) && !editando && e.contactos && (
               <button type="button" className="boton-secundario" onClick={() => setEditando(e.contactos!.map((c) => ({ nombre: c.nombre, celular: c.celular ?? '', correo: c.correo ?? '', dni: c.dni ?? '' })))}>Editar</button>
             )}
-            {(e.puedeEditar || e.puedeCorregirDatos) && !editando && e.contactos && sunatActivo && (
-              <button type="button" className="boton-secundario" onClick={traerSunat} disabled={consultandoSunat}>{consultandoSunat ? 'Consultando…' : 'Traer de SUNAT'}</button>
-            )}
           </div>
 
           {e.contactos === null && (
@@ -214,18 +195,6 @@ export function FichaEmpresa() {
                 </div>
               ))}
             </div>
-          )}
-          {sunat && !editando && (
-            <PanelSunat datos={sunat} onCerrar={() => setSunat(null)}
-              onUsar={(r) => {
-                // Si es el mismo representante, se conservan su teléfono y correo; si es otra persona, se escriben de nuevo
-                const actual = e.contactos?.find((c) => c.posicion === 1);
-                const mismo = !!actual && ((actual.dni && actual.dni === r.dni) || mismoNombre(actual.nombre, r.nombre));
-                const otro = e.contactos?.filter((c) => c.posicion === 2).map((c) => ({ nombre: c.nombre, celular: c.celular ?? '', correo: c.correo ?? '', dni: '' })) ?? [];
-                setEditando([{ nombre: nombrePropio(r.nombre), dni: r.dni ?? '', celular: mismo ? actual!.celular ?? '' : '', correo: mismo ? actual!.correo ?? '' : '' }, ...otro]);
-                setSunat(null);
-                setAviso(mismo ? 'Revisa y guarda: se completó el DNI del representante.' : 'Revisa y guarda: el representante cambió, escribe su teléfono y correo si los tienes.');
-              }} />
           )}
           {editando && (
             <>
@@ -320,7 +289,7 @@ function OperadorLineas({ e, editable, onGuardado }: { e: EmpresaDetalle; editab
           <p style={{ margin: 0, color: 'var(--texto-suave)', lineHeight: 1.5 }}>¿Con qué operador está y cuántas líneas tiene hoy? Regístralo para priorizar esta empresa.</p>
         )
       )}
-      {editable && <RevisarLineas ruc={e.ruc} />}
+      {editable && <RevisarLineas ruc={e.ruc} onAbierta={() => { if (!editando) abrir(); }} />}
       {editando && (
         <div className="bloque">
           <div className="rejilla-2">
@@ -388,23 +357,44 @@ function Reasignar({ e, onCancelar, onHecho }: { e: EmpresaDetalle; onCancelar: 
   );
 }
 
-const sinTildes = (t: string) => t.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toUpperCase().replace(/[^A-Z ]/g, ' ').split(' ').filter((x) => x.length > 1).sort().join(' ');
-/** "PEREZ ROJAS JUAN" y "Juan Pérez Rojas" son la misma persona */
-const mismoNombre = (a: string, b: string) => !!a && sinTildes(a) === sinTildes(b);
+const URL_OSIPTEL = 'https://checatuslineas.osiptel.gob.pe/';
 
-/** Enlace a la consulta oficial de OSIPTEL, con el RUC listo para copiar */
-function RevisarLineas({ ruc }: { ruc: string }) {
-  const [copiado, setCopiado] = useState(false);
+/**
+ * Consulta oficial de OSIPTEL en una ventana pequeña al costado del CRM, con el RUC ya copiado.
+ * La página de OSIPTEL no se puede mostrar dentro del CRM ni recibir el RUC escrito: se pega con Ctrl+V.
+ */
+function RevisarLineas({ ruc, onAbierta }: { ruc: string; onAbierta: () => void }) {
+  const [estado, setEstado] = useState<'' | 'abierta' | 'bloqueada'>('');
+
+  function abrir() {
+    navigator.clipboard?.writeText(ruc).catch(() => undefined);
+    const ancho = 520;
+    const alto = Math.min(820, window.screen.availHeight - 80);
+    const izquierda = Math.max(0, window.screenX + window.outerWidth - ancho - 24);
+    const v = window.open('about:blank', 'osiptel-lineas', `popup=yes,width=${ancho},height=${alto},left=${izquierda},top=${window.screenY + 60}`);
+    if (!v) { setEstado('bloqueada'); return; }
+    // La página de OSIPTEL no puede tocar la pestaña del CRM
+    v.opener = null;
+    v.location.href = URL_OSIPTEL;
+    v.focus();
+    setEstado('abierta');
+    onAbierta();
+  }
+
   return (
     <div className="revisar-lineas">
       <span>
-        <b>¿No sabes cuántas líneas tiene?</b> Revisa las líneas asociadas al RUC en OSIPTEL: elige <b>RUC</b>, pega el número y consulta.
+        {estado === 'abierta' ? (
+          <><b>RUC {ruc} copiado.</b> En la ventana de OSIPTEL elige <b>RUC</b>, pega con <kbd>Ctrl</kbd>+<kbd>V</kbd> y consulta. Luego anota aquí lo que encontraste.</>
+        ) : estado === 'bloqueada' ? (
+          <><b>El navegador bloqueó la ventana.</b> Permite las ventanas emergentes para este sitio o ábrela en otra pestaña. El RUC {ruc} ya está copiado.</>
+        ) : (
+          <><b>¿Quieres confirmar las líneas?</b> Consulta las líneas asociadas al RUC en OSIPTEL, en una ventana al costado.</>
+        )}
       </span>
       <span className="revisar-lineas__acciones">
-        <button type="button" className="boton-secundario" onClick={() => navigator.clipboard?.writeText(ruc).then(() => { setCopiado(true); setTimeout(() => setCopiado(false), 2000); })}>
-          {copiado ? '✓ RUC copiado' : `Copiar RUC ${ruc}`}
-        </button>
-        <a className="boton" href="https://checatuslineas.osiptel.gob.pe/" target="_blank" rel="noopener noreferrer">Abrir Checa tus líneas ↗</a>
+        <button type="button" className="boton" onClick={abrir}>{estado === 'abierta' ? 'Volver a abrir' : 'Revisar en OSIPTEL'}</button>
+        {estado === 'bloqueada' && <a className="boton-secundario" href={URL_OSIPTEL} target="_blank" rel="noopener noreferrer">Abrir en otra pestaña ↗</a>}
       </span>
     </div>
   );

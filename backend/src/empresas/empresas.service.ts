@@ -8,7 +8,6 @@ import { ContactoDto } from './dto/contacto.dto';
 import { CrearEmpresaDto } from './dto/crear-empresa.dto';
 import { ListarEmpresasDto } from './dto/listar.dto';
 import { errorRuc } from './ruc';
-import { SunatService } from '../sunat/sunat.service';
 import { RetencionService } from './retencion';
 
 /** Columnas generales de una empresa (lo que cualquier rol puede ver en el repositorio) */
@@ -68,7 +67,6 @@ export class EmpresasService {
     private readonly db: DataSource,
     private readonly parametros: ParametrosService,
     private readonly retencion: RetencionService,
-    private readonly sunat: SunatService,
   ) {}
 
   // ───────────── ¿El RUC ya existe? (para la alerta roja antes de guardar) ─────────────
@@ -101,12 +99,6 @@ export class EmpresasService {
          VALUES ($1, $2, $3, $4, 'PROSPECCION', now(), now(), $4, $5) RETURNING id`,
         [dto.ruc, dto.razonSocial.trim(), dto.distritoId, sesion.sub, retencion],
       );
-      // Si la ejecutiva usó "Traer de SUNAT", se guarda lo que dijo SUNAT (sin gastar otra consulta)
-      const sunat = this.sunat.enCache(dto.ruc);
-      if (sunat) {
-        await tx.query(`UPDATE clientes SET sunat_estado = $2, sunat_condicion = $3, sunat_consultado_at = now() WHERE id = $1`,
-          [c.id, sunat.estado, sunat.condicion]);
-      }
       await this.reemplazarContactos(tx, c.id, dto.contactos);
       await tx.query(
         `INSERT INTO asignaciones (cliente_id, asesor_nuevo, motivo, asignado_por) VALUES ($1, $2, 'CREACION', $2)`,

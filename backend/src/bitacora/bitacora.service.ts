@@ -26,7 +26,7 @@ const REGLAS: Record<string, Regla> = {
   'POST /empresas/:id/reasignar': { accion: 'EMPRESA_REASIGNAR', entidad: 'EMPRESA', campos: ['asesorId'] },
   'PUT /empresas/:id': { accion: 'EMPRESA_CORREGIR', entidad: 'EMPRESA', campos: ['razonSocial', 'distritoId'] },
   'PUT /empresas/:id/contactos': { accion: 'CONTACTOS_EDITAR', entidad: 'EMPRESA' },
-  'PUT /empresas/:id/contrato-actual': { accion: 'EMPRESA_CONTRATO', entidad: 'EMPRESA', campos: ['operadorId', 'finContrato'] },
+  'PUT /empresas/:id/contrato-actual': { accion: 'EMPRESA_CONTRATO', entidad: 'EMPRESA', campos: ['operadorId', 'finContrato', 'lineas'] },
   'POST /gestiones': { accion: 'GESTION_REGISTRAR', entidad: 'EMPRESA', idDe: 'clienteId', campos: ['canal', 'resultado'] },
   'PUT /gestiones/:id/reprogramar': { accion: 'GESTION_REPROGRAMAR', entidad: 'GESTION' },
   'POST /negociaciones': { accion: 'NEGOCIACION_CREAR', entidad: 'EMPRESA', idDe: 'clienteId', campos: ['tipo'] },
