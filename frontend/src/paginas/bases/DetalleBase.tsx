@@ -30,7 +30,7 @@ export function DetalleBase() {
     try {
       const r = await basesApi.aprobar(id, enDiferencias);
       setC(r.carga);
-      setAviso(`Listo: ${r.creadas} empresas nuevas${r.actualizadas ? ` y ${r.actualizadas} que ya estaban en el CRM con sus datos completados` : ''}. No se creó ninguna empresa repetida.${r.completaSunat ? ' Los representantes legales que falten se completarán desde SUNAT en los próximos minutos.' : ''}`);
+      setAviso(`Listo: ${r.creadas} empresas nuevas${r.actualizadas ? ` y ${r.actualizadas} que ya estaban en el CRM con sus datos completados` : ''}. No se creó ninguna empresa repetida.`);
       avisarCampana();
     } catch (e) { setError(e instanceof ErrorApi ? e.message : 'No se pudo aprobar'); }
     finally { setOcupado(false); }
