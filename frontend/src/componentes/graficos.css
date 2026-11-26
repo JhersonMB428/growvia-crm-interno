@@ -30,3 +30,22 @@
 .barras__pista { height: 10px; border-radius: 999px; background: var(--linea); overflow: hidden; }
 .barras__barra { display: block; height: 100%; min-width: 2px; border-radius: 999px; background: var(--acento); }
 .barras__valor { text-align: right; font-weight: 700; }
+/* Actividad diaria */
+.actividad { margin: 0; display: flex; flex-direction: column; gap: 6px; }
+.actividad__area { height: 170px; display: grid; grid-auto-flow: column; grid-auto-columns: minmax(0, 1fr); gap: 3px; align-items: end; border-bottom: 1px solid var(--linea); }
+.actividad__col { position: relative; height: 100%; display: flex; align-items: flex-end; justify-content: center; outline: none; }
+.actividad__barra { width: 100%; max-width: 26px; min-height: 2px; border-radius: 3px 3px 0 0; background: var(--acento); opacity: .6; transition: opacity .15s; }
+.actividad__col:hover .actividad__barra, .actividad__col:focus-visible .actividad__barra { opacity: 1; }
+.actividad__col:hover .columnas__tip, .actividad__col:focus-visible .columnas__tip { display: flex; }
+.actividad__ejes { display: grid; grid-auto-flow: column; grid-auto-columns: minmax(0, 1fr); gap: 3px; font-size: 11px; color: var(--texto-suave); white-space: nowrap; }
+.actividad__ejes span { overflow: visible; }
+
+/* Mapa de calor */
+.calor { margin: 0; display: flex; flex-direction: column; gap: 4px; overflow-x: auto; }
+.calor__fila { display: grid; grid-template-columns: 38px repeat(var(--horas), minmax(14px, 1fr)); gap: 4px; align-items: center; }
+.calor__fila--ejes span { font-size: 11px; color: var(--texto-suave); }
+.calor__dia { font-size: 12px; color: var(--texto-suave); }
+.calor__celda { height: 22px; border-radius: 5px; outline: none; }
+.calor__celda:focus-visible { box-shadow: 0 0 0 2px var(--texto); }
+.calor__leyenda { display: flex; align-items: center; gap: 6px; justify-content: flex-end; font-size: 12px; color: var(--texto-suave); margin-top: 6px; }
+.calor__leyenda i { width: 16px; height: 12px; border-radius: 3px; background: var(--acento); display: inline-block; }
