@@ -13,6 +13,8 @@ import { negociacionesApi, type Operador } from '../../api/negociaciones';
 import { NegociacionesEmpresa } from '../../componentes/NegociacionesEmpresa';
 import { SelectorUbigeo } from '../../componentes/SelectorUbigeo';
 import { useSesion } from '../../sesion/SesionContext';
+import { PersonasEmpresa } from '../../componentes/PersonasEmpresa';
+import { objetivoInicial, type Objetivo } from '../../utilidades/personas';
 
 const MOTIVO: Record<string, string> = {
   CREACION: 'Registró la empresa', TOMA: 'Tomó la empresa del repositorio', REASIGNACION: 'Reasignó la empresa',
@@ -38,6 +40,9 @@ export function FichaEmpresa() {
   const [reasignando, setReasignando] = useState(false);
   const [preseleccion, setPreseleccion] = useState<{ resultado: ResultadoGestion; n: number } | null>(null);
   const [recargaGestiones, setRecargaGestiones] = useState(0);
+  // Con quién y a qué número está llamando la asesora (lo usan los botones rápidos y el formulario de gestiones)
+  const [objetivoElegido, setObjetivo] = useState<Objetivo | null>(null);
+  const objetivo = objetivoElegido ?? (e ? objetivoInicial(e) : undefined);
   // Estable para que el selector de ubigeo no se re-ejecute en cada render
   const alCambiarDistrito = useCallback((d: string) => setCorrigiendo((c) => (c && c.distritoId !== d ? { ...c, distritoId: d } : c)), []);
 
@@ -62,6 +67,8 @@ export function FichaEmpresa() {
     }
     setE((x) => (x ? { ...x, retencionHasta: g.retencionHasta, ultimaGestionAt: g.fecha, prorrogada: false } : x));
     setRecargaGestiones((n) => n + 1);
+    // El número usado pudo cambiar de estado (funciona / no contesta)
+    if (g.medio || g.contactoId) empresasApi.detalle(id).then(setE).catch(() => undefined);
     setAviso(g.resultado === 'NO_CONTESTA' ? 'Registrado: no contestó. Vuelve a intentarlo antes de que venza el plazo.' : 'Gestión registrada.');
   }
 
@@ -128,7 +135,8 @@ export function FichaEmpresa() {
       {e.puedeEditar && e.estado === 'PROSPECTO' && puede('NEGOCIACION_GESTIONAR') && (
         <LlamadaRapida empresa={e} onPreseleccion={preseleccionar} onRegistrada={alRegistrar}
           onMantenida={(h) => { setE({ ...e, retencionHasta: h, prorrogada: true }); setAviso('Listo: tienes 24 horas más con esta empresa.'); }}
-          onLiberada={() => navegar('/empresas', { state: { aviso: `${e.razonSocial} volvió al repositorio.` } })} />
+          onLiberada={() => navegar('/empresas', { state: { aviso: `${e.razonSocial} volvió al repositorio.` } })}
+          objetivo={objetivo} onObjetivo={setObjetivo} />
       )}
       {reasignando && (
         <Reasignar e={e} onCancelar={() => setReasignando(false)}
@@ -169,12 +177,15 @@ export function FichaEmpresa() {
 
           <div style={{ height: 1, background: 'var(--linea)' }} />
 
-          <div className="fila-acciones">
-            <h2 className="h2">Representante y contactos</h2>
-            {(e.puedeEditar || e.puedeCorregirDatos) && !editando && e.contactos && (
-              <button type="button" className="boton-secundario" onClick={() => setEditando(e.contactos!.map((c) => ({ nombre: c.nombre, celular: c.celular ?? '', correo: c.correo ?? '', dni: c.dni ?? '' })))}>Editar</button>
-            )}
-          </div>
+          {/* El representante legal y el otro contacto se registran con su formulario si aún faltan */}
+          {(e.puedeEditar || e.puedeCorregirDatos) && !editando && e.contactos && e.contactos.filter((c) => (c.posicion ?? 1) <= 2).length < 2 && (
+            <div className="fila-acciones" style={{ justifyContent: 'flex-start' }}>
+              <button type="button" className="boton-secundario"
+                onClick={() => setEditando(e.contactos!.filter((c) => (c.posicion ?? 1) <= 2).map((c) => ({ nombre: c.nombre, celular: c.celular ?? '', correo: c.correo ?? '', dni: c.dni ?? '' })))}>
+                {e.contactos.some((c) => c.posicion === 1) ? 'Agregar otro contacto (con teléfono)' : 'Registrar representante legal'}
+              </button>
+            </div>
+          )}
 
           {e.contactos === null && (
             <p style={{ color: 'var(--texto-suave)', lineHeight: 1.5 }}>
@@ -182,19 +193,7 @@ export function FichaEmpresa() {
             </p>
           )}
           {e.contactos && !editando && (
-            <div className="rejilla-2">
-              {e.contactos.map((c) => (
-                <div key={c.id} className="bloque" style={{ gap: 6 }}>
-                  <span style={{ fontSize: 12, fontWeight: 700, color: 'var(--texto-tenue)', textTransform: 'uppercase', letterSpacing: '.05em' }}>{c.posicion === 1 ? 'Representante legal (SUNAT)' : 'Otro contacto'}</span>
-                  <b>{c.nombre}</b>
-                  {c.posicion === 1 && <span className="numeros" style={{ fontSize: 14, color: 'var(--texto-suave)' }}>{c.dni ? `DNI ${c.dni}` : 'DNI sin registrar'}</span>}
-                  {c.celular
-                    ? <a href={`tel:${c.celular}`} className="numeros" style={{ textDecoration: 'none' }}>{c.celular.replace(/(\d{3})(\d{3})(\d{3})/, '$1 $2 $3')}</a>
-                    : <span style={{ fontSize: 14, color: 'var(--salir)' }}>Teléfono sin registrar</span>}
-                  {c.correo && <a href={`mailto:${c.correo}`} style={{ textDecoration: 'none' }}>{c.correo}</a>}
-                </div>
-              ))}
-            </div>
+            <PersonasEmpresa e={e} editable={e.puedeEditar || !!e.puedeCorregirDatos} onCambio={(d, texto) => { setE(d); setAviso(texto); }} />
           )}
           {editando && (
             <>
@@ -239,7 +238,8 @@ export function FichaEmpresa() {
       {/* Solo quien ve la información comercial ve sus negociaciones */}
       {e.contactos !== null && <NegociacionesEmpresa empresaId={e.id} puedeAbrir={e.puedeEditar && puede('NEGOCIACION_GESTIONAR')} />}
       {e.contactos !== null && (
-        <GestionesEmpresa empresaId={e.id} preseleccion={preseleccion} recarga={recargaGestiones} onRegistrada={alRegistrar} />
+        <GestionesEmpresa empresaId={e.id} preseleccion={preseleccion} recarga={recargaGestiones} onRegistrada={alRegistrar}
+          personas={e.puedeEditar ? e.contactos ?? [] : undefined} medios={e.medios} objetivo={objetivo} onObjetivo={setObjetivo} />
       )}
     </>
   );

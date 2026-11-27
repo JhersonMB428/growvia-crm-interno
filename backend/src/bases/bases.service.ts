@@ -30,6 +30,11 @@ const COLUMNAS: Record<string, string[]> = {
   nombre2: ['contacto 2', 'contacto 2 nombre'],
   celular2: ['celular 2', 'contacto 2 celular', 'telefono 2'],
   correo2: ['correo 2', 'contacto 2 correo', 'email 2'],
+  // Lo que agrega la app Growvia Datos: todas las personas, teléfonos y correos de la empresa
+  cargo1: ['cargo del representante', 'cargo representante', 'cargo'],
+  otrosContactos: ['otros contactos', 'otras personas'],
+  otrosTelefonos: ['otros telefonos', 'telefonos de la empresa', 'telefonos empresa'],
+  otrosCorreos: ['otros correos', 'correos de la empresa', 'correos empresa'],
 };
 /** Estructura pedida por Ann (nov 2026). "Contacto 2", "Celular 2" y "Correo 2" se siguen aceptando si vienen. */
 const PLANTILLA = ['RUC', 'Razón social', 'Representante legal SUNAT', 'DNI', 'Teléfono', 'Correo', 'Departamento', 'Provincia', 'Distrito', 'Cantidad de líneas', 'Operador'];
@@ -40,9 +45,17 @@ const correoValido = (c: string) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(c);
 
 type Motivo = 'RUC_INVALIDO' | 'RUC_DUPLICADO' | 'UBIGEO_INVALIDO' | 'DATO_FALTANTE' | 'DATO_INVALIDO';
 type ContactoBase = { nombre: string; celular: string | null; correo: string | null; dni: string | null };
+/** Más personas, teléfonos y correos de la empresa (columnas OTROS CONTACTOS, OTROS TELÉFONOS y OTROS CORREOS) */
+interface Extras {
+  cargo?: string | null;
+  personas?: (ContactoBase & { cargo: string | null; origen: 'SUNAT' | 'BASE' })[];
+  telefonos?: string[];
+  correos?: string[];
+}
 interface FilaValida {
   fila: number; ruc: string; razon: string; distritoId: string | null; lineas: number | null; operadorId: number | null;
   contactos: ContactoBase[];
+  extras: Extras;
   /** Empresa que ya está en el CRM con ese RUC: la fila no crea otra, completa (o corrige) sus datos */
   clienteId: string | null;
   cambios: Cambios | null;
@@ -53,6 +66,7 @@ interface Cambios { completa: string[]; diferencias: { campo: string; crm: strin
 interface FotoCrm {
   id: string; ruc: string; razon: string; distritoId: string | null; lineas: number | null; operadorId: number | null; asesor: string | null;
   contactos: (ContactoBase & { posicion: number })[];
+  medios: string[];
 }
 type Nombres = { distrito: (id: string) => string; operador: (id: number) => string };
 
@@ -68,7 +82,7 @@ const mismoTexto = (a: string | null, b: string | null) => {
  *  - completa: datos que el CRM no tiene y la base sí (se agregan siempre).
  *  - diferencias: el CRM y la base tienen valores distintos (al aprobar se elige cuál se queda).
  */
-function comparar(f: Pick<FilaValida, 'razon' | 'distritoId' | 'lineas' | 'operadorId' | 'contactos'>, c: FotoCrm, n: Nombres): Cambios {
+function comparar(f: Pick<FilaValida, 'razon' | 'distritoId' | 'lineas' | 'operadorId' | 'contactos' | 'extras'>, c: FotoCrm, n: Nombres): Cambios {
   const completa: string[] = [];
   const diferencias: Cambios['diferencias'] = [];
   const campo = <T>(nombre: string, base: T | null, crm: T | null, texto: (v: T) => string, igual = (a: T, b: T) => a === b) => {
@@ -98,6 +112,11 @@ function comparar(f: Pick<FilaValida, 'razon' | 'distritoId' | 'lineas' | 'opera
     if (!oc) completa.push(`Otro contacto: ${ob.nombre}`);
     else if (ob.celular !== oc.celular) diferencias.push({ campo: 'Otro contacto', crm: detalleContacto(oc), base: detalleContacto(ob) });
   }
+  // Más personas, teléfonos y correos: se agregan los que la empresa no tiene (nunca reemplazan)
+  const personas = (f.extras.personas ?? []).filter((p) => !c.contactos.some((k) => mismaPersona(p, k)));
+  if (personas.length) completa.push(`Más personas: ${personas.map((p) => p.nombre).join(', ')}`);
+  const medios = [...(f.extras.telefonos ?? []), ...(f.extras.correos ?? [])].filter((m) => !c.medios.includes(m));
+  if (medios.length) completa.push(`Teléfonos y correos: ${medios.join(', ')}`);
   return { completa, diferencias };
 }
 /** Mismo representante si coincide el DNI, o el nombre cuando falta el DNI en alguno */
@@ -109,6 +128,37 @@ function telefono(t: string): string {
   const d = t.replace(/\D/g, '').replace(/^51(?=\d{9}$)/, '');
   return /^[2-7]\d{6}$/.test(d) ? `01${d}` : d;
 }
+/**
+ * Columnas extra de la app Growvia Datos:
+ *  - OTROS CONTACTOS: una persona por línea "Nombre | Cargo | DNI | Teléfono | Correo" (también separadas por ";").
+ *  - OTROS TELÉFONOS y OTROS CORREOS: separados por coma, punto y coma o salto de línea.
+ * Lo que no se entiende se ignora (no bloquea la fila).
+ */
+function leerExtras(d: Record<string, string>): Extras {
+  const extras: Extras = {};
+  const cargo = (d.cargo1 ?? '').trim();
+  if (cargo) extras.cargo = cargo.slice(0, 80);
+  const personas: NonNullable<Extras['personas']> = [];
+  for (const linea of (d.otrosContactos ?? '').split(/\r?\n|;/)) {
+    const [nombre = '', cargoP = '', textoDni = '', textoTel = '', textoCorreo = ''] = linea.split('|').map((x) => x.trim());
+    if (nombre.length < 3) continue;
+    const digitosDni = textoDni.replace(/\D/g, '');
+    const dni = digitosDni.length === 7 ? `0${digitosDni}` : digitosDni;
+    const tel = telefono(textoTel);
+    personas.push({
+      nombre: nombre.slice(0, 100), cargo: cargoP.slice(0, 80) || null, dni: /^\d{8}$/.test(dni) ? dni : null,
+      celular: /^[90]\d{8}$/.test(tel) ? tel : null, correo: correoValido(textoCorreo) ? textoCorreo.toLowerCase().slice(0, 150) : null,
+      origen: /contacto de la base/i.test(cargoP) ? 'BASE' : 'SUNAT',
+    });
+  }
+  if (personas.length) extras.personas = personas;
+  const telefonos = (d.otrosTelefonos ?? '').split(/[,;\n/]+/).map((t) => telefono(t.trim())).filter((t) => /^[90]\d{8}$/.test(t));
+  if (telefonos.length) extras.telefonos = [...new Set(telefonos)];
+  const correos = (d.otrosCorreos ?? '').split(/[,;\s]+/).map((t) => t.trim().toLowerCase()).filter(correoValido);
+  if (correos.length) extras.correos = [...new Set(correos)].map((c) => c.slice(0, 150));
+  return extras;
+}
+
 interface FilaError { fila: number; ruc: string | null; motivo: Motivo; detalle: string; datos: Record<string, string> }
 
 /**
@@ -162,12 +212,12 @@ export class BasesService {
       for (let i = 0; i < validas.length; i += 500) {
         const bloque = validas.slice(i, i + 500);
         await tx.query(
-          `INSERT INTO lote_filas (lote_id, fila, ruc, razon_social, distrito_id, contactos, lineas, operador_id, cliente_id, cambios)
-           SELECT $1, x.fila, x.ruc, x.razon, x.distrito, x.contactos, x.lineas, x.operador, x.cliente, x.cambios FROM jsonb_to_recordset($2::jsonb)
-             AS x(fila int, ruc text, razon text, distrito text, contactos jsonb, lineas smallint, operador smallint, cliente uuid, cambios jsonb)`,
+          `INSERT INTO lote_filas (lote_id, fila, ruc, razon_social, distrito_id, contactos, lineas, operador_id, cliente_id, cambios, extras)
+           SELECT $1, x.fila, x.ruc, x.razon, x.distrito, x.contactos, x.lineas, x.operador, x.cliente, x.cambios, COALESCE(x.extras, '{}') FROM jsonb_to_recordset($2::jsonb)
+             AS x(fila int, ruc text, razon text, distrito text, contactos jsonb, lineas smallint, operador smallint, cliente uuid, cambios jsonb, extras jsonb)`,
           [lote.id, JSON.stringify(bloque.map((v) => ({
             fila: v.fila, ruc: v.ruc, razon: v.razon, distrito: v.distritoId, contactos: v.contactos, lineas: v.lineas, operador: v.operadorId,
-            cliente: v.clienteId, cambios: v.cambios,
+            cliente: v.clienteId, cambios: v.cambios, extras: v.extras,
           })))],
         );
       }
@@ -234,7 +284,7 @@ export class BasesService {
     );
     const muestra = await this.db.query(
       `SELECT f.fila, f.ruc, f.razon_social AS "razonSocial", di.nombre AS distrito, pr.nombre AS provincia,
-              jsonb_array_length(f.contactos) AS contactos, f.contactos->0->>'nombre' AS representante,
+              jsonb_array_length(f.contactos) + jsonb_array_length(COALESCE(f.extras->'personas', '[]')) AS contactos, f.contactos->0->>'nombre' AS representante,
               f.lineas, op.nombre AS operador
        FROM lote_filas f LEFT JOIN distritos di ON di.id = f.distrito_id LEFT JOIN provincias pr ON pr.id = di.provincia_id
        LEFT JOIN operadores op ON op.id = f.operador_id
@@ -289,8 +339,8 @@ export class BasesService {
            ON CONFLICT (ruc) DO NOTHING
            RETURNING id, ruc
          ), contactos AS (
-           INSERT INTO contactos (cliente_id, nombre, celular, correo, dni, posicion)
-           SELECT n.id, x.nombre, x.celular, x.correo, CASE WHEN x.ord = 1 THEN x.dni END, x.ord::smallint
+           INSERT INTO contactos (cliente_id, nombre, celular, correo, dni, posicion, origen)
+           SELECT n.id, x.nombre, x.celular, x.correo, CASE WHEN x.ord = 1 THEN x.dni END, x.ord::smallint, 'BASE'
            FROM nuevas n JOIN lote_filas f ON f.lote_id = $1 AND f.ruc = n.ruc
            CROSS JOIN LATERAL ROWS FROM (jsonb_to_recordset(f.contactos) AS (nombre text, celular text, correo text, dni text)) WITH ORDINALITY AS x(nombre, celular, correo, dni, ord)
            WHERE x.ord <= 2
@@ -303,10 +353,17 @@ export class BasesService {
       );
       const n = creadas[0].n as number;
 
+      // Más personas, teléfonos y correos de las empresas nuevas
+      const nuevasConExtras: { clienteId: string; contactos: ContactoBase[]; extras: Extras }[] = await tx.query(
+        `SELECT c.id AS "clienteId", f.contactos, f.extras FROM lote_filas f JOIN clientes c ON c.ruc = f.ruc AND c.lote_id = $1
+         WHERE f.lote_id = $1 AND f.cliente_id IS NULL`, [id],
+      );
+      for (const x of nuevasConExtras) await this.guardarExtras(tx, x.clienteId, x.contactos, x.extras, []);
+
       // Empresas que ya estaban: se comparan otra vez con sus datos de este momento
-      const existentes: { ruc: string; razon: string; distritoId: string | null; lineas: number | null; operadorId: number | null; contactos: ContactoBase[] }[] =
+      const existentes: { ruc: string; razon: string; distritoId: string | null; lineas: number | null; operadorId: number | null; contactos: ContactoBase[]; extras: Extras }[] =
         await tx.query(
-          `SELECT f.ruc, f.razon_social AS razon, f.distrito_id AS "distritoId", f.lineas, f.operador_id AS "operadorId", f.contactos
+          `SELECT f.ruc, f.razon_social AS razon, f.distrito_id AS "distritoId", f.lineas, f.operador_id AS "operadorId", f.contactos, f.extras
            FROM lote_filas f WHERE f.lote_id = $1 AND f.cliente_id IS NOT NULL ORDER BY f.fila`, [id],
         );
       const fotos = await this.fotos(tx, existentes.map((e) => e.ruc), true);
@@ -346,7 +403,7 @@ export class BasesService {
    *  - lo que es distinto, se queda como está ('CRM') o se reemplaza ('BASE').
    * No cambia al asesor a cargo. Devuelve si hubo algún cambio.
    */
-  private async fusionar(tx: EntityManager, f: Pick<FilaValida, 'razon' | 'distritoId' | 'lineas' | 'operadorId' | 'contactos'>, c: FotoCrm, regla: 'CRM' | 'BASE') {
+  private async fusionar(tx: EntityManager, f: Pick<FilaValida, 'razon' | 'distritoId' | 'lineas' | 'operadorId' | 'contactos' | 'extras'>, c: FotoCrm, regla: 'CRM' | 'BASE') {
     const usarBase = regla === 'BASE';
     const elegir = <T>(base: T | null, crm: T | null) => (base === null || base === undefined ? crm : crm === null || crm === undefined || usarBase ? base : crm);
     let cambio = false;
@@ -378,7 +435,7 @@ export class BasesService {
       if (actual && final.nombre === actual.nombre && final.dni === actual.dni && final.celular === actual.celular && final.correo === actual.correo) return;
       if (posicion === 2 && !final.celular) return;
       await tx.query(
-        `INSERT INTO contactos (cliente_id, nombre, celular, correo, dni, posicion) VALUES ($1, $2, $3, $4, $5, $6)
+        `INSERT INTO contactos (cliente_id, nombre, celular, correo, dni, posicion, origen) VALUES ($1, $2, $3, $4, $5, $6, 'BASE')
          ON CONFLICT (cliente_id, posicion) DO UPDATE SET nombre = EXCLUDED.nombre, celular = EXCLUDED.celular, correo = EXCLUDED.correo, dni = EXCLUDED.dni`,
         [c.id, final.nombre.slice(0, 100), final.celular, final.correo, posicion === 1 ? final.dni : null, posicion],
       );
@@ -387,6 +444,44 @@ export class BasesService {
     const [rb, ob] = f.contactos;
     if (rb) await guardar(rb, 1, c.contactos.find((k) => k.posicion === 1));
     if (ob) await guardar(ob, 2, c.contactos.find((k) => k.posicion === 2));
+    if (await this.guardarExtras(tx, c.id, f.contactos, f.extras ?? {}, c.contactos)) cambio = true;
+    return cambio;
+  }
+
+  /**
+   * Agrega a la empresa las personas, teléfonos y correos que trae la base y no tiene (nunca borra ni reemplaza).
+   * Los teléfonos y correos del representante y del otro contacto también pasan a la lista de la empresa.
+   */
+  private async guardarExtras(tx: EntityManager, clienteId: string, contactos: ContactoBase[], extras: Extras, actuales: ContactoBase[]) {
+    let cambio = false;
+    if (extras.cargo) {
+      const r = await tx.query(`UPDATE contactos SET cargo = $2 WHERE cliente_id = $1 AND posicion = 1 AND cargo IS NULL RETURNING id`, [clienteId, extras.cargo.slice(0, 80)]);
+      if (r.length) cambio = true;
+    }
+    const yaEstan = [...actuales, ...contactos];
+    for (const p of extras.personas ?? []) {
+      if (yaEstan.some((k) => mismaPersona(p, k))) continue;
+      await tx.query(
+        `INSERT INTO contactos (cliente_id, nombre, cargo, celular, correo, dni, origen, posicion)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, GREATEST(3, (SELECT COALESCE(max(posicion), 0) + 1 FROM contactos WHERE cliente_id = $1)))`,
+        [clienteId, p.nombre.slice(0, 100), p.cargo?.slice(0, 80) ?? null, p.celular, p.correo, p.dni, p.origen],
+      );
+      yaEstan.push(p);
+      cambio = true;
+    }
+    const telefonos = [...contactos.map((k) => k.celular), ...(extras.personas ?? []).map((k) => k.celular), ...(extras.telefonos ?? [])]
+      .filter((t): t is string => !!t);
+    const correos = [...contactos.map((k) => k.correo), ...(extras.personas ?? []).map((k) => k.correo), ...(extras.correos ?? [])]
+      .filter((c): c is string => !!c).map((c) => c.toLowerCase());
+    const lista = [...new Set(telefonos)].map((v) => ({ tipo: 'TELEFONO', valor: v })).concat([...new Set(correos)].map((v) => ({ tipo: 'CORREO', valor: v })));
+    if (lista.length) {
+      const r = await tx.query(
+        `INSERT INTO medios_contacto (cliente_id, tipo, valor, origen)
+         SELECT $1, x.tipo, x.valor, 'BASE' FROM jsonb_to_recordset($2::jsonb) AS x(tipo text, valor text)
+         ON CONFLICT (cliente_id, tipo, valor) DO NOTHING RETURNING id`, [clienteId, JSON.stringify(lista)],
+      );
+      if (r.length) cambio = true;
+    }
     return cambio;
   }
 
@@ -552,7 +647,7 @@ export class BasesService {
         err('DATO_INVALIDO', `Operador no reconocido: "${datos.operador}". Usa ${[...operadores.keys()].map((o) => o.charAt(0) + o.slice(1).toLowerCase()).join(', ')} o déjalo vacío`, ruc); continue;
       }
 
-      const nueva: FilaValida = { fila, ruc, razon: razon.slice(0, 200), distritoId: distrito, contactos, lineas, operadorId, clienteId: null, cambios: null };
+      const nueva: FilaValida = { fila, ruc, razon: razon.slice(0, 200), distritoId: distrito, contactos, extras: leerExtras(datos), lineas, operadorId, clienteId: null, cambios: null };
       // Ya está en el CRM: no se repite; se ve qué datos completa y en cuáles difiere
       const foto = enCrm.get(ruc);
       if (foto) {
@@ -573,7 +668,8 @@ export class BasesService {
       `SELECT c.id, c.ruc, c.razon_social AS razon, c.distrito_id AS "distritoId", c.lineas_actuales AS lineas, c.operador_actual_id AS "operadorId",
               CASE WHEN u.id IS NULL THEN NULL ELSE u.nombres || ' ' || u.apellidos END AS asesor,
               COALESCE((SELECT jsonb_agg(jsonb_build_object('nombre', k.nombre, 'celular', k.celular, 'correo', k.correo, 'dni', k.dni, 'posicion', k.posicion)
-                                          ORDER BY k.posicion) FROM contactos k WHERE k.cliente_id = c.id), '[]') AS contactos
+                                          ORDER BY k.posicion) FROM contactos k WHERE k.cliente_id = c.id), '[]') AS contactos,
+              COALESCE((SELECT jsonb_agg(m.valor) FROM medios_contacto m WHERE m.cliente_id = c.id), '[]') AS medios
        FROM clientes c LEFT JOIN usuarios u ON u.id = c.asesor_id WHERE c.ruc = ANY($1)${bloquear ? ' FOR UPDATE OF c' : ''}`, [rucs],
     );
     return new Map(filas.map((f) => [f.ruc.trim(), f]));

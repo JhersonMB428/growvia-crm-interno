@@ -1,0 +1,48 @@
+/* ===== Personas de contacto y medios de la empresa ===== */
+.personas { display: flex; flex-direction: column; gap: 14px; }
+.personas .h2 { display: inline-flex; align-items: center; gap: 8px; }
+.personas__ayuda { margin: 0; font-size: 14px; color: var(--texto-suave); line-height: 1.5; }
+.personas__lista { display: grid; grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); gap: 12px; }
+
+.persona {
+  display: flex; flex-direction: column; gap: 4px; padding: 14px 16px; border-radius: 14px;
+  background: var(--campo-fondo); border: 1px solid var(--linea); min-width: 0;
+}
+.persona--decisor { border-color: var(--acento); box-shadow: inset 3px 0 0 var(--acento); }
+.persona__cabecera { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 6px; }
+.persona__rol { font-size: 12px; font-weight: 700; color: var(--texto-tenue); text-transform: uppercase; letter-spacing: .05em; }
+.persona__nombre { font-size: 15px; overflow-wrap: anywhere; }
+.persona__dato { font-size: 14px; color: var(--texto-suave); }
+.persona__dato--falta { color: var(--texto-tenue); font-style: italic; }
+.persona__enlace { text-decoration: none; font-size: 14px; overflow-wrap: anywhere; }
+.persona__nota { font-size: 13px; color: var(--texto-suave); font-style: italic; }
+.persona__meta { font-size: 12px; color: var(--texto-tenue); margin-top: 2px; }
+.persona__acciones { display: flex; flex-wrap: wrap; gap: 2px 10px; margin-top: 6px; padding-top: 8px; border-top: 1px solid var(--linea); }
+.persona__acciones .boton-texto { font-size: 13px; padding: 2px 0; }
+.boton-texto--peligro { color: var(--salir); }
+
+.persona-form { display: flex; flex-direction: column; gap: 12px; padding: 16px; border-radius: 14px; border: 1px solid var(--acento); background: var(--campo-fondo); }
+.persona-form__titulo, .h3 { margin: 0; font-family: var(--fuente-titulos); font-size: 16px; font-weight: 600; }
+
+.medios { display: flex; flex-direction: column; gap: 10px; padding-top: 6px; }
+.medios__lista { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 6px; }
+.medio {
+  display: grid; grid-template-columns: minmax(130px, 1fr) 150px minmax(120px, 1fr); align-items: center; gap: 10px;
+  padding: 6px 12px; border-radius: 12px; border: 1px solid var(--linea); background: var(--campo-fondo);
+}
+.medio__valor { text-decoration: none; font-weight: 600; overflow-wrap: anywhere; }
+.medio .entrada.medio__estado { height: 34px; min-height: 34px; padding: 0 8px; font-size: 13px; }
+.medio__meta { font-size: 12px; color: var(--texto-tenue); text-align: right; }
+.medio--funciona { border-color: var(--acento); }
+.medio--no_existe .medio__valor, .medio--equivocado .medio__valor { text-decoration: line-through; opacity: .7; }
+.medios__agregar { display: flex; gap: 8px; max-width: 460px; }
+.medios__agregar .entrada { flex: 1; }
+@media (max-width: 640px) {
+  .medio { grid-template-columns: 1fr auto; }
+  .medio__meta { grid-column: 1 / -1; text-align: left; }
+}
+
+/* Selector "¿con quién y a qué número?" de la llamada y del formulario de gestión */
+.con-quien { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+.con-quien__llamar { align-self: end; }
+@media (max-width: 640px) { .con-quien { grid-template-columns: 1fr; } }

@@ -20,6 +20,11 @@ export interface Gestion {
   usuario: string;
   /** Segundos en la ficha antes de registrarla (solo lo ven supervisión y gerencia) */
   segundosFicha: number | null;
+  /** Con quién habló y a qué número o correo */
+  contactoId?: string | null;
+  contacto?: string | null;
+  contactoCargo?: string | null;
+  medio?: string | null;
 }
 
 /** Lo que devuelve el registro: si la empresa volvió al repositorio y su nuevo plazo */
@@ -33,6 +38,8 @@ export interface NuevaGestion {
   comentario?: string;
   proximaAccion?: string;
   proximoCanal?: Canal;
+  contactoId?: string;
+  medio?: string;
 }
 
 export interface Notificacion {

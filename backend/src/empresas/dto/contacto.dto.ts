@@ -1,4 +1,4 @@
-import { IsEmail, IsOptional, IsString, Length, Matches } from 'class-validator';
+import { IsEmail, IsOptional, IsString, Length, Matches, MaxLength } from 'class-validator';
 
 export class ContactoDto {
   @IsString()
@@ -19,4 +19,9 @@ export class ContactoDto {
   @IsOptional()
   @IsEmail({}, { message: 'El correo del contacto no es válido' })
   correo?: string;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(80, { message: 'El cargo tiene máximo 80 caracteres' })
+  cargo?: string;
 }

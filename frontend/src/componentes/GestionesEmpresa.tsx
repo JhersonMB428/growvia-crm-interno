@@ -5,6 +5,8 @@ import {
   duracion, estadoProxima, gestionesApi, TEXTO_CANAL, TEXTO_RESULTADO, type Gestion, type GestionRegistrada, type ResultadoGestion,
 } from '../api/gestiones';
 import { fechaHora, FormGestion } from './FormGestion';
+import type { Contacto, Medio } from '../api/empresas';
+import { telefonoLegible, type Objetivo } from '../utilidades/personas';
 import './gestiones.css';
 
 const ESTADO: Record<string, string> = { hecha: '✓ Hecha', no_realizada: '✗ No realizada', pendiente: 'Pendiente' };
@@ -17,10 +19,14 @@ interface Props {
   recarga?: number;
   /** Avisa a la ficha para que actualice el plazo o salga si la empresa se liberó */
   onRegistrada?: (g: GestionRegistrada) => void;
+  personas?: Contacto[];
+  medios?: Medio[];
+  objetivo?: Objetivo;
+  onObjetivo?: (o: Objetivo) => void;
 }
 
 /** Bloque "Gestiones" de la ficha de empresa: registrar y ver la línea de tiempo */
-export function GestionesEmpresa({ empresaId, preseleccion, recarga = 0, onRegistrada }: Props) {
+export function GestionesEmpresa({ empresaId, preseleccion, recarga = 0, onRegistrada, personas, medios, objetivo, onObjetivo }: Props) {
   const [filas, setFilas] = useState<Gestion[] | null>(null);
   const [puedeRegistrar, setPuedeRegistrar] = useState(false);
   const [segundosMinimos, setSegundosMinimos] = useState<number | null>(null);
@@ -52,7 +58,8 @@ export function GestionesEmpresa({ empresaId, preseleccion, recarga = 0, onRegis
         {puedeRegistrar && <Link to="/agenda" className="boton-texto" style={{ textDecoration: 'none' }}>Ver mi agenda →</Link>}
       </div>
 
-      {puedeRegistrar && <FormGestion empresaId={empresaId} idBase="ficha" textoBoton="Registrar gestión" preseleccion={preseleccion} onGuardada={alGuardar} />}
+      {puedeRegistrar && <FormGestion empresaId={empresaId} idBase="ficha" textoBoton="Registrar gestión" preseleccion={preseleccion} onGuardada={alGuardar}
+        personas={personas} medios={medios} objetivo={objetivo} onObjetivo={onObjetivo} />}
       {aviso && <div className="aviso" role="status">{aviso}</div>}
       {error && <div className="alerta" role="alert">{error}</div>}
 
@@ -68,6 +75,12 @@ export function GestionesEmpresa({ empresaId, preseleccion, recarga = 0, onRegis
                 <span className={`chip ${g.resultado === 'INTERESADO' ? 'chip--lima' : g.resultado === 'RECHAZA' ? 'chip--crema' : 'chip--gris'}`}>{TEXTO_RESULTADO[g.resultado]}</span>
                 {g.codigoNegociacion && <span className="tenue numeros">{g.codigoNegociacion}</span>}
               </div>
+              {(g.contacto || g.medio) && (
+                <span className="tenue">
+                  {g.contacto ? <>Con <b>{g.contacto}</b>{g.contactoCargo ? ` (${g.contactoCargo})` : ''}</> : 'Al número'}
+                  {g.medio ? ` · ${telefonoLegible(g.medio)}` : ''}
+                </span>
+              )}
               <p>{g.comentario}</p>
               {g.proximaAccion && g.proximoCanal && estado && (
                 <span className={`proxima proxima--${estado}`}>
