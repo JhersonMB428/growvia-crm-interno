@@ -120,7 +120,7 @@ export function Bases() {
           )}
 
           <ul style={{ margin: 0, paddingLeft: 18, fontSize: 14, color: 'var(--texto-suave)', lineHeight: 1.6 }}>
-            <li>Columnas obligatorias: <b>RUC</b> y <b>Razón social</b>. Opcionales: departamento, provincia, distrito y hasta 2 contactos.</li>
+            <li>Columnas obligatorias: <b>RUC</b> y <b>Razón social</b>. Opcionales: departamento, provincia, distrito, representante y contactos. Las columnas <b>Otros contactos</b>, <b>Otros teléfonos</b> y <b>Otros correos</b> (las que arma Growvia Datos) agregan todas las personas y números de la empresa.</li>
             <li><b>No se crean empresas repetidas.</b> Si un RUC ya está en el CRM, la base solo completa los datos que le faltan (operador, líneas, representante, teléfono…). Si un dato es distinto, al aprobar se elige cuál se queda.</li>
             <li>Los RUC repetidos dentro del mismo archivo se cargan una sola vez.</li>
           </ul>

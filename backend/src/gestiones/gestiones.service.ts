@@ -15,12 +15,14 @@ const COLUMNAS = `
   g.id, g.cliente_id AS "clienteId", c.razon_social AS "razonSocial", g.oportunidad_id AS "oportunidadId", o.codigo AS "codigoNegociacion",
   g.canal, g.resultado, g.comentario, g.proxima_accion AS "proximaAccion", g.proximo_canal AS "proximoCanal",
   g.proxima_hecha_at AS "proximaHechaAt", g.reprogramaciones, g.created_at AS fecha, g.segundos_ficha AS "segundosFicha",
-  u.nombres || ' ' || u.apellidos AS usuario`;
+  u.nombres || ' ' || u.apellidos AS usuario,
+  g.contacto_id AS "contactoId", k.nombre AS contacto, k.cargo AS "contactoCargo", g.medio`;
 const UNIONES = `
   FROM gestiones g
   JOIN clientes c ON c.id = g.cliente_id
   JOIN usuarios u ON u.id = g.usuario_id
-  LEFT JOIN oportunidades o ON o.id = g.oportunidad_id`;
+  LEFT JOIN oportunidades o ON o.id = g.oportunidad_id
+  LEFT JOIN contactos k ON k.id = g.contacto_id`;
 
 @Injectable()
 export class GestionesService {
@@ -75,13 +77,28 @@ export class GestionesService {
         [s.sub, dto.clienteId, desde],
       );
       const comentario = dto.comentario?.trim() || (dto.resultado === 'RECHAZA' ? 'No está interesado.' : 'No contestó.');
+      if (dto.contactoId) {
+        const [k] = await tx.query(`SELECT 1 FROM contactos WHERE id = $1 AND cliente_id = $2`, [dto.contactoId, dto.clienteId]);
+        if (!k) throw new BadRequestException('Esa persona no es de esta empresa');
+      }
+      const medio = dto.medio?.trim() ? (dto.medio.includes('@') ? dto.medio.trim().toLowerCase() : dto.medio.replace(/\D/g, '')) : null;
       const [g] = await tx.query(
-        `INSERT INTO gestiones (cliente_id, oportunidad_id, usuario_id, canal, resultado, comentario, proxima_accion, proximo_canal, segundos_ficha)
-         VALUES ($1, (SELECT id FROM oportunidades WHERE cliente_id = $1 AND resultado = 'EN_CURSO'), $2, $3, $4, $5, $6, $7, $8)
+        `INSERT INTO gestiones (cliente_id, oportunidad_id, usuario_id, canal, resultado, comentario, proxima_accion, proximo_canal, segundos_ficha,
+                                contacto_id, medio)
+         VALUES ($1, (SELECT id FROM oportunidades WHERE cliente_id = $1 AND resultado = 'EN_CURSO'), $2, $3, $4, $5, $6, $7, $8, $9, $10)
          RETURNING id`,
         [dto.clienteId, s.sub, dto.canal, dto.resultado, comentario,
-          dto.proximaAccion ?? null, dto.proximaAccion ? dto.proximoCanal : null, segundos],
+          dto.proximaAccion ?? null, dto.proximaAccion ? dto.proximoCanal : null, segundos, dto.contactoId ?? null, medio || null],
       );
+      // El número o correo usado queda marcado: contestaron → funciona; no contestaron → no contesta (si no se sabía que funcionaba)
+      if (medio && dto.resultado !== 'OTRO') {
+        const contesto = dto.resultado !== 'NO_CONTESTA';
+        await tx.query(
+          `UPDATE medios_contacto SET estado = $4, actualizado_por = $5, actualizado_at = now()
+           WHERE cliente_id = $1 AND tipo = $2 AND valor = $3 AND ($6 OR estado IN ('SIN_PROBAR', 'NO_CONTESTA'))`,
+          [dto.clienteId, medio.includes('@') ? 'CORREO' : 'TELEFONO', medio, contesto ? 'FUNCIONA' : 'NO_CONTESTA', s.sub, contesto],
+        );
+      }
       await tx.query(`UPDATE clientes SET ultima_gestion_at = now(), prorrogada = false, updated_at = now() WHERE id = $1`, [dto.clienteId]);
 
       // Las ventas no se liberan nunca

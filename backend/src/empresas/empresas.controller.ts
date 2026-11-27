@@ -1,9 +1,10 @@
-import { Body, Controller, Get, Param, ParseUUIDPipe, Post, Put, Query } from '@nestjs/common';
+import { Body, Controller, Delete, Get, Param, ParseUUIDPipe, Post, Put, Query } from '@nestjs/common';
 import { RequierePermisos } from '../auth/decorators/requiere-permisos.decorator';
 import { SesionUsuario, UsuarioActual } from '../auth/decorators/usuario-actual.decorator';
 import { ContratoActualDto } from './dto/contrato-actual.dto';
 import { CorregirEmpresaDto, CrearEmpresaDto, GuardarContactosDto } from './dto/crear-empresa.dto';
 import { ListarEmpresasDto } from './dto/listar.dto';
+import { EstadoMedioDto, NuevoMedioDto, PersonaDto } from './dto/persona.dto';
 import { ReasignarDto } from './dto/reasignar.dto';
 import { EmpresasService } from './empresas.service';
 import { LiberacionService } from './liberacion.service';
@@ -63,6 +64,38 @@ export class EmpresasController {
   @RequierePermisos('INFO_COMERCIAL_VER')
   contactos(@Param('id', ParseUUIDPipe) id: string, @Body() dto: GuardarContactosDto, @UsuarioActual() s: SesionUsuario) {
     return this.empresas.guardarContactos(id, dto.contactos, s);
+  }
+
+  /** Más personas de la empresa: otros representantes, quien decide la compra, etc. (asesor a cargo o back office) */
+  @Post(':id/personas')
+  @RequierePermisos('INFO_COMERCIAL_VER')
+  agregarPersona(@Param('id', ParseUUIDPipe) id: string, @Body() dto: PersonaDto, @UsuarioActual() s: SesionUsuario) {
+    return this.empresas.agregarPersona(id, dto, s);
+  }
+
+  @Put(':id/personas/:contactoId')
+  @RequierePermisos('INFO_COMERCIAL_VER')
+  editarPersona(@Param('id', ParseUUIDPipe) id: string, @Param('contactoId', ParseUUIDPipe) contactoId: string, @Body() dto: PersonaDto, @UsuarioActual() s: SesionUsuario) {
+    return this.empresas.editarPersona(id, contactoId, dto, s);
+  }
+
+  @Delete(':id/personas/:contactoId')
+  @RequierePermisos('INFO_COMERCIAL_VER')
+  quitarPersona(@Param('id', ParseUUIDPipe) id: string, @Param('contactoId', ParseUUIDPipe) contactoId: string, @UsuarioActual() s: SesionUsuario) {
+    return this.empresas.quitarPersona(id, contactoId, s);
+  }
+
+  /** Teléfonos y correos de la empresa: agregar uno o marcar si funciona */
+  @Post(':id/medios')
+  @RequierePermisos('INFO_COMERCIAL_VER')
+  agregarMedio(@Param('id', ParseUUIDPipe) id: string, @Body() dto: NuevoMedioDto, @UsuarioActual() s: SesionUsuario) {
+    return this.empresas.agregarMedio(id, dto, s);
+  }
+
+  @Put(':id/medios/:medioId')
+  @RequierePermisos('INFO_COMERCIAL_VER')
+  estadoMedio(@Param('id', ParseUUIDPipe) id: string, @Param('medioId', ParseUUIDPipe) medioId: string, @Body() dto: EstadoMedioDto, @UsuarioActual() s: SesionUsuario) {
+    return this.empresas.estadoMedio(id, medioId, dto, s);
   }
 
   /** Operador y fin de contrato actuales del prospecto (el servicio revisa quién puede) */

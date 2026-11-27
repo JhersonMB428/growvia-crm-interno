@@ -100,7 +100,7 @@ export function NuevoProspecto() {
         </section>
 
         <section style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
-          <h2 className="h2">Contactos <span style={{ fontSize: 14, fontWeight: 500, color: 'var(--texto-tenue)' }}>· máximo 2</span></h2>
+          <h2 className="h2">Contactos <span style={{ fontSize: 14, fontWeight: 500, color: 'var(--texto-tenue)' }}>· después puedes agregar más personas en la ficha</span></h2>
           <EditorContactos contactos={contactos} onChange={setContactos} mostrarErrores={intentado} telefonoRepOpcional />
         </section>
 

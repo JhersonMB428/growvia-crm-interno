@@ -2,6 +2,8 @@ import { useEffect, useState } from 'react';
 import { ErrorApi } from '../api/cliente';
 import { empresasApi, fechaHoraPlazo, plazo, type EmpresaDetalle } from '../api/empresas';
 import { gestionesApi, type GestionRegistrada, type ResultadoGestion } from '../api/gestiones';
+import { telefonoLegible, type Objetivo } from '../utilidades/personas';
+import { ConQuien } from './ConQuien';
 import './llamada.css';
 
 interface Props {
@@ -11,13 +13,16 @@ interface Props {
   onRegistrada: (g: GestionRegistrada) => void;
   onMantenida: (retencionHasta: string) => void;
   onLiberada: () => void;
+  /** A quién y a qué número se está llamando (se comparte con el formulario de gestiones) */
+  objetivo?: Objetivo;
+  onObjetivo?: (o: Objetivo) => void;
 }
 
 /**
  * Arriba de la ficha, para el asesor a cargo: el resultado de la llamada con un clic,
  * cuánto falta para que la empresa vuelva al repositorio, "Mantener 24 h más" y "Liberar".
  */
-export function LlamadaRapida({ empresa, onPreseleccion, onRegistrada, onMantenida, onLiberada }: Props) {
+export function LlamadaRapida({ empresa, onPreseleccion, onRegistrada, onMantenida, onLiberada, objetivo, onObjetivo }: Props) {
   const [ocupado, setOcupado] = useState<'' | 'NO_CONTESTA' | 'RECHAZA' | 'mantener' | 'liberar'>('');
   const [confirmar, setConfirmar] = useState<'' | 'RECHAZA' | 'liberar'>('');
   const [error, setError] = useState('');
@@ -32,7 +37,12 @@ export function LlamadaRapida({ empresa, onPreseleccion, onRegistrada, onManteni
 
   async function rapida(resultado: 'NO_CONTESTA' | 'RECHAZA') {
     setOcupado(resultado); setError(''); setConfirmar('');
-    try { onRegistrada(await gestionesApi.crear({ clienteId: empresa.id, canal: 'LLAMADA', resultado })); }
+    try {
+      onRegistrada(await gestionesApi.crear({
+        clienteId: empresa.id, canal: 'LLAMADA', resultado,
+        ...(objetivo?.contactoId ? { contactoId: objetivo.contactoId } : {}), ...(objetivo?.medio ? { medio: objetivo.medio } : {}),
+      }));
+    }
     catch (e) { setError(e instanceof ErrorApi ? e.message : 'No se pudo registrar la llamada'); }
     finally { setOcupado(''); }
   }
@@ -64,6 +74,15 @@ export function LlamadaRapida({ empresa, onPreseleccion, onRegistrada, onManteni
           </div>
         )}
       </div>
+
+      {objetivo && onObjetivo && ((empresa.contactos?.length ?? 0) > 0 || (empresa.medios?.length ?? 0) > 0) && (
+        <div className="llamada__a-quien">
+          <ConQuien idBase="llamada" personas={empresa.contactos ?? []} medios={empresa.medios ?? []} valor={objetivo} onChange={onObjetivo} />
+          {objetivo.medio && !objetivo.medio.includes('@') && (
+            <a className="boton con-quien__llamar numeros" href={`tel:${objetivo.medio}`}>✆ Llamar al {telefonoLegible(objetivo.medio)}</a>
+          )}
+        </div>
+      )}
 
       <div className="llamada__botones">
         <button type="button" className="llamada__opcion" disabled={!!ocupado} onClick={() => rapida('NO_CONTESTA')}>

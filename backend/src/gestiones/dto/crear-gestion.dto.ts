@@ -1,5 +1,5 @@
 import { Type } from 'class-transformer';
-import { IsDate, IsIn, IsOptional, IsString, IsUUID, Length, ValidateIf } from 'class-validator';
+import { IsDate, IsIn, IsOptional, IsString, IsUUID, Length, MaxLength, ValidateIf } from 'class-validator';
 
 export const CANALES = ['LLAMADA', 'WHATSAPP', 'CORREO', 'VISITA'] as const;
 export const RESULTADOS = ['INTERESADO', 'NO_CONTESTA', 'VOLVER_A_LLAMAR', 'RECHAZA', 'OTRO'] as const;
@@ -32,4 +32,15 @@ export class CrearGestionDto {
   @ValidateIf((o: CrearGestionDto) => !!o.proximaAccion)
   @IsIn(CANALES, { message: 'Elige cómo será la próxima acción' })
   proximoCanal?: Canal;
+
+  /** Con quién habló (una de las personas de la empresa). Opcional. */
+  @IsOptional()
+  @IsUUID('4', { message: 'Persona no válida' })
+  contactoId?: string;
+
+  /** Teléfono o correo que usó. Opcional. */
+  @IsOptional()
+  @IsString()
+  @MaxLength(150)
+  medio?: string;
 }

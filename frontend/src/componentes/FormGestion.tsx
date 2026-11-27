@@ -5,6 +5,9 @@ import {
   type Canal, type GestionRegistrada, type ResultadoGestion,
 } from '../api/gestiones';
 import { problemaFechaHora } from '../utilidades/validacion';
+import type { Contacto, Medio } from '../api/empresas';
+import type { Objetivo } from '../utilidades/personas';
+import { ConQuien } from './ConQuien';
 import { AyudaCampo, Faltantes } from './Faltantes';
 import './gestiones.css';
 
@@ -22,10 +25,15 @@ interface Props {
   preseleccion?: { resultado: ResultadoGestion; n: number } | null;
   onGuardada: (g: GestionRegistrada) => void;
   onCancelar?: () => void;
+  /** Personas y teléfonos de la empresa: para elegir con quién se habló y a qué número */
+  personas?: Contacto[];
+  medios?: Medio[];
+  objetivo?: Objetivo;
+  onObjetivo?: (o: Objetivo) => void;
 }
 
 /** Formulario para registrar una gestión hecha (y opcionalmente agendar la siguiente) */
-export function FormGestion({ empresaId, idBase = 'g', canalInicial = 'LLAMADA', textoBoton = 'Guardar gestión', preseleccion, onGuardada, onCancelar }: Props) {
+export function FormGestion({ empresaId, idBase = 'g', canalInicial = 'LLAMADA', textoBoton = 'Guardar gestión', preseleccion, onGuardada, onCancelar, personas, medios, objetivo, onObjetivo }: Props) {
   const [canal, setCanal] = useState<Canal>(canalInicial);
   const [resultado, setResultado] = useState<ResultadoGestion | ''>('');
   const [comentario, setComentario] = useState('');
@@ -76,6 +84,8 @@ export function FormGestion({ empresaId, idBase = 'g', canalInicial = 'LLAMADA',
       const g = await gestionesApi.crear({
         clienteId: empresaId, canal, resultado, ...(comentario.trim() ? { comentario: comentario.trim() } : {}),
         ...(agendar ? { proximaAccion: unirFechaHora(fecha, hora), proximoCanal } : {}),
+        ...(objetivo?.contactoId ? { contactoId: objetivo.contactoId } : {}),
+        ...(objetivo?.medio ? { medio: objetivo.medio } : {}),
       });
       setResultado(''); setComentario(''); setAgendar(false); setFecha(masDias(1)); setHora('09:00'); setIntentado(false);
       onGuardada(g);
@@ -98,6 +108,9 @@ export function FormGestion({ empresaId, idBase = 'g', canalInicial = 'LLAMADA',
           ))}
         </div>
       </div>
+      {personas && objetivo && onObjetivo && (personas.length > 0 || (medios?.length ?? 0) > 0) && (
+        <ConQuien idBase={idBase} personas={personas} medios={medios ?? []} valor={objetivo} onChange={onObjetivo} />
+      )}
       <div className="gestion-form__fila">
         <span className="etiqueta obligatorio">Resultado</span>
         <div className="chips-opcion" role="radiogroup" aria-label="Resultado">

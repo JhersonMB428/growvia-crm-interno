@@ -55,7 +55,7 @@ export const TEXTO_ACCION: Record<string, string> = {
   EMPRESA_CREAR: 'Registró una empresa', EMPRESA_TOMAR: 'Tomó una empresa', EMPRESA_REASIGNAR: 'Reasignó una empresa',
   EMPRESA_MANTENER: 'Mantuvo una empresa 24 h más', EMPRESA_LIBERAR: 'Devolvió una empresa al repositorio',
   ROL_ELEGIR: 'Eligió con qué rol usar el CRM (soporte)',
-  EMPRESA_CORREGIR: 'Corrigió datos de la empresa', CONTACTOS_EDITAR: 'Editó contactos', EMPRESA_CONTRATO: 'Registró su contrato actual',
+  EMPRESA_CORREGIR: 'Corrigió datos de la empresa', CONTACTOS_EDITAR: 'Editó contactos', PERSONA_AGREGAR: 'Agregó una persona de contacto', PERSONA_EDITAR: 'Editó una persona de contacto', PERSONA_QUITAR: 'Quitó una persona de contacto', MEDIO_AGREGAR: 'Agregó un teléfono o correo', MEDIO_ESTADO: 'Marcó si un teléfono o correo funciona', EMPRESA_CONTRATO: 'Registró su contrato actual',
   GESTION_REGISTRAR: 'Registró una gestión', GESTION_REPROGRAMAR: 'Reprogramó una gestión',
   NEGOCIACION_CREAR: 'Abrió una negociación', NEGOCIACION_EDITAR: 'Editó los servicios', NEGOCIACION_ETAPA: 'Cambió la etapa',
   NEGOCIACION_PERDER: 'Marcó como perdida', VENTA_GANAR: 'Marcó la venta como ganada',

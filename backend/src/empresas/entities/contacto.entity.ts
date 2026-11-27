@@ -22,7 +22,21 @@ export class Contacto {
   @Column({ type: 'varchar', length: 150, nullable: true })
   correo: string | null;
 
-  /** 1 = principal, 2 = secundario */
+  /** 1 = representante legal, 2 = otro contacto (con teléfono), 3 en adelante = más personas de la empresa */
   @Column({ type: 'smallint' })
-  posicion: 1 | 2;
+  posicion: number;
+
+  @Column({ type: 'varchar', length: 80, nullable: true })
+  cargo: string | null;
+
+  /** Es quien toma la decisión de compra */
+  @Column({ default: false })
+  decisor: boolean;
+
+  /** SUNAT, BASE (llegó en una base cargada) o ASESORA (la agregó alguien del equipo) */
+  @Column({ type: 'varchar', length: 10, default: 'ASESORA' })
+  origen: 'SUNAT' | 'BASE' | 'ASESORA';
+
+  @Column({ type: 'varchar', length: 200, nullable: true })
+  nota: string | null;
 }

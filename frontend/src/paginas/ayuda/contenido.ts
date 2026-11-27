@@ -84,7 +84,8 @@ const ASESOR: Tema[] = [
     pasos: [
       'Repositorio: en “Mis empresas” abre la pestaña Repositorio. Las empresas libres se toman con un clic y quedan a tu cargo al instante.',
       'Nuevo prospecto: en “Mis empresas” pulsa “+ Nuevo prospecto”. Escribe el RUC: si ya existe, el CRM te avisa en rojo y te dice quién la tiene.',
-      'Cada empresa tiene máximo 2 contactos (nombre, celular y correo).',
+      'Cada empresa puede tener todas las personas de contacto que haga falta: el representante legal, otro contacto y quien de verdad decide la compra (márcala con “Decide la compra”).',
+      'En “Teléfonos y correos de la empresa” anota cuál funciona. Al registrar una gestión eligiendo con quién hablaste y a qué número, se marca solo.',
       'Las bases de empresas las cargan tu supervisor o gerencia: te llegan asignadas o al repositorio.',
     ],
     consejo: 'Cada empresa tiene un plazo: si tomas una y no registras una gestión en 24 horas, vuelve sola al repositorio. En “Mis empresas” ves cuánto le queda a cada una.',

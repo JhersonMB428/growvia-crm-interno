@@ -5,6 +5,7 @@ import { DataSource, EntityManager } from 'typeorm';
 import { SesionUsuario } from '../auth/decorators/usuario-actual.decorator';
 import { ParametrosService } from '../sistema/parametros.service';
 import { ContactoDto } from './dto/contacto.dto';
+import { EstadoMedioDto, NuevoMedioDto, PersonaDto } from './dto/persona.dto';
 import { CrearEmpresaDto } from './dto/crear-empresa.dto';
 import { ListarEmpresasDto } from './dto/listar.dto';
 import { errorRuc } from './ruc';
@@ -99,7 +100,7 @@ export class EmpresasService {
          VALUES ($1, $2, $3, $4, 'PROSPECCION', now(), now(), $4, $5) RETURNING id`,
         [dto.ruc, dto.razonSocial.trim(), dto.distritoId, sesion.sub, retencion],
       );
-      await this.reemplazarContactos(tx, c.id, dto.contactos);
+      await this.reemplazarContactos(tx, c.id, dto.contactos, sesion.sub);
       await tx.query(
         `INSERT INTO asignaciones (cliente_id, asesor_nuevo, motivo, asignado_por) VALUES ($1, $2, 'CREACION', $2)`,
         [c.id, sesion.sub],
@@ -145,7 +146,17 @@ export class EmpresasService {
     if (!verComercial) return { ...general, libre: !e.asesorId, contactos: null, historial: null, puedeEditar: false };
 
     const contactos = await this.db.query(
-      `SELECT id, nombre, celular, correo, dni, posicion FROM contactos WHERE cliente_id = $1 ORDER BY posicion`, [id],
+      `SELECT k.id, k.nombre, k.celular, k.correo, k.dni, k.posicion, k.cargo, k.decisor, k.origen, k.nota, k.created_at AS "creadoAt",
+              CASE WHEN u.id IS NULL THEN NULL ELSE u.nombres || ' ' || u.apellidos END AS "creadoPor",
+              (SELECT max(g.created_at) FROM gestiones g WHERE g.contacto_id = k.id) AS "ultimaGestion"
+       FROM contactos k LEFT JOIN usuarios u ON u.id = k.creado_por WHERE k.cliente_id = $1 ORDER BY k.posicion`, [id],
+    );
+    // Teléfonos y correos de la empresa, con lo que pasó al usarlos
+    const medios = await this.db.query(
+      `SELECT m.id, m.tipo, m.valor, m.origen, m.estado, m.nota, m.actualizado_at AS "actualizadoAt",
+              CASE WHEN u.id IS NULL THEN NULL ELSE u.nombres || ' ' || u.apellidos END AS "actualizadoPor"
+       FROM medios_contacto m LEFT JOIN usuarios u ON u.id = m.actualizado_por WHERE m.cliente_id = $1
+       ORDER BY m.tipo DESC, CASE m.estado WHEN 'FUNCIONA' THEN 0 WHEN 'SIN_PROBAR' THEN 1 WHEN 'NO_CONTESTA' THEN 2 ELSE 3 END, m.created_at`, [id],
     );
     // Contrato con su operador actual (para saber cuándo ofrecer la portabilidad)
     const [contratoActual] = await this.db.query(
@@ -167,7 +178,7 @@ export class EmpresasService {
        WHERE a.cliente_id = $1 ORDER BY a.created_at DESC LIMIT 20`, [id],
     );
     return {
-      ...general, libre: !e.asesorId, contactos, historial, contratoActual, puedeEditar: e.asesorId === sesion.sub, prorrogada,
+      ...general, libre: !e.asesorId, contactos, medios, historial, contratoActual, puedeEditar: e.asesorId === sesion.sub, prorrogada,
       // Back office y admin mantienen la base de clientes actualizada
       puedeCorregirDatos: sesion.permisos.includes('EMPRESA_EDITAR'),
     };
@@ -219,16 +230,109 @@ export class EmpresasService {
     return this.detalle(id, sesion);
   }
 
-  // ───────────── Contactos (máximo 2) ─────────────
+  // ───────────── Representante legal y otro contacto (posiciones 1 y 2) ─────────────
   async guardarContactos(id: string, contactos: ContactoDto[], sesion: SesionUsuario) {
+    await this.asegurarEditor(id, sesion);
+    await this.db.transaction((tx) => this.reemplazarContactos(tx, id, contactos, sesion.sub));
+    return this.detalle(id, sesion);
+  }
+
+  // ───────────── Más personas de la empresa (sin límite) ─────────────
+  async agregarPersona(id: string, dto: PersonaDto, sesion: SesionUsuario) {
+    await this.asegurarEditor(id, sesion);
+    await this.db.transaction(async (tx) => {
+      const iguales = await tx.query(
+        `SELECT 1 FROM contactos WHERE cliente_id = $1 AND (($2::text IS NOT NULL AND dni = $2) OR ${SIN_TILDES('nombre')} = $3)`,
+        [id, dto.dni || null, sinTildes(dto.nombre.trim())],
+      );
+      if (iguales.length) throw new ConflictException('Esa persona ya está registrada en esta empresa');
+      await tx.query(
+        `INSERT INTO contactos (cliente_id, nombre, cargo, celular, correo, dni, decisor, nota, origen, creado_por, posicion)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, 'ASESORA', $9,
+                 GREATEST(3, (SELECT COALESCE(max(posicion), 0) + 1 FROM contactos WHERE cliente_id = $1)))`,
+        [id, dto.nombre.trim(), dto.cargo?.trim() || null, dto.celular || null, dto.correo?.trim().toLowerCase() || null,
+          dto.dni || null, !!dto.decisor, dto.nota?.trim() || null, sesion.sub],
+      );
+      await this.registrarMedios(tx, id, [dto.celular], [dto.correo], 'ASESORA');
+    });
+    return this.detalle(id, sesion);
+  }
+
+  async editarPersona(id: string, contactoId: string, dto: PersonaDto, sesion: SesionUsuario) {
+    await this.asegurarEditor(id, sesion);
+    const [k] = await this.db.query(`SELECT posicion FROM contactos WHERE id = $1 AND cliente_id = $2`, [contactoId, id]);
+    if (!k) throw new NotFoundException('La persona no existe');
+    if (k.posicion === 2 && !dto.celular) throw new BadRequestException('El otro contacto necesita teléfono');
+    await this.db.transaction(async (tx) => {
+      await tx.query(
+        `UPDATE contactos SET nombre = $3, cargo = $4, celular = $5, correo = $6, dni = $7, decisor = $8, nota = $9
+         WHERE id = $1 AND cliente_id = $2`,
+        [contactoId, id, dto.nombre.trim(), dto.cargo?.trim() || null, dto.celular || null, dto.correo?.trim().toLowerCase() || null,
+          dto.dni || null, !!dto.decisor, dto.nota?.trim() || null],
+      );
+      await this.registrarMedios(tx, id, [dto.celular], [dto.correo], 'ASESORA');
+    });
+    return this.detalle(id, sesion);
+  }
+
+  /** El representante legal y el otro contacto se cambian, no se quitan; las demás personas sí */
+  async quitarPersona(id: string, contactoId: string, sesion: SesionUsuario) {
+    await this.asegurarEditor(id, sesion);
+    const [k] = await this.db.query(`SELECT posicion FROM contactos WHERE id = $1 AND cliente_id = $2`, [contactoId, id]);
+    if (!k) throw new NotFoundException('La persona no existe');
+    if (k.posicion <= 2) throw new BadRequestException('El representante legal y el otro contacto no se quitan: edítalos');
+    await this.db.query(`DELETE FROM contactos WHERE id = $1`, [contactoId]);
+    return this.detalle(id, sesion);
+  }
+
+  // ───────────── Teléfonos y correos de la empresa ─────────────
+  async agregarMedio(id: string, dto: NuevoMedioDto, sesion: SesionUsuario) {
+    await this.asegurarEditor(id, sesion);
+    const valor = dto.tipo === 'TELEFONO' ? dto.valor.replace(/\D/g, '').replace(/^51(?=\d{9}$)/, '') : dto.valor.trim().toLowerCase();
+    if (dto.tipo === 'TELEFONO' && !/^[90]\d{8}$/.test(valor)) {
+      throw new BadRequestException('El teléfono debe tener 9 dígitos: celular (9…) o fijo con código de ciudad (01…, 044…)');
+    }
+    if (dto.tipo === 'CORREO' && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(valor)) throw new BadRequestException('El correo no es válido');
+    const r = await this.db.query(
+      `INSERT INTO medios_contacto (cliente_id, tipo, valor, origen, actualizado_por, actualizado_at) VALUES ($1, $2, $3, 'ASESORA', $4, now())
+       ON CONFLICT (cliente_id, tipo, valor) DO NOTHING RETURNING id`, [id, dto.tipo, valor, sesion.sub],
+    );
+    if (!r.length) throw new ConflictException(dto.tipo === 'TELEFONO' ? 'Ese teléfono ya está en la lista' : 'Ese correo ya está en la lista');
+    return this.detalle(id, sesion);
+  }
+
+  async estadoMedio(id: string, medioId: string, dto: EstadoMedioDto, sesion: SesionUsuario) {
+    await this.asegurarEditor(id, sesion);
+    const r = await this.db.query(
+      `UPDATE medios_contacto SET estado = $3, nota = COALESCE($4, nota), actualizado_por = $5, actualizado_at = now()
+       WHERE id = $1 AND cliente_id = $2 RETURNING id`, [medioId, id, dto.estado, dto.nota?.trim() || null, sesion.sub],
+    );
+    if (!r.length) throw new NotFoundException('Ese teléfono o correo no existe');
+    return this.detalle(id, sesion);
+  }
+
+  /** Teléfonos y correos nuevos a la lista de la empresa (los repetidos se ignoran) */
+  async registrarMedios(tx: EntityManager, clienteId: string, telefonos: (string | null | undefined)[], correos: (string | null | undefined)[], origen: 'SUNAT' | 'BASE' | 'ASESORA') {
+    const lista = [
+      ...telefonos.filter((t): t is string => !!t && /^[90]\d{8}$/.test(t)).map((v) => ({ tipo: 'TELEFONO', valor: v })),
+      ...correos.filter((c): c is string => !!c && c.includes('@')).map((v) => ({ tipo: 'CORREO', valor: v.trim().toLowerCase().slice(0, 150) })),
+    ];
+    if (!lista.length) return;
+    await tx.query(
+      `INSERT INTO medios_contacto (cliente_id, tipo, valor, origen)
+       SELECT $1, x.tipo, x.valor, $3 FROM jsonb_to_recordset($2::jsonb) AS x(tipo text, valor text)
+       ON CONFLICT (cliente_id, tipo, valor) DO NOTHING`, [clienteId, JSON.stringify(lista), origen],
+    );
+  }
+
+  /** Asesor a cargo o back office */
+  private async asegurarEditor(id: string, sesion: SesionUsuario) {
     const [e] = await this.db.query(`SELECT asesor_id AS "asesorId" FROM clientes WHERE id = $1`, [id]);
     if (!e) throw new NotFoundException('La empresa no existe');
     const esDueno = e.asesorId === sesion.sub && sesion.permisos.includes('PROSPECTO_CREAR');
     if (!esDueno && !sesion.permisos.includes('EMPRESA_EDITAR')) {
       throw new ForbiddenException('Solo el asesor a cargo o back office pueden editar los contactos');
     }
-    await this.db.transaction((tx) => this.reemplazarContactos(tx, id, contactos));
-    return this.detalle(id, sesion);
   }
 
   // ───────────── Contrato con su operador actual (asesor a cargo o back office) ─────────────
@@ -344,16 +448,24 @@ export class EmpresasService {
     return asesorId === s.sub;
   }
 
-  private async reemplazarContactos(tx: EntityManager, clienteId: string, contactos: ContactoDto[]) {
+  /** Representante (1) y otro contacto (2). Se actualizan en su lugar para no perder con quién se habló en cada gestión. */
+  private async reemplazarContactos(tx: EntityManager, clienteId: string, contactos: ContactoDto[], usuarioId: string) {
     if (contactos.slice(1, 2).some((c) => !c.celular)) throw new BadRequestException('Falta el teléfono del otro contacto');
-    await tx.query(`DELETE FROM contactos WHERE cliente_id = $1`, [clienteId]);
-    for (const [i, c] of contactos.slice(0, 2).entries()) {
+    for (const posicion of [1, 2]) {
+      const c = contactos[posicion - 1];
+      if (!c) { await tx.query(`DELETE FROM contactos WHERE cliente_id = $1 AND posicion = $2`, [clienteId, posicion]); continue; }
       await tx.query(
-        `INSERT INTO contactos (cliente_id, nombre, celular, correo, dni, posicion) VALUES ($1, $2, $3, $4, $5, $6)`,
+        `INSERT INTO contactos (cliente_id, nombre, celular, correo, dni, cargo, posicion, origen, creado_por)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, 'ASESORA', $8)
+         ON CONFLICT (cliente_id, posicion) DO UPDATE
+           SET nombre = EXCLUDED.nombre, celular = EXCLUDED.celular, correo = EXCLUDED.correo, dni = EXCLUDED.dni,
+               cargo = COALESCE(EXCLUDED.cargo, contactos.cargo)`,
         // Solo el contacto 1 (representante legal) lleva DNI
-        [clienteId, c.nombre.trim(), c.celular || null, c.correo?.trim() || null, i === 0 ? c.dni || null : null, i + 1],
+        [clienteId, c.nombre.trim(), c.celular || null, c.correo?.trim() || null, posicion === 1 ? c.dni || null : null,
+          c.cargo?.trim() || null, posicion, usuarioId],
       );
     }
+    await this.registrarMedios(tx, clienteId, contactos.map((c) => c.celular), contactos.map((c) => c.correo), 'ASESORA');
   }
 
   private async listar(f: ListarEmpresasDto, cond: string[], params: unknown[], sesion: SesionUsuario, orden = 'c.updated_at DESC') {

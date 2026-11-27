@@ -38,11 +38,30 @@ export interface EmpresaResumen {
 
 /** El contacto 1 es el representante legal (SUNAT) y lleva DNI. "celular" es el teléfono: celular o fijo con código.
  *  El representante puede no tener teléfono (si llegó desde SUNAT): en ese caso viene vacío. */
-export interface Contacto { id?: string; nombre: string; celular?: string | null; correo?: string | null; dni?: string | null; posicion?: number }
+export interface Contacto {
+  id?: string; nombre: string; celular?: string | null; correo?: string | null; dni?: string | null; posicion?: number;
+  /** Desde la posición 3: más personas de la empresa (otros representantes, quien decide la compra…) */
+  cargo?: string | null; decisor?: boolean; origen?: 'SUNAT' | 'BASE' | 'ASESORA'; nota?: string | null;
+  creadoPor?: string | null; creadoAt?: string; ultimaGestion?: string | null;
+}
+
+export type EstadoMedio = 'SIN_PROBAR' | 'FUNCIONA' | 'NO_CONTESTA' | 'NO_EXISTE' | 'EQUIVOCADO';
+/** Teléfono o correo de la empresa, con lo que pasó al usarlo */
+export interface Medio {
+  id: string; tipo: 'TELEFONO' | 'CORREO'; valor: string; origen: 'SUNAT' | 'BASE' | 'ASESORA'; estado: EstadoMedio;
+  nota: string | null; actualizadoAt: string | null; actualizadoPor: string | null;
+}
+export const ESTADOS_MEDIO: { valor: EstadoMedio; texto: string }[] = [
+  { valor: 'SIN_PROBAR', texto: 'Sin probar' }, { valor: 'FUNCIONA', texto: 'Funciona' }, { valor: 'NO_CONTESTA', texto: 'No contesta' },
+  { valor: 'NO_EXISTE', texto: 'No existe' }, { valor: 'EQUIVOCADO', texto: 'Equivocado' },
+];
+/** Datos de una persona para agregarla o editarla */
+export interface PersonaNueva { nombre: string; cargo?: string; celular?: string; correo?: string; dni?: string; decisor?: boolean; nota?: string }
 
 export interface EmpresaDetalle extends EmpresaResumen {
   libre: boolean;
   contactos: Contacto[] | null; // null = no tiene permiso para verlos
+  medios?: Medio[];
   historial: { motivo: string; fecha: string; asesorAnterior: string | null; asesorNuevo: string | null; hechoPor: string }[] | null;
   /** Contrato con su operador actual (null = no tiene permiso para verlo) */
   contratoActual?: { operadorId: number | null; operador: string | null; fin: string | null; dias: number | null; lineas: number | null } | null;
@@ -81,6 +100,14 @@ export const empresasApi = {
     api<EmpresaDetalle>(`/empresas/${id}`, { metodo: 'PUT', cuerpo: datos }),
   guardarContactos: (id: string, contactos: Contacto[]) =>
     api<EmpresaDetalle>(`/empresas/${id}/contactos`, { metodo: 'PUT', cuerpo: { contactos } }),
+  agregarPersona: (id: string, p: PersonaNueva) => api<EmpresaDetalle>(`/empresas/${id}/personas`, { metodo: 'POST', cuerpo: p }),
+  editarPersona: (id: string, contactoId: string, p: PersonaNueva) =>
+    api<EmpresaDetalle>(`/empresas/${id}/personas/${contactoId}`, { metodo: 'PUT', cuerpo: p }),
+  quitarPersona: (id: string, contactoId: string) => api<EmpresaDetalle>(`/empresas/${id}/personas/${contactoId}`, { metodo: 'DELETE' }),
+  agregarMedio: (id: string, tipo: 'TELEFONO' | 'CORREO', valor: string) =>
+    api<EmpresaDetalle>(`/empresas/${id}/medios`, { metodo: 'POST', cuerpo: { tipo, valor } }),
+  estadoMedio: (id: string, medioId: string, estado: EstadoMedio) =>
+    api<EmpresaDetalle>(`/empresas/${id}/medios/${medioId}`, { metodo: 'PUT', cuerpo: { estado } }),
   /** Gerencia y admin: asesores activos para reasignar */
   asesores: () => api<{ id: string; nombre: string; equipo: string | null }[]>('/empresas/asesores'),
   reasignar: (id: string, asesorId: string) => api<EmpresaDetalle>(`/empresas/${id}/reasignar`, { metodo: 'POST', cuerpo: { asesorId } }),
